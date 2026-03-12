@@ -1,0 +1,183 @@
+/* Patients.css */
+.patients-page {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.patients-page .toolbar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.patients-page .toolbar .count {
+  font-size: 1.3em;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.patients-page .toolbar .count span {
+  color: #a7a18e;
+}
+
+.patients-page .lists {
+  width: 100%;
+  margin: 10px auto;
+  max-height: 75vh;
+  padding: 15px 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9em;
+  border-radius: 10px;
+}
+
+.patients-page .lists .title {
+  width: calc(100% - 40px);
+  background: rgba(239, 239, 239, 0.61);
+  padding: 20px;
+  border-radius: 10px;
+  display: grid;
+  grid-template-columns: 15% 18% 12% 14% 9% 38%;
+  margin: 20px 0px;
+  color: #666666;
+}
+
+.patients-page .lists .list {
+  width: calc(100% - 40px);
+  display: grid;
+  grid-template-columns: 15% 18% 12% 14% 9%  38%;
+  padding: 15px 20px;
+  border-bottom: 1px solid rgba(109, 109, 109, 0.09);
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
+  align-items: center;
+  font-size: 1em;
+  color: rgb(131, 131, 131);
+}
+.patients-page .lists .list .patientId{
+  font-size: .9em;
+}
+.patients-page .lists .list .risk .risk-color{
+  margin: 0px;
+  font-size: .7em;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 6px;
+  border-radius: 10px;
+  justify-content: center;
+  border: none;
+  gap: 8px;
+  font-weight: bold;
+  max-width: calc(60% - 16px)  !important;
+}
+.patients-page .lists .list .risk  .risk-color .dot{
+  width: 5px;
+  height: 5px;
+  border-radius: 5px;
+}
+.patients-page .lists .list .suspected span{
+  font-size: .9em;
+}
+.patients-page .lists .list .id {
+  color: #666666;
+  font-size: 0.9em;
+  font-family: monospace;
+}
+
+.patients-page .lists .list:hover {
+  transform: translateX(5px);
+}
+
+.patients-page .lists .list:last-child {
+  border-bottom: none;
+}
+
+.patients-page .lists .list .name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.patients-page .lists .list .name span {
+  width: 35px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #e5decb;
+  color: rgba(51, 51, 51, 0.68);
+  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.patients-page .no-results {
+  text-align: center;
+  padding: 40px;
+  color: #8e8e93;
+  font-size: 16px;
+}
+
+/* Scrollbar styling */
+.patients-page .lists::-webkit-scrollbar {
+  width: 6px;
+}
+
+.patients-page .lists::-webkit-scrollbar-track {
+  background: rgba(241, 237, 233, 0.3);
+}
+
+.patients-page .lists::-webkit-scrollbar-thumb {
+  background: rgba(109, 109, 109, 0.3);
+  border-radius: 3px;
+}
+
+.patients-page .lists::-webkit-scrollbar-thumb:hover {
+  background: rgba(109, 109, 109, 0.5);
+}
+
+/* Responsive Design */
+@media screen and (max-width: 1024px) {
+  .patients-page .lists .title,
+  .patients-page .lists .list {
+    grid-template-columns: 20% 12% 15% 10% 10% 10% 10% auto;
+    font-size: 0.85em;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .patients-page .lists .title,
+  .patients-page .lists .list {
+    grid-template-columns: 30% 20% 20% auto;
+  }
+
+  .patients-page .lists .title .hospital,
+  .patients-page .lists .title .risk,
+  .patients-page .lists .title .week,
+  .patients-page .lists .title .createdAt,
+  .patients-page .lists .title .reason,
+  .patients-page .lists .title .suspected {
+    display: none;
+  }
+
+  .patients-page .lists .list .hospital,
+  .patients-page .lists .list .risk,
+  .patients-page .lists .list .week,
+  .patients-page .lists .list .createdAt,
+  .patients-page .lists .list .reason,
+  .patients-page .lists .list .suspected {
+    display: none;
+  }
+}
+
+@media screen and (max-width: 500px) {
+  .patients-page .toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
