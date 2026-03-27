@@ -331,7 +331,7 @@ const ScreeningForm = ({ fields, onSubmit, initialData = {}, isLastStep = false 
     const fieldOptions = field.name === 'hospital' ? hospitalOptions : field.options;
 
     return (
-      <div key={field.name} className="w-[95%] flex flex-col">
+      <div key={field.name} className="w-full lg:w-[95%] flex flex-col">
         <label className="text-sm font-medium text-gray-700 mb-2">
           {field.label}
           {field.required && <span className="text-red-500 ml-1">*</span>}
@@ -434,7 +434,7 @@ const ScreeningForm = ({ fields, onSubmit, initialData = {}, isLastStep = false 
         </div>
       </div> */}
 
-      <div className="grid grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Left column - first 5 fields */}
         <div className="space-y-6">
           {currentFields.slice(0, Math.ceil(currentFields.length / 2)).map(renderField)}

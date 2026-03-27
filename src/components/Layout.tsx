@@ -17,6 +17,7 @@ function Layout() {
 
   useEffect(() => {
     setActiveItem(getActiveFromPath(location.pathname));
+    console.log(internalTab)
   }, [location.pathname]);
 
   return (

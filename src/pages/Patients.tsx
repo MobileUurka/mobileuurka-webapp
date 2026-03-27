@@ -50,9 +50,9 @@ const Patients = ({ setActiveItem }: { setActiveItem?: (val: string) => void }) 
   }, [patients, searchTerm]);
 
   return (
-    <div className="w-full pt-6 h-full flex flex-col bg-white overflow-hidden">
-      <div className="w-full flex justify-between items-center mb-6">
-        <div className="text-[1.3em] font-medium flex items-center gap-3">
+    <div className="w-full pt-4 px-4 sm:pt-6 sm:px-6 h-full flex flex-col bg-white overflow-hidden">
+      <div className="w-full flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <div className="text-lg sm:text-[1.3em] font-medium flex items-center gap-3">
           All Patients <span className='text-[#a7a18e] font-light'>{filteredPatients.length}</span>
         </div>
 

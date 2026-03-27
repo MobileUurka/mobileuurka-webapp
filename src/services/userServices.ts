@@ -33,7 +33,7 @@ export const userService = {
   },
 
   /**
-   * Create a new user (Staff)
+   * Create a new user (Staff) - Legacy method
    */
   createUser: async (userData: any, orgIdForAdmin?: string) => {
     let endpoint = '/users';
@@ -44,6 +44,23 @@ export const userService = {
     }
 
     return await api.post(endpoint, userData);
+  },
+
+  /**
+   * Add user to organization - New method based on your API
+   */
+  addUserToOrganization: async (organizationId: string, userData: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+    phone?: string;
+    specialization?: string;
+    licenseNumber?: string;
+    department?: string;
+  }) => {
+    return await api.post(`/organizations/${organizationId}/users`, userData);
   },
 
   /**

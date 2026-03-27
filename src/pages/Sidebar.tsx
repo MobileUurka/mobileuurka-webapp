@@ -6,9 +6,10 @@ import { FiBell } from "react-icons/fi";
 import { RiBubbleChartLine } from "react-icons/ri";
 import { useNavigate } from "react-router-dom";
 import { LuBuilding2 } from "react-icons/lu";
-import { FaStethoscope } from "react-icons/fa";
+import { authService } from "../services/authServices";
 import { BiChevronLeft } from "react-icons/bi";
 import { TbNurse } from "react-icons/tb";
+import { IoLogOutOutline } from "react-icons/io5";
 
 type SidebarProps = {
     activeItem: string;
@@ -21,6 +22,7 @@ type SidebarProps = {
 const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, sideBarActive }: SidebarProps) => {
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 900);
+    
 
     const navigate = useNavigate();
 
@@ -35,6 +37,7 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
     const activityItems = [
         { name: "Settings", icon: <IoSettingsOutline /> },
         { name: "Alerts", icon: <FiBell />, showBadge: true },
+        { name: "Logout", icon: <IoLogOutOutline /> }
     ];
 
     const handleClick = (name: string) => {
@@ -44,13 +47,30 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
             setSidebarOpen(false); // close mobile sidebar
             navigate(`/`);
         }
+        else if (name == "Logout") {
+            handleLogout();
+        }
         else {
             setActiveItem(name);
             setInternalTab(null);
             setSidebarOpen(false); // close mobile sidebar
             navigate(`/${name}`);
         }
+    };
 
+    const handleLogout = async () => {
+        try {
+            await authService.logout();
+            
+        } catch (error) {
+            console.error("Logout failed, cleaning up local state anyway:", error);
+            // Force clear if the network request fails
+        }
+        finally{
+            localStorage.clear();
+            sessionStorage.clear();
+            window.location.reload();
+        }
     };
 
     // Update mobile state on resize
@@ -108,7 +128,7 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
                                 ${activeItem === item.name ? "bg-bgColor" : "hover:bg-bgColor"}
                             `}
                         >
-                            <span className="text-[#aca287] text-lg flex-shrink-0">
+                            <span className="text-[#aca287] text-lg shrink-0">
                                 {item.icon}
                             </span>
 
@@ -135,7 +155,7 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
                             ${activeItem === item.name ? "bg-bgColor" : "hover:bg-bgColor"}
                         `}
                     >
-                        <span className="text-[#aca287] text-lg flex-shrink-0">
+                        <span className="text-[#aca287] text-lg shrink-0">
                             {item.icon}
                         </span>
 
@@ -152,6 +172,7 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
                         </li>
                     ))}
                 </ul>
+                
             </div>
 
             {/* Mobile Sidebar */}
@@ -199,6 +220,8 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
                                 </li>
                             ))}
                         </ul>
+
+                       
                     </div>
                 </>
             )}

@@ -150,5 +150,72 @@ export const hospitalService = {
             console.error('Error fetching all hospitals:', error);
             throw error;
         }
+    },
+
+    // Search hospitals (mock implementation for testing)
+    async searchHospitals(searchTerm: string): Promise<Hospital[]> {
+        // For testing purposes, return mock data
+        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API delay
+
+        const mockHospitals: Hospital[] = [
+            {
+                id: '1',
+                name: 'Nairobi Hospital',
+                address: '123 Uhuru Highway, Nairobi',
+                phone: '+254712345678',
+                city: 'Nairobi',
+                state: 'Nairobi',
+                type: 'private',
+                totalPatients: 150
+            },
+            {
+                id: '2',
+                name: 'Kenyatta National Hospital',
+                address: '456 Hospital Road, Nairobi',
+                phone: '+254712345679',
+                city: 'Nairobi',
+                state: 'Nairobi',
+                type: 'public',
+                totalPatients: 500
+            },
+            {
+                id: '3',
+                name: 'Aga Khan University Hospital',
+                address: '789 Third Parklands Avenue, Nairobi',
+                phone: '+254712345680',
+                city: 'Nairobi',
+                state: 'Nairobi',
+                type: 'private',
+                totalPatients: 200
+            }
+        ];
+
+        // Filter based on search term
+        return mockHospitals.filter(hospital =>
+            hospital.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            hospital.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            hospital.city.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    },
+
+    // Link hospitals to organization after hospital setup
+    async linkHospitalsToOrganization(requestData: {
+        action: 'join' | 'create';
+        hospitalId?: string;
+        hospitalData?: {
+            name: string;
+            type: string;
+            address: string;
+            phone: string;
+            email: string;
+        };
+    }): Promise<{ success: boolean; message: string; data?: any }> {
+        try {
+            const response = await api.post('/auth/organization/link-hospitals', requestData);
+            return response;
+        } catch (error) {
+            console.error('Error linking hospitals to organization:', error);
+            throw error;
+        }
     }
 };

@@ -67,13 +67,13 @@ export const PATIENT_COLUMNS: ColumnConfig<Patient>[] = [
   {
     label: "Name",
     key: "name",
-    width:"18%",
+    width:"180px",
     render: (patient) => (
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-full bg-[#e5decb] flex items-center justify-center text-xs text-gray-700 shrink-0">
           {patient.firstName?.charAt(0)}{patient.lastName?.charAt(0)}
         </div>
-        <span className="font-medium">
+        <span className="font-medium truncate">
           {patient.firstName} {patient.lastName}
         </span>
       </div>
@@ -82,7 +82,7 @@ export const PATIENT_COLUMNS: ColumnConfig<Patient>[] = [
   {
     label: "National ID",
     key: "nationalId",
-    width:"12%",
+    width:"120px",
     render: (patient) => {
       const id = String(patient.nationalId || "");
       return id ? `*****${id.slice(-4)}` : "—";
@@ -91,13 +91,13 @@ export const PATIENT_COLUMNS: ColumnConfig<Patient>[] = [
   {
     label: "Hospital",
     key: "hospital",
-    width:"15%",
-    render: (patient) => patient.hospital || "—"
+    width:"150px",
+    render: (patient) => <span className="truncate">{patient.hospital || "—"}</span>
   },
   {
     label: "Risk Status",
     key: "riskLevel",
-    width: "10%",
+    width: "120px",
     render: (item: any) => {
       const riskValue = item.riskLevel;
   
@@ -148,7 +148,7 @@ export const PATIENT_COLUMNS: ColumnConfig<Patient>[] = [
   {
     label: "Next Visit",
     key: "nextVisit",
-    width: "12%",
+    width: "120px",
     render: (item: any) => {
       const nextVisit = item.nextVisit;
       
@@ -199,7 +199,7 @@ export const PATIENT_COLUMNS: ColumnConfig<Patient>[] = [
   {
     label: "Suspected Diagnosed Diseases",
     key: "suspected",
-    width: "23%",
+    width: "250px",
     render: (item: any) => {
       // Access the patient object inside the nested response
       const rawDiagnosis = item.diagnosis; 

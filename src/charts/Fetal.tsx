@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import type { PatientData } from '../types/patient';
 import DropdownMenu from '../components/DropdownMenu';
 import FetalGraph from './FetalGraph';
 

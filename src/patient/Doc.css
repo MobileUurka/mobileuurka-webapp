@@ -1,0 +1,35 @@
+
+.doc-main {
+    width: calc(100% - 40px);
+    /* background: #f8f4ef; */
+    padding: 20px;
+    margin-bottom: 30px;
+    border-radius: 10px;
+    color: #585858;
+    display: flex;
+    flex-direction:column;
+  }
+  .doc-main h3{
+      padding: 0px 4%;
+  }
+  .doc-main .row{
+      /* align-self: self-end; */
+      width: 90%;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: .8em;
+      text-align: right;
+      display: grid;
+      grid-template-columns: 10% 20%;
+      gap: 20px;
+      justify-content: end;
+      text-align: left;
+  
+  }
+  /* 
+  .doc-cont{
+      width: 100%;
+      display: grid;
+      grid-template-columns: 50% 50% !important;
+      margin: 0;
+  } */

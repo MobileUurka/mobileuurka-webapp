@@ -42,6 +42,7 @@ const Patient: React.FC = () => {
 
   // Selection states for drill-down views
   const [selectedDocument, setSelectedDocument] = useState<any>([]);
+  const [selectedDocumentTitle, setSelectedDocumentTitle] = useState<string>("");
   const [selectedNote, setSelectedNote] = useState<string>("");
 
   useEffect(() => {
@@ -60,6 +61,7 @@ const Patient: React.FC = () => {
       const response = await patientService.getPatientCompleteProfile(patientId);
       if (response.success) {
         setPatient(response.data);
+        console.log(response.data)
       } else {
         setError("Patient profile not found");
       }
@@ -258,7 +260,10 @@ const Patient: React.FC = () => {
                     className={`relative pb-[5px] transition-all duration-300 text-sm ${activeTab === tab ? "font-semibold text-black/80 border-b border-black" : "hover:text-black/80"}`}
                     onClick={() => {
                       setActiveTab(tab);
-                      if (tab === "documents") setSelectedDocument([]);
+                      if (tab === "documents") {
+                        setSelectedDocument([]);
+                        setSelectedDocumentTitle("");
+                      }
                     }}
                   >
                     {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -270,7 +275,7 @@ const Patient: React.FC = () => {
               <div className="flex flex-row items-center gap-[10px]">
                 <div className="w-[50px] aspect-square rounded-[4px] bg-[#f1ede97a] flex justify-center items-center cursor-pointer relative">
                   <LuBell size={20} className="text-gray-600" />
-                 
+
                 </div>
                 <div className="w-[50px] aspect-square rounded-[4px] bg-[#f1ede97a] flex justify-center items-center cursor-pointer" onClick={() => setChatActive((prev) => !prev)}>
                   <img src="/images/logo.png" alt="AI Chat" className="w-1/2" />
@@ -283,9 +288,15 @@ const Patient: React.FC = () => {
               {activeTab === "overview" && <Overview patient={patient} setActiveTab={setActiveTab} />}
               {activeTab === "profile" && <Profile patient={patient} />}
               {activeTab === "medication" && <Medication patient={patient} setActiveTab={setActiveTab} />}
-              {activeTab === "documents" && <Documents patient={patient} setActiveTitle={setActiveTab} setDocument={setSelectedDocument} />}
+              {activeTab === "documents" && <Documents patient={patient} setActiveTitle={setActiveTab} setDocument={setSelectedDocument} setDocumentTitle={setSelectedDocumentTitle} />}
               {activeTab === "notes" && <Notes patient={patient} setActiveTitle={setActiveTab} setNotes={setSelectedNote} />}
-              {activeTab === "document" && <Document document={selectedDocument} />}
+              {activeTab === "document" && (
+                <Document
+                  document={selectedDocument}
+                  title={selectedDocumentTitle}
+                  onBack={() => setActiveTab("documents")}
+                />
+              )}
               {activeTab === "note" && <Note note={selectedNote} user={currentUser} />}
               {activeTab === "notepad" && <Notepad patient={patient} user={currentUser} />}
             </div>

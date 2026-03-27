@@ -174,7 +174,7 @@ const Screening = () => {
           csection: data.csection,
           preeclampsiaHistory: data.preeclampsiaHistory,
           gestationalDiabetesHistory: data.gestationalDiabetesHistory,
-        
+
           // Missing fields added
           famHistoryGestationalHypertension: data.famHistoryGestationalHypertension,
           famHistoryGestationalDiabetes: data.famHistoryGestationalDiabetes,
@@ -232,19 +232,37 @@ const Screening = () => {
 
       case 'Journey':
         structuredData = {
-          patientId: data.patientId, // This will be the actual patient ID
+          patientId: data.patientId,
           editor: data.editor,
           date: data.date,
           gestationweek: data.gestationweek,
+
+          // Pregnancy Complications
+          abnormaldoppler: data.abnormaldoppler,
           bleeding: data.bleeding,
+          eclampsia: data.eclampsia,
           edema: data.edema,
+          malpresentation: data.malpresentation,
+          multifetalgestation: data.multifetalgestation,
+          pprom: data.pprom,
+          prom: data.prom,
           preeclampsia: data.preeclampsia,
           gestationaldiabetes: data.gestationaldiabetes,
           gesthypertension: data.gesthypertension,
+          placentaprevia: data.placentaprevia,
+          primipaternity: data.primipaternity,
+
+          // Fetal Information
+          sexOfFetus: data.sexOfFetus,
+          spe: data.spe,
+
+          // Medical Conditions
           anemia: data.anemia,
-          malpresentation: data.malpresentation,
-          multifetalgestation: data.multifetalgestation,
-          sexOfFetus: data.sexOfFetus
+          malaria: data.malaria,
+          hookworm: data.hookworm,
+          vitamindDeficiency: data.vitamindDeficiency,
+          severAnemia: data.severAnemia,
+          highHb: data.highHb
         };
 
         try {
@@ -263,22 +281,69 @@ const Screening = () => {
 
       case 'Lab':
         structuredData = {
-          patientId: data.patientId, // This will be the actual patient ID
+          patientId: data.patientId,
           editor: data.editor,
           date: data.date,
           gestationweek: data.gestationweek,
-          haemoglobin: data.haemoglobin,
-          platelets: data.platelets,
-          creatinine: data.creatinine,
+
+          // Blood Chemistry
+          alp: data.alp,
           alt: data.alt,
           ast: data.ast,
-          urineProtein: data.urineProtein,
+          albumin: data.albumin,
+          bicarbonate: data.bicarbonate,
+          bilirubin: data.bilirubin,
+          calcium: data.calcium,
+          chloride: data.chloride,
+          creatinine: data.creatinine,
+          glutamyl: data.glutamyl,
+          potassium: data.potassium,
+          sodium: data.sodium,
+          uricAcid: data.uricAcid,
+          bun: data.bun,
+
+          // Blood Sugar Tests
           fbs: data.fbs,
-          diagnosis: data.diagnosis
+          fbs1: data.fbs1,
+          fbs2: data.fbs2,
+          hba1c: data.hba1c,
+          hba1cValue: data.hba1cValue,
+          randombloodsugar: data.randombloodsugar,
+
+          // Hematology
+          ht: data.ht,
+          leukocyte: data.leukocyte,
+          haemoglobin: data.haemoglobin,
+          mch: data.mch,
+          mchc: data.mchc,
+          mcv: data.mcv,
+          platelets: data.platelets,
+          rbc: data.rbc,
+          wbc: data.wbc,
+
+          // Thyroid Function
+          t3: data.t3,
+          t4: data.t4,
+          tsh: data.tsh,
+
+          // Urine Analysis
+          ketones: data.ketones,
+          clarity: data.clarity,
+          sg: data.sg,
+          ph: data.ph,
+          urineColor: data.urineColor,
+          urineGlucose: data.urineGlucose,
+          urineNitrite: data.urineNitrite,
+          urineOdor: data.urineOdor,
+          urineProtein: data.urineProtein,
+
+          // Diagnosis
+          diagnosis: data.diagnosis,
+          diagnosisId: data.diagnosisId
         };
 
         try {
-          const response = await patientService.createRecord('lab', structuredData);
+          const response = await patientService.createRecord('labwork', structuredData);
           if (response.success) {
             alert('Laboratory record created successfully!');
             navigate('/Screening');

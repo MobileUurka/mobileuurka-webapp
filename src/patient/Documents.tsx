@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { RiSearchLine } from "react-icons/ri";
-import { IoDocumentTextOutline, IoWarningOutline } from "react-icons/io5";
+import { IoDocumentTextOutline } from "react-icons/io5";
 import { IoIosWarning, IoMdAdd } from "react-icons/io";
-import { FaShieldAlt } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
+import DataTable from "../components/DataTable";
 
 // Types
 import { type PatientData, type TabType } from '../types/patient';
@@ -12,14 +12,15 @@ interface DocumentsProps {
   patient: PatientData;
   setActiveTitle: (tab: TabType) => void;
   setDocument: (doc: any) => void;
+  setDocumentTitle: (title: string) => void;
   document?: any; // The currently selected document object
 }
 
-const Documents: React.FC<DocumentsProps> = ({ 
-  patient, 
-  setActiveTitle, 
-  setDocument, 
-  document: selectedDoc 
+const Documents: React.FC<DocumentsProps> = ({
+  patient,
+  setActiveTitle,
+  setDocument,
+  setDocumentTitle
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
@@ -57,7 +58,6 @@ const Documents: React.FC<DocumentsProps> = ({
 
   const renderResult = (record: any) => {
     if (record.title === "Pregnancy Journey") {
-      const risk = record.result?.toLowerCase();
       const label = record.result?.charAt(0).toUpperCase() + record.result?.slice(1).toLowerCase();
       return (
         <div className="flex items-center gap-[5px]">
@@ -74,10 +74,21 @@ const Documents: React.FC<DocumentsProps> = ({
       hiv: "HIV", syphilis: "Syphilis", hepB: "Hepatitis B", hepC: "Hepatitis C", rubella: "Rubella",
     };
     let positives = [];
+    let negatives = [];
+    
     for (const key in infectionFields) {
-      if (item[key] === "Positive") positives.push(infectionFields[key]);
+      if (item[key] === "Positive") {
+        positives.push(infectionFields[key]);
+      } else if (item[key] === "Negative") {
+        negatives.push(infectionFields[key]);
+      }
     }
-    return positives.length > 0 ? `Positive: ${positives.join(", ")}` : "No positive infections";
+    
+    if (positives.length > 0) {
+      return `Positive: ${positives.join(", ")}${negatives.length > 0 ? ` | Negative: ${negatives.join(", ")}` : ""}`;
+    }
+    
+    return negatives.length > 0 ? `All Negative: ${negatives.join(", ")}` : "No infection data";
   };
 
   const buildRecord = (array: any[] | undefined, title: string) =>
@@ -105,6 +116,59 @@ const Documents: React.FC<DocumentsProps> = ({
       };
     }) || [];
 
+  // Define columns for DataTable
+  const documentColumns = [
+    {
+      label: "Name",
+      key: "name",
+      width: "25%",
+      render: (record: any) => (
+        <div className="flex flex-row items-center gap-[15px]">
+          <div className="w-10 h-10 rounded-full bg-[#ffae1b] flex justify-center items-center text-white text-[1.1em] shrink-0">
+            <IoDocumentTextOutline />
+          </div>
+          <div className="flex flex-col overflow-hidden">
+            <div className="font-medium text-black truncate">{record.title}</div>
+            <div className="text-[0.8em] text-gray-400">View Details</div>
+          </div>
+        </div>
+      )
+    },
+    {
+      label: "Editor",
+      key: "editor",
+      width: "20%",
+      render: (record: any) => (
+        <div className="text-black/70 truncate">{record.editor}</div>
+      )
+    },
+    {
+      label: "Date",
+      key: "date",
+      width: "15%",
+      render: (record: any) => (
+        <div className="text-[#333]">{formatDate(record.date_of_visit)}</div>
+      )
+    },
+    {
+      label: "Analysis",
+      key: "analysis",
+      width: "39%",
+      render: (record: any) => (
+        <div className="flex items-center text-[#838383] overflow-hidden">
+          {(record.result !== "" && record.result !== "All Negative" && !record.result.startsWith("All Negative:")) && (
+            <IoIosWarning
+              className="shrink-0 mr-2.5 p-[2px] rounded-full text-[#FF9500] bg-[#FF950020]"
+              size={20}
+            />
+          )}
+          <div className="truncate italic">{renderResult(record)}</div>
+        </div>
+      )
+    }
+  ];
+
+  console.log(patient)
   const realRecords = [
     ...buildRecord(patient?.triage, "Triage"),
     ...buildRecord(patient?.labwork, "Lab Work"),
@@ -122,8 +186,8 @@ const Documents: React.FC<DocumentsProps> = ({
   };
 
   const handleAddDocument = () => {
-    navigate("/Screening", { 
-      state: { patientId: patient?.id, returnTo: 'documents', internalTab: 1 } 
+    navigate("/Screening", {
+      state: { patientId: patient?.id, returnTo: 'documents', internalTab: 1 }
     });
   };
 
@@ -141,7 +205,7 @@ const Documents: React.FC<DocumentsProps> = ({
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button 
+        <button
           onClick={handleAddDocument}
           className="h-[50px] px-[25px] rounded-[11px] bg-[#008540] text-white flex items-center justify-center gap-2.5 text-[0.9em] cursor-pointer hover:bg-[#007036] transition-colors"
         >
@@ -150,59 +214,18 @@ const Documents: React.FC<DocumentsProps> = ({
         </button>
       </div>
 
-      {/* Documents Table */}
-      <div className="mt-[50px]">
-        {/* Table Header */}
-        <div className="grid grid-cols-[25%_20%_15%_39%] gap-1 m-2.5 mb-[15px] text-[0.9em] text-[#333]">
-          <div className="font-[500] text-black">Name</div>
-          <div className="font-[500] text-black">Editor</div>
-          <div className="font-[500] text-black">Date</div>
-          <div className="font-[500] text-black">Analysis</div>
-        </div>
-
-        {/* Table Body */}
-        <div className="flex flex-col">
-          {filteredRecords.map((record, index) => (
-            <div
-              key={index}
-              className="grid grid-cols-[25%_20%_15%_39%] gap-1 items-center py-5 px-2.5 text-[0.9em] text-[#333] border-b border-[#dfdede80] cursor-pointer transition-all hover:pl-5"
-              onClick={() => {
-                setDocument(record);
-                setActiveTitle("document" as TabType);
-              }}
-            >
-              <div className="flex flex-row items-center gap-[15px]">
-                <div className="w-10 h-10 rounded-full bg-[#ffae1b] flex justify-center items-center text-white text-[1.1em] flex-shrink-0">
-                  <IoDocumentTextOutline />
-                </div>
-                <div className="flex flex-col overflow-hidden">
-                  <div className="font-medium text-black truncate">{record.title}</div>
-                  <div className="text-[0.8em] text-gray-400">View Details</div>
-                </div>
-              </div>
-
-              <div className="text-black/70 truncate">{record.editor}</div>
-              
-              <div className="text-[#333]">{formatDate(record.date_of_visit)}</div>
-
-              <div className="flex items-center text-[#838383] overflow-hidden">
-              {(record.result !== "" && record.result !== "No positive infections") && (                  <IoIosWarning
-                    className="flex-shrink-0 mr-2.5 p-[2px] rounded-full text-[#FF9500] bg-[#FF950020]"
-                    size={20}
-                  />
-                )}
-                <div className="truncate italic">{renderResult(record)}</div>
-              </div>
-            </div>
-          ))}
-
-          {filteredRecords.length === 0 && (
-            <div className="py-20 text-center text-gray-400 italic">
-              No matching documents found.
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Documents Table with Pagination */}
+      <DataTable
+        columns={documentColumns}
+        data={filteredRecords}
+        onRowClick={(record) => {
+          setDocument(record.source);
+          setDocumentTitle(record.title);
+          setActiveTitle("document" as TabType);
+        }}
+        emptyMessage={searchTerm ? `No documents found matching "${searchTerm}"` : "No documents found."}
+        initialItemsPerPage={4}
+      />
     </div>
   );
 };

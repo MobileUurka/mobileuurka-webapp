@@ -10,7 +10,7 @@ async function request(endpoint: string, options: any = {}) {
     // 1. Validate and refresh token proactively
     const isTokenValid = await authService.validateAndRefreshToken();
     if (!isTokenValid && !endpoint.includes('/auth/')) {
-      console.error('No valid token available');
+      console.error('No valid token available for endpoint:', endpoint);
       authService.logout();
       window.dispatchEvent(new Event('auth-logout'));
       throw new Error('Authentication required');
@@ -19,6 +19,12 @@ async function request(endpoint: string, options: any = {}) {
     // 2. Prepare Headers
     const token = authService.getAccessToken();
     const sessionId = authService.getSessionId();
+
+    console.log('Making request to:', endpoint, {
+      hasToken: !!token,
+      hasSessionId: !!sessionId,
+      tokenLength: token?.length || 0
+    });
 
     const headers = {
         'Content-Type': 'application/json',
@@ -29,6 +35,8 @@ async function request(endpoint: string, options: any = {}) {
 
     // 3. Make Initial Request
     let response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
+    
+    console.log('Response status:', response.status, 'for endpoint:', endpoint);
     
     // We need to parse the JSON, but only if there is a body
     let data;
@@ -78,7 +86,14 @@ async function request(endpoint: string, options: any = {}) {
     }
 
     // 5. Final Response Handling
-    if (!response.ok) throw data;
+    if (!response.ok) {
+        console.error('Request failed:', {
+            endpoint,
+            status: response.status,
+            data
+        });
+        throw data;
+    }
     return data;
 }
 

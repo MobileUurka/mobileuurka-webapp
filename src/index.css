@@ -48,6 +48,92 @@ input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 textarea:-webkit-autofill,
 select:-webkit-autofill {
+
+  /* OTP Input Styles */
+  .otp-container {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin: 1rem 0;
+  }
+
+  .otp-input {
+    width: 3rem;
+    height: 3rem;
+    text-align: center;
+    font-size: 1.25rem;
+    font-weight: 600;
+    border: 2px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background-color: white;
+    transition: all 0.2s ease-in-out;
+  }
+
+  .otp-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(81, 67, 52, 0.1);
+  }
+
+  .otp-input:hover {
+    border-color: #d1d5db;
+  }
+
+  /* Auth form styles */
+  .auth {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  }
+
+  .form {
+    background: white;
+    padding: 2rem;
+    border-radius: 1rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .logo-auth {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .logo-auth img {
+    max-width: 150px;
+    height: auto;
+  }
+
+
+  .input-group {
+    margin-bottom: 1rem;
+  }
+
+  .input-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #374151;
+  }
+
+  .input-group input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    transition: border-color 0.2s ease-in-out;
+  }
+
+  .input-group input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(81, 67, 52, 0.1);
+  }
+
   box-shadow: none !important;
   -webkit-box-shadow: none !important;
   -webkit-text-fill-color: inherit !important;
@@ -105,6 +191,7 @@ select:-webkit-autofill {
     margin-bottom: 6px;
     font-size: 0.9em;
   }
+
   .input-group input {
     padding: 0.8em 1rem;
     border: 1px solid #d5dbe2;
@@ -114,6 +201,7 @@ select:-webkit-autofill {
     position: relative;
     z-index: 90;
   }
+
   .password-input {
     display: flex;
     align-items: center;
@@ -121,6 +209,7 @@ select:-webkit-autofill {
     border-radius: 8px;
     padding: 0.8em 1rem;
   }
+
   .password-input input {
     width: 100%;
     padding: 0px 0.4rem;
@@ -128,22 +217,53 @@ select:-webkit-autofill {
     background: none;
     font-size: 16px;
   }
+
   .password-toggle {
     color: #495057;
     cursor: pointer !important;
     z-index: 9999;
   }
+
   .password-input .password-toggle .icon {
     cursor: pointer;
   }
+
   .input-group input:focus {
     outline: none;
   }
-  
+
   .input-group input::placeholder {
     color: rgba(44, 44, 44, 0.5);
   }
-  
+
+  /* OTP Input Styles */
+  .otp-container {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    margin: 1rem 0;
+  }
+
+  .otp-input {
+    width: 4rem !important;
+    height: 4rem !important;
+    text-align: center;
+    font-size: 1.25rem !important;
+    font-weight: 600;
+    border-radius: 8px !important;
+    padding: 0 !important;
+    border: none;
+    transition: all 0.2s ease;
+  }
+
+  .otp-input:focus {
+    outline: none !important;
+  }
+
+  .otp-input:not(:placeholder-shown) {
+    background-color: rgba(81, 67, 52, 0.01);
+  }
+
   /* Form actions (remember me, forgot password) */
   .form-actions {
     display: flex;
@@ -151,7 +271,7 @@ select:-webkit-autofill {
     align-items: center;
     font-size: 0.875rem;
   }
-  
+
   .remember-me {
     display: flex;
     align-items: center;
@@ -159,18 +279,53 @@ select:-webkit-autofill {
     cursor: pointer;
     color: #495057;
   }
-  
+
   .remember-me input[type="checkbox"] {
     accent-color: var(--color-primary);
     color: white;
   }
-  
+
   .form-actions a {
     color: var(--color-primary);
     text-decoration: none;
   }
-  
+
   .form-actions a:hover {
     text-decoration: underline;
   }
+}
+
+
+section {
+  width: 100%;
+}
+section h4 {
+  font-size: 0.8em;
+}
+section .container {
+  margin: 10px 0px;
+  background: var(--section);
+  padding: 15px 0px;
+  border-radius: 10px;
+  width: 98%;
+  display: flex;
+  flex-direction: column;
+}
+section .container .list {
+  width: 92%;
+  margin: auto;
+  padding: 15px 0px;
+  border-bottom: 1px solid rgba(144, 144, 144, 0.16);
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8em;
+  color: #585858;
+}
+section .container .list:last-child {
+  border-bottom: none;
+}
+section .container .list .label {
+  font-weight: bolder;
 }

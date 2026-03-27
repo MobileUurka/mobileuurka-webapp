@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { FiSearch, FiPlus, FiRefreshCw } from 'react-icons/fi';
+import { authService } from '../services/authServices';
 
 interface SearchProps {
   placeholder?: string;
@@ -35,20 +36,44 @@ const SearchContainer: React.FC<SearchProps> = ({
     onSearch(val);
   };
 
+  const [user, setUser] = useState<any>(null);
+  const [initial,setInitial] = useState()
+    // We use useCallback so this function doesn't change on every render
+    const checkAuth = useCallback(async () => {
+      // 1. Initialize encryption keys first      
+      const data = await authService.getUser();
+      setUser(data)
+  
+    }, []);
+  
+    useEffect(() => {
+      checkAuth();
+    }, [checkAuth]);
+
+    useEffect(() => {
+      if (user?.firstName && user?.lastName) {
+        const initials =
+          user.firstName.charAt(0).toUpperCase() +
+          user.lastName.charAt(0).toUpperCase();
+        setInitial(initials);
+      }
+    }, [user]);
+  
+
   return (
-    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 justify-end bg-transparent w-full md:w-auto">
-      <div className="relative flex items-center flex-1 md:flex-initial">
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 justify-end bg-transparent w-full sm:w-auto">
+      <div className="relative flex items-center flex-1 sm:flex-initial">
         <FiSearch className="absolute left-3 text-[#a7a18e] text-lg" />
         <input
           type="text"
           placeholder={placeholder}
           value={localValue}
           onChange={handleChange}
-          className="pl-10 pr-4 py-3 border border-[#a7a18e]/30 rounded-lg text-sm w-full md:w-64 bg-transparent focus:outline-none focus:border-[#008540] transition-all"
+          className="pl-10 pr-4 py-3 border border-[#a7a18e]/30 rounded-lg text-sm w-full sm:w-64 bg-transparent focus:outline-none focus:border-[#008540] transition-all"
         />
       </div>
       
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 justify-end sm:justify-start">
         {showRefresh && (
           <button 
             onClick={onRefresh}
@@ -63,12 +88,16 @@ const SearchContainer: React.FC<SearchProps> = ({
         {showAdd && onAdd && (
           <button
             onClick={onAdd}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-[#008540] text-white rounded-lg text-sm font-medium hover:bg-[#006d35] transition-all active:scale-95 shadow-sm"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-[#008540] text-white rounded-lg text-sm font-medium hover:bg-[#006d35] transition-all active:scale-95 shadow-sm whitespace-nowrap"
           >
             <FiPlus className="text-lg" />
-            <span>{addButtonText}</span>
+            <span className="hidden sm:inline">{addButtonText}</span>
+            <span className="sm:hidden">Add</span>
           </button>
         )}
+      </div>
+      <div className='w-10 aspect-square rounded-full bg-[#008540] text-sm text-white flex items-center justify-center'>
+        {initial}
       </div>
     </div>
   );

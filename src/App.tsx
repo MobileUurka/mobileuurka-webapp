@@ -13,6 +13,12 @@ import Settings from './pages/Settings';
 import { useEffect, useState, useCallback } from 'react';
 import { authService } from './services/authServices';
 import Hospital from './pages/Hospital';
+import { ToastProvider } from './contexts/ToastContext';
+import Verify from './pages/Verify';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import Payment from './pages/Payment';
+import HospitalSetup from './pages/HospitalSetup';
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -22,6 +28,9 @@ function App() {
   const checkAuth = useCallback(async () => {
     // 1. Initialize encryption keys first
     const hasKeys = await authService.initializeEncryption();
+    
+    const data = await authService.getUser();
+    console.log(data)
 
     // 2. Check if we actually have a valid token (decrypted)
     const hasToken = authService.isAuthenticated();
@@ -51,32 +60,40 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        {!isAuthenticated ? (
-          // Use a specific path for Auth and redirect all others to it
-          <>
-            <Route path="/auth" element={<Auth onLoginSuccess={checkAuth} />} />
-            <Route path="*" element={<Navigate to="/auth" replace />} />
-          </>
-        ) : (
-          <Route element={<Layout />}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/Staff" element={<Staff />} />
-            <Route path="/Screening" element={<Screening />} />
-            <Route path="/Screening/:tabId" element={<Screening />} />
-            <Route path="/Patients" element={<Patients />} />
-            <Route path="/Hospital" element={<Hospital />} />
-            <Route path="/Patient/:id" element={<Patient />} />
-            <Route path="/Alerts" element={<Alerts />} />
-            <Route path="/Settings" element={<Settings />} />
-            {/* Redirect /auth to dashboard if already logged in */}
-            <Route path="/auth" element={<Navigate to="/" replace />} />
-            <Route path="*" element={<div>Page not found</div>} />
-          </Route>
-        )}
-      </Routes>
-    </BrowserRouter>
+    <ToastProvider>
+      <BrowserRouter>
+        <Routes>
+          {!isAuthenticated ? (
+            // Use a specific path for Auth and redirect all others to it
+            <>
+              <Route path="/auth" element={<Auth onLoginSuccess={checkAuth} />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/verify" element={<Verify />} />
+              <Route path="/payment" element={<Payment />} />
+              <Route path="/hospital-setup" element={<HospitalSetup />} />
+              <Route path="*" element={<Navigate to="/auth" replace />} />
+            </>
+          ) : 
+          (
+            <Route element={<Layout />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/Staff" element={<Staff />} />
+              <Route path="/Screening" element={<Screening />} />
+              <Route path="/Screening/:tabId" element={<Screening />} />
+              <Route path="/Patients" element={<Patients />} />
+              <Route path="/Hospital" element={<Hospital />} />
+              <Route path="/Patient/:id" element={<Patient />} />
+              <Route path="/Alerts" element={<Alerts />} />
+              <Route path="/Settings" element={<Settings />} />
+              {/* Redirect /auth to dashboard if already logged in */}
+              <Route path="/auth" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<div>Page not found</div>} />
+            </Route>
+          )}
+        </Routes>
+      </BrowserRouter>
+    </ToastProvider>
   );
 }
 

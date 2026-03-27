@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 
 type LoginFormData = {
     email: string;
@@ -19,8 +20,9 @@ type Props = {
     onSwitch: () => void;
 }
 
-const LoginForm = ({ loginFormData, setLoginFormData, showPassword, setShowPassword, loading, onSubmit, setError, error, onSwitch
+const LoginForm = ({ loginFormData, setLoginFormData, showPassword, setShowPassword, loading, onSubmit, error, onSwitch
 }: Props) => {
+    const navigate = useNavigate();
 
     const handleEmailChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
@@ -95,7 +97,13 @@ const LoginForm = ({ loginFormData, setLoginFormData, showPassword, setShowPassw
                     />
                     <span>Remember me</span>
                 </label>
-                <a href="/forgot-password">Forgot password?</a>
+                <button 
+                    type="button"
+                    onClick={() => navigate('/forgot-password')}
+                    className="text-primary hover:underline text-sm"
+                >
+                    Forgot password?
+                </button>
             </div>
 
             {error && <p className="text-red-500 text-[0.9rem] text-center mt-2">{error}</p>}

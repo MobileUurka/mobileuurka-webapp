@@ -101,9 +101,9 @@ const Hospitals = () => {
   }, [hospitals, searchTerm]);
 
   return (
-    <div className="w-full pt-6 h-full flex flex-col bg-white overflow-hidden">
-      <div className="w-full flex justify-between items-center mb-6">
-        <div className="text-[1.3em] font-medium flex items-center gap-3">
+    <div className="w-full pt-4 px-4 sm:pt-6 sm:px-6 h-full flex flex-col bg-white overflow-hidden">
+      <div className="w-full flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <div className="text-lg sm:text-[1.3em] font-medium flex items-center gap-3">
           Hospitals <span className='text-[#a7a18e] font-light'>{filteredHospitals.length}</span>
         </div>
 
@@ -139,8 +139,8 @@ const Hospitals = () => {
 
       {/* Create Hospital Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">Create New Hospital</h3>
             
             <div className="space-y-4">
@@ -186,7 +186,7 @@ const Hospitals = () => {
                 />
               </div>
               
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     City
@@ -214,7 +214,7 @@ const Hospitals = () => {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Phone
@@ -243,7 +243,7 @@ const Hospitals = () => {
               </div>
             </div>
             
-            <div className="flex gap-3 mt-6">
+            <div className="flex flex-col sm:flex-row gap-3 mt-6">
               <button
                 onClick={() => setShowCreateModal(false)}
                 className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
