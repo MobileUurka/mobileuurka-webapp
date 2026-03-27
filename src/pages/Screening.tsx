@@ -5,7 +5,6 @@ import { SCREENING_FORMS } from '../constants/screeningForms';
 import SearchContainer from '../components/SearchContainer';
 import ScreeningForm from '../components/ScreeningForm';
 import { patientService } from '../services/patientServices';
-import { hospitalService } from '../services/hospitalServices';
 
 const Screening = () => {
   const { tabId } = useParams();

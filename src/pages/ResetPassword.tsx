@@ -5,7 +5,6 @@ import PasswordChangeForm from '../components/PasswordChangeForm';
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
-  const [token, setToken] = useState('');
   const [isValidToken, setIsValidToken] = useState<boolean | null>(null);
   const navigate = useNavigate();
 
@@ -18,8 +17,10 @@ const ResetPassword = () => {
       return;
     }
 
+
+
     setEmail(emailParam);
-    setToken(tokenParam);
+    // setToken(tokenParam);
 
     // Verify the reset token
     verifyResetToken(emailParam, tokenParam);

@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5500/api/v1';
+// const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5500/api/v1';
 
 export interface PaymentPlan {
   id: string;
@@ -110,7 +110,7 @@ export const paymentService = {
   },
 
   // Cancel payment (mock implementation)
-  async cancelPayment(transactionId: string): Promise<{ success: boolean; message: string }> {
+  async cancelPayment(): Promise<{ success: boolean; message: string }> {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 1000));
 
