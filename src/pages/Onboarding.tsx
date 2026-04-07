@@ -14,7 +14,7 @@ function Onboarding() {
     const [error, setError] = useState<string | null>(null);
     const [pendingUserData, setPendingUserData] = useState<any>(null);
     const [paymentData, setPaymentData] = useState<any>(null);
-    const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+    // const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
 
     const navigate = useNavigate();
     const location = useLocation();

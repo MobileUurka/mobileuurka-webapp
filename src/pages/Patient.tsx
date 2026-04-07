@@ -4,7 +4,7 @@ import { IoFlagSharp } from "react-icons/io5";
 import { FaRegCopy } from "react-icons/fa";
 import { TiTick } from "react-icons/ti";
 import { LuBell } from "react-icons/lu";
-import { FiChevronDown, FiChevronUp, FiMenu, FiX } from "react-icons/fi";
+import { FiChevronDown, FiMenu, FiX } from "react-icons/fi";
 import { Tooltip } from "react-tooltip";
 
 // Assets & Styles
@@ -98,14 +98,14 @@ const Patient: React.FC = () => {
     }
   };
 
-  const handleHospitalAssignmentUpdate = (hospitalName: string) => {
-    if (patient) {
-      setPatient({
-        ...patient,
-        hospital: hospitalName
-      });
-    }
-  };
+  // const handleHospitalAssignmentUpdate = (hospitalName: string) => {
+  //   if (patient) {
+  //     setPatient({
+  //       ...patient,
+  //       hospital: hospitalName
+  //     });
+  //   }
+  // };
 
   // --- Helpers ---
   const calculateAge = (dob?: string): string | number => {
