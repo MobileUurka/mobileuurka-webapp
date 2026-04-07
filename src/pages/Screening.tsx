@@ -216,7 +216,7 @@ const Screening = () => {
         };
 
         try {
-          const response = await patientService.createRecord('history', structuredData);
+          const response = await patientService.createRecord('patientHistory', structuredData);
           if (response.success) {
             alert('Medical history record created successfully!');
             navigate('/Screening');
@@ -497,8 +497,8 @@ const Screening = () => {
   return (
     <div className="pb-10 w-full flex flex-col bg-white">
       {/* HEADER SECTION */}
-      <div className="sticky top-0 z-20 bg-white pt-6 pb-4 w-full flex justify-between items-center">
-        <div className="text-[1.3em] font-medium flex items-center gap-3">
+      <div className="sticky top-0 z-20 bg-white pt-6 pb-4 w-full flex flex-col lg:flex-row lg:justify-between lg:items-center">
+        <div className="mb-5 lg:mb-0 text-[1.3em] font-medium flex items-center gap-3">
           {tabId ? (
             <div className='pt-2'>
               <span

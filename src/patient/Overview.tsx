@@ -22,7 +22,7 @@ const Overview: React.FC<OverviewProps> = ({ patient, setActiveTab }) => {
     <div className="w-full h-full flex flex-col overflow-y-auto pb-5 scrollbar-hide">
       
       {/* Grid 3: Weight, Fetal, Predisposition */}
-      <div className="w-full grid grid-cols-[32.5%_32.5%_32.5%] gap-[0.75%]">
+      <div className="w-full grid grid-cols-1 lg:grid-cols-[32.5%_32.5%_32.5%] gap-[0.75%]">
         <div className="w-full aspect-square bg-[#F6F6F6] rounded-[10px] flex relative overflow-visible">
           <Weight patient={patient.triage} />
         </div>
@@ -35,17 +35,17 @@ const Overview: React.FC<OverviewProps> = ({ patient, setActiveTab }) => {
       </div>
 
       {/* Grid 2: Risk Assessment & Lab */}
-      <div className="w-full grid grid-cols-[66.375%_32.375%] gap-[0.75%] my-[10px]">
-        <div className="w-full aspect-[1/0.49] bg-[#F6F6F6] rounded-[10px] flex">
+      <div className="w-full grid grid-cols-1 lg:grid-cols-[66.375%_32.375%] gap-[0.75%] my-[10px]">
+        <div className="w-full h-auto lg:aspect-[1/0.49] bg-[#F6F6F6] rounded-[10px] flex mt-3 lg:mt-0">
           <Riskassessment patient={patient} />
         </div>
-        <div className="w-full aspect-square bg-[#F6F6F6] rounded-[10px] flex relative">
+        <div className="w-full aspect-square bg-[#F6F6F6] rounded-[10px] flex relative ">
           <Lab patient={patient} />
         </div>
       </div>
 
       {/* Grid 2 Reverse: Medications & (Blood Pressure + Symptoms) */}
-      <div className="w-full grid grid-cols-[32.5%_32.5%_32.5%] gap-[0.75%] mb-[30px]">
+      <div className="w-full grid grid-cols-1 lg:grid-cols-[32.5%_32.5%_32.5%] gap-[0.75%] mb-[30px]">
         <div className="w-full aspect-square bg-[#F6F6F6] rounded-[10px] flex relative">
           <Medications patient={patient} setActiveTab={setActiveTab} />
         </div>

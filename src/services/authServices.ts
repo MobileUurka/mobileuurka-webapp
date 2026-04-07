@@ -46,6 +46,7 @@ export interface PendingUserData {
   email: string;
   firstName: string;
   lastName: string;
+  phone?: string;
   organizationName: string;
   licenseNumber?: string;
   licenseVerified: boolean;

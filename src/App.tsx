@@ -17,8 +17,7 @@ import { ToastProvider } from './contexts/ToastContext';
 import Verify from './pages/Verify';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
-import Payment from './pages/Payment';
-import HospitalSetup from './pages/HospitalSetup';
+import Onboarding from './pages/Onboarding';
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -70,8 +69,7 @@ function App() {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/verify" element={<Verify />} />
-              <Route path="/payment" element={<Payment />} />
-              <Route path="/hospital-setup" element={<HospitalSetup />} />
+              <Route path="/onboarding" element={<Onboarding />} />
               <Route path="*" element={<Navigate to="/auth" replace />} />
             </>
           ) : 

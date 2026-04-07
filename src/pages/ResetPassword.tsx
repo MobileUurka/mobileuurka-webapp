@@ -1,30 +1,49 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import PasswordChangeForm from '../components/PasswordChangeForm';
+import OTPForm from '../components/OTPForm';
+import Overlay from '../components/Overlay';
 
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const [email, setEmail] = useState('');
-  const [isValidToken, setIsValidToken] = useState<boolean | null>(null);
+  const [token, setToken] = useState('');
+  const [isOTPVerified, setIsOTPVerified] = useState<boolean>(false);
+  const [isMobile] = useState<boolean>(window.innerWidth <= 900);
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Check if we came from OTP verification with state data
+    const stateEmail = location.state?.email;
+    const stateToken = location.state?.token;
+    const alreadyVerified = location.state?.verified;
+
+    // Or check URL parameters
     const emailParam = searchParams.get('email');
     const tokenParam = searchParams.get('token');
 
-    if (!emailParam || !tokenParam) {
+    const finalEmail = stateEmail || emailParam;
+    const finalToken = stateToken || tokenParam;
+
+    if (!finalEmail) {
       navigate('/forgot-password');
       return;
     }
 
-
-
-    setEmail(emailParam);
-    // setToken(tokenParam);
-
-    // Verify the reset token
-    verifyResetToken(emailParam, tokenParam);
-  }, [searchParams, navigate]);
+    setEmail(finalEmail);
+    
+    if (finalToken && alreadyVerified) {
+      // Token already verified in OTP form, skip to password change
+      setToken(finalToken);
+      setIsOTPVerified(true);
+    } else if (finalToken) {
+      // Token provided but not verified, verify it first
+      setToken(finalToken);
+      verifyResetToken(finalEmail, finalToken);
+    }
+    // If no token, show OTP form to get one
+  }, [searchParams, location.state, navigate]);
 
   const verifyResetToken = async (email: string, token: string) => {
     try {
@@ -37,69 +56,83 @@ const ResetPassword = () => {
       });
 
       const result = await response.json();
-      setIsValidToken(result.success);
-
-      if (!result.success) {
-        setTimeout(() => navigate('/forgot-password'), 3000);
+      
+      if (result.success) {
+        setIsOTPVerified(true);
+      } else {
+        // Invalid token, show OTP form
+        setToken('');
+        setIsOTPVerified(false);
       }
     } catch (error) {
-      setIsValidToken(false);
-      setTimeout(() => navigate('/forgot-password'), 3000);
+      // Error verifying token, show OTP form
+      setToken('');
+      setIsOTPVerified(false);
     }
   };
 
-  const handlePasswordChanged = () => {
-    // Show success dialog and then navigate
+  const handleVerificationSuccess = useCallback((verifiedToken?: string) => {
+    console.log('ResetPassword: handleVerificationSuccess called with token:', verifiedToken);
+    console.log('ResetPassword: current isOTPVerified state:', isOTPVerified);
+    if (verifiedToken) {
+      setToken(verifiedToken);
+      setIsOTPVerified(true);
+      console.log('ResetPassword: setting isOTPVerified to true');
+    }
+  }, [isOTPVerified]);
+
+  const handlePasswordChanged = useCallback(() => {
+    // Show success and navigate to auth
     navigate('/auth', {
       state: {
         message: 'Password reset successfully! You can now sign in with your new password.',
         type: 'success'
       }
     });
-  };
+  }, [navigate]);
 
-  if (isValidToken === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-gray-600">Verifying reset link...</p>
+  const Left = useMemo(
+    () => (
+      <div className="form">
+        <div className="logo-auth">
+          <img src="/images/logo.png" alt="company-logo" />
         </div>
-      </div>
-    );
-  }
-
-  if (isValidToken === false) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full text-center">
-          <img src="/images/logo.png" alt="MobileUurka" className="mx-auto h-12 w-auto" />
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Invalid Reset Link</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            This password reset link is invalid or has expired.
-          </p>
-          <p className="mt-4 text-sm text-gray-600">
-            Redirecting you to request a new reset link...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full">
-        <div className="bg-white shadow-md rounded-lg p-8">
-          <div className="text-center mb-6">
-            <img src="/images/logo.png" alt="MobileUurka" className="mx-auto h-12 w-auto" />
-          </div>
+        {isOTPVerified && (
           <PasswordChangeForm
             email={email}
+            token={token}
             mode="reset"
             onPasswordChanged={handlePasswordChanged}
           />
-        </div>
+        )}
       </div>
+    ), [isOTPVerified, email, token, handlePasswordChanged]
+  );
+
+  const Right = useMemo(
+    () => (
+      <div className="form">
+        <div className="logo-auth">
+          <img src="/images/logo.png" alt="company-logo" />
+        </div>
+        {!isOTPVerified && (
+          <OTPForm
+            email={email}
+            verificationType="password_reset"
+            onVerificationSuccess={handleVerificationSuccess}
+          />
+        )}
+      </div>
+    ), [email, isOTPVerified, handleVerificationSuccess]
+  );
+
+  return isMobile ? (
+    <div className="auth">{isOTPVerified ? Left : Right}</div>
+  ) : (
+    <div className="flex flex-row h-screen relative">
+      {Right}
+      {Left}
+      <Overlay isActive={!isOTPVerified} />
     </div>
   );
 };

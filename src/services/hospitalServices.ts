@@ -152,50 +152,49 @@ export const hospitalService = {
         }
     },
 
-    // Search hospitals (mock implementation for testing)
-    async searchHospitals(searchTerm: string): Promise<Hospital[]> {
-        // For testing purposes, return mock data
-        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API delay
+    // Search hospitals with pagination
+    async searchHospitals(searchTerm: string, page: number = 1, limit: number = 5): Promise<{ hospitals: Hospital[], pagination: { page: number, limit: number, total: number, totalPages: number } }> {
+        try {
+            const queryParams = new URLSearchParams();
+            if (searchTerm) queryParams.append('search', searchTerm);
 
-        const mockHospitals: Hospital[] = [
-            {
-                id: '1',
-                name: 'Nairobi Hospital',
-                address: '123 Uhuru Highway, Nairobi',
-                phone: '+254712345678',
-                city: 'Nairobi',
-                state: 'Nairobi',
-                type: 'private',
-                totalPatients: 150
-            },
-            {
-                id: '2',
-                name: 'Kenyatta National Hospital',
-                address: '456 Hospital Road, Nairobi',
-                phone: '+254712345679',
-                city: 'Nairobi',
-                state: 'Nairobi',
-                type: 'public',
-                totalPatients: 500
-            },
-            {
-                id: '3',
-                name: 'Aga Khan University Hospital',
-                address: '789 Third Parklands Avenue, Nairobi',
-                phone: '+254712345680',
-                city: 'Nairobi',
-                state: 'Nairobi',
-                type: 'private',
-                totalPatients: 200
+            const url = `/organizations/hospitals/all${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+            const response = await api.get(url);
+            
+            console.log('Search Hospitals API Response:', response); // Debug log
+            
+            // Handle different possible response structures
+            let hospitals: Hospital[] = [];
+            if (response.data?.hospitals) {
+                hospitals = response.data.hospitals;
+            } else if (response.hospitals) {
+                hospitals = response.hospitals;
+            } else if (Array.isArray(response.data)) {
+                hospitals = response.data;
+            } else if (Array.isArray(response)) {
+                hospitals = response;
             }
-        ];
+            
+            // Apply client-side pagination since the backend doesn't support it yet
+            const total = hospitals.length;
+            const totalPages = Math.ceil(total / limit);
+            const startIndex = (page - 1) * limit;
+            const endIndex = startIndex + limit;
+            const paginatedHospitals = hospitals.slice(startIndex, endIndex);
 
-        // Filter based on search term
-        return mockHospitals.filter(hospital =>
-            hospital.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            hospital.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            hospital.city.toLowerCase().includes(searchTerm.toLowerCase())
-        );
+            return {
+                hospitals: paginatedHospitals,
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    totalPages
+                }
+            };
+        } catch (error) {
+            console.error('Error searching hospitals:', error);
+            throw error;
+        }
     },
 
     // Link hospitals to organization after hospital setup

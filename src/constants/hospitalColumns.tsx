@@ -35,14 +35,14 @@ export const HOSPITAL_COLUMNS: ColumnConfig<Hospital>[] = [
       </div>
     )
   },
-  {
-    label: "Type",
-    key: "type",
-    width: "120px",
-    render: (hospital) => (
-      <span className="capitalize">{hospital.type}</span>
-    )
-  },
+  // {
+  //   label: "Type",
+  //   key: "type",
+  //   width: "120px",
+  //   render: (hospital) => (
+  //     <span className="capitalize">{hospital.type}</span>
+  //   )
+  // },
   {
     label: "Total Patients",
     key: "totalPatients",

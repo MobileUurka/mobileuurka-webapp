@@ -4,10 +4,10 @@ import { useNavigate } from 'react-router-dom';
 
 interface OTPFormProps {
   email?: string;
-  verificationType?: 'signup' | 'organization';
+  verificationType?: 'signup' | 'organization' | 'password_reset';
   organizationSlug?: string;
-  onVerificationSuccess?: () => void;
-  isOTP?: boolean; // Add this if the form needs to know the current state
+  onVerificationSuccess?: (token?: string) => void;
+  isOTP?: boolean;
 }
 
 const OTPForm = ({ email, verificationType = 'signup', organizationSlug, onVerificationSuccess }: OTPFormProps) => {
@@ -111,6 +111,11 @@ const OTPForm = ({ email, verificationType = 'signup', organizationSlug, onVerif
           otp: otpCode,
           organizationSlug: organizationSlug || ''
         });
+      } else if (verificationType === 'password_reset') {
+        // For password reset, don't verify the token separately
+        // Just pass the OTP directly to be used for password reset
+        console.log('OTPForm: password_reset - skipping verification, passing OTP directly');
+        response = { success: true }; // Fake success to proceed
       } else {
         // Use new signup verification endpoint (just verifies OTP, doesn't create organization)
         response = await authService.completeSignupWithOTP({
@@ -121,13 +126,29 @@ const OTPForm = ({ email, verificationType = 'signup', organizationSlug, onVerif
 
       if (response.success) {
         if (verificationType === 'signup') {
-          // For signup, navigate to payment page with email in state
-          navigate('/payment', {
+          // For signup, navigate to onboarding page with email in state
+          navigate('/onboarding', {
             state: {
               email: email,
               signupData: response.data
             }
           });
+        } else if (verificationType === 'password_reset') {
+          // For password reset, call success callback with token if provided, otherwise navigate
+          console.log('OTPForm: password_reset verification successful, onVerificationSuccess:', !!onVerificationSuccess);
+          if (onVerificationSuccess) {
+            console.log('OTPForm: calling onVerificationSuccess with token:', otpCode);
+            onVerificationSuccess(otpCode);
+          } else {
+            console.log('OTPForm: no callback, navigating to reset-password');
+            navigate('/reset-password', {
+              state: {
+                email: email,
+                token: otpCode,
+                verified: true
+              }
+            });
+          }
         } else {
           // For organization, call success callback
           if (onVerificationSuccess) {
@@ -157,6 +178,25 @@ const OTPForm = ({ email, verificationType = 'signup', organizationSlug, onVerif
           email: email || '',
           organizationSlug: organizationSlug || ''
         });
+      } else if (verificationType === 'password_reset') {
+        // For password reset, resend the forgot password request
+        response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5500/api/v1'}/auth/forgot-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: email || ''
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(result.message || 'Failed to resend reset code');
+        }
+        
+        response = result;
       } else {
         // Use signup resend OTP endpoint
         response = await authService.resendSignupOTP({
@@ -181,10 +221,16 @@ const OTPForm = ({ email, verificationType = 'signup', organizationSlug, onVerif
     <form onSubmit={(e) => { e.preventDefault(); handleVerify(); }}>
       <div className="text-center mb-6">
         <h2 className="text-2xl font-semibold mb-2">
-          {verificationType === 'organization' ? 'Verify Organization Email' : 'Verify Your Email'}
+          {verificationType === 'organization' 
+            ? 'Verify Organization Email' 
+            : verificationType === 'password_reset'
+            ? 'Enter Reset Code'
+            : 'Verify Your Email'}
         </h2>
         <p className="text-gray-600 text-sm">
-          We've sent a 6-digit code to {email || 'your email'}
+          {verificationType === 'password_reset' 
+            ? `We've sent a 6-digit reset code to ${email || 'your email'}`
+            : `We've sent a 6-digit code to ${email || 'your email'}`}
           {verificationType === 'organization' && organizationSlug && (
             <span className="block mt-1 text-xs">for organization: {organizationSlug}</span>
           )}
@@ -209,14 +255,14 @@ const OTPForm = ({ email, verificationType = 'signup', organizationSlug, onVerif
         </div>
       </div>
 
-      {error && <p className="text-red-500 text-[0.9rem] text-center mt-2">{error}</p>}
+      {error && <p className="text-[#514334] text-[0.9rem] text-center mt-2">{error}</p>}
 
       <button
         type="submit"
         className="p-4 rounded-[8px] border-0 cursor-pointer bg-primary text-white mt-4 w-full"
         disabled={loading || otp.join('').length !== 6}
       >
-        {loading ? "Verifying..." : "Verify Code"}
+        {loading ? "Verifying..." : verificationType === 'password_reset' ? "Verify Reset Code" : "Verify Code"}
       </button>
 
       <div className="text-center mt-4">
@@ -228,7 +274,7 @@ const OTPForm = ({ email, verificationType = 'signup', organizationSlug, onVerif
             disabled={!canResend || loading}
             className={`text-primary ${canResend && !loading ? 'cursor-pointer hover:underline' : 'cursor-not-allowed opacity-50'}`}
           >
-            {canResend ? 'Resend OTP' : `Resend in ${resendTimer}s`}
+            {canResend ? (verificationType === 'password_reset' ? 'Resend Reset Code' : 'Resend OTP') : `Resend in ${resendTimer}s`}
           </button>
         </p>
       </div>

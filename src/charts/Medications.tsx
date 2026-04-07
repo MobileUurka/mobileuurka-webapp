@@ -30,7 +30,7 @@ const Medications: React.FC<OverviewProps> = ({ patient, setActiveTab }) => {
   const activeMedications = allMedications.filter((med) => med.stopDate >= currentDate);
 
   return (
-    <div className="w-[88%] h-[92%] mx-auto flex flex-col z-[9999]">
+    <div className="w-[88%] h-[92%] mx-auto flex flex-col">
       {/* Title Block */}
       <div className="w-full h-[45px] my-5 lg:my-[15px] flex flex-row justify-between items-center">
         <h3 className="text-base font-bold text-gray-800">Medication</h3>
@@ -45,8 +45,8 @@ const Medications: React.FC<OverviewProps> = ({ patient, setActiveTab }) => {
               );
 
               return (
-                <div 
-                  key={index} 
+                <div
+                  key={index}
                   className="flex w-full flex-row gap-2.5 p-2.5 lg:p-2 items-center bg-white rounded-md relative"
                 >
                   {/* Pill Icon */}
@@ -115,7 +115,7 @@ const Medications: React.FC<OverviewProps> = ({ patient, setActiveTab }) => {
         {/* Action Button */}
         <div
           onClick={() => setActiveTab("medication" as TabType)}
-          className="z-[999] w-full absolute bottom-[15px] h-[50px] lg:h-[40px] bg-[#FFC187] rounded-md text-white flex justify-center items-center cursor-pointer text-[0.9em] lg:text-[0.8em] hover:bg-[#ffb36b] transition-colors"
+          className="w-full absolute bottom-[15px] h-[50px] lg:h-[40px] bg-[#FFC187] rounded-md text-white flex justify-center items-center cursor-pointer text-[0.9em] lg:text-[0.8em] hover:bg-[#ffb36b] transition-colors"
         >
           View Medications
         </div>

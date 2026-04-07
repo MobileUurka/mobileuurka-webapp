@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
 interface PasswordChangeFormProps {
   email: string;
-  mode?: 'setup' | 'reset'; // Dynamic mode
+  token?: string;
+  mode?: 'setup' | 'reset';
   onPasswordChanged?: () => void;
 }
 
-const PasswordChangeForm = ({ email, mode = 'setup', onPasswordChanged }: PasswordChangeFormProps) => {
+const PasswordChangeForm = ({ email, token, mode = 'setup', onPasswordChanged }: PasswordChangeFormProps) => {
   const [formData, setFormData] = useState({
     newPassword: '',
     confirmPassword: ''
@@ -30,12 +32,6 @@ const PasswordChangeForm = ({ email, mode = 'setup', onPasswordChanged }: Passwo
     setError(null);
   };
 
-  const togglePasswordVisibility = (field: 'new' | 'confirm') => {
-    setShowPasswords(prev => ({
-      ...prev,
-      [field]: !prev[field]
-    }));
-  };
 
   const validateForm = () => {
     if (!formData.newPassword) {
@@ -58,7 +54,7 @@ const PasswordChangeForm = ({ email, mode = 'setup', onPasswordChanged }: Passwo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
 
     setLoading(true);
@@ -100,13 +96,12 @@ const PasswordChangeForm = ({ email, mode = 'setup', onPasswordChanged }: Passwo
           }
         }
       } else {
-        // For reset mode, we need to get the token from URL params
-        const urlParams = new URLSearchParams(window.location.search);
-        const resetToken = urlParams.get('token');
-        
-        if (!resetToken) {
+        // For reset mode, use the token prop
+        if (!token) {
           throw new Error('Reset token not found');
         }
+
+        console.log('PasswordChangeForm: Attempting password reset with email:', email, 'token:', token);
 
         const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5500/api/v1'}/auth/reset-password`, {
           method: 'POST',
@@ -115,12 +110,13 @@ const PasswordChangeForm = ({ email, mode = 'setup', onPasswordChanged }: Passwo
           },
           body: JSON.stringify({
             email,
-            token: resetToken,
+            token,
             newPassword: formData.newPassword
           })
         });
 
         const result = await response.json();
+        console.log('PasswordChangeForm: Reset password response:', result);
 
         if (!response.ok) {
           throw new Error(result.message || 'Failed to reset password');
@@ -133,7 +129,7 @@ const PasswordChangeForm = ({ email, mode = 'setup', onPasswordChanged }: Passwo
       } else {
         navigate('/dashboard', {
           state: {
-            message: mode === 'setup' 
+            message: mode === 'setup'
               ? 'Password set successfully! Welcome to your dashboard.'
               : 'Password reset successfully! Welcome back.'
           }
@@ -165,6 +161,13 @@ const PasswordChangeForm = ({ email, mode = 'setup', onPasswordChanged }: Passwo
     }
   };
 
+  const togglePasswordVisibility = (field: 'new' | 'confirm') => {
+    setShowPasswords(prev => ({
+      ...prev,
+      [field]: !prev[field]
+    }));
+  };
+
   return (
     <form onSubmit={handleSubmit}>
       <div className="text-center mb-6">
@@ -189,13 +192,23 @@ const PasswordChangeForm = ({ email, mode = 'setup', onPasswordChanged }: Passwo
             placeholder="Enter your new password"
             required
           />
-          <button
-            type="button"
+          <span
+            className="password-toggle absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1 "
             onClick={() => togglePasswordVisibility('new')}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                togglePasswordVisibility('new');
+              }
+            }}
           >
-            {showPasswords.new ? '👁️' : '👁️‍🗨️'}
-          </button>
+            {showPasswords.new ? (
+              <FaEyeSlash className="icon" />
+            ) : (
+              <FaEye className="icon" />
+            )}
+          </span>
         </div>
         <p className="text-xs text-gray-500 mt-1">
           Password must be at least 8 characters long
@@ -217,13 +230,23 @@ const PasswordChangeForm = ({ email, mode = 'setup', onPasswordChanged }: Passwo
             placeholder="Confirm your new password"
             required
           />
-          <button
-            type="button"
+          <span
+            className="password-toggle absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1 "
             onClick={() => togglePasswordVisibility('confirm')}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                togglePasswordVisibility('confirm');
+              }
+            }}
           >
-            {showPasswords.confirm ? '👁️' : '👁️‍🗨️'}
-          </button>
+            {showPasswords.confirm ? (
+              <FaEyeSlash className="icon" />
+            ) : (
+              <FaEye className="icon" />
+            )}
+          </span>
         </div>
       </div>
 

@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Overlay from '../components/Overlay';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState(true);
+  const [isMobile] = useState<boolean>(window.innerWidth <= 900);
   
   const navigate = useNavigate();
 
@@ -35,7 +37,13 @@ const ForgotPassword = () => {
         throw new Error(result.message || 'Failed to send reset email');
       }
 
-      setSuccess(true);
+      // Navigate directly to verify page for password reset
+      navigate('/verify', {
+        state: {
+          email: email.trim().toLowerCase(),
+          type: 'password_reset'
+        }
+      });
     } catch (err: any) {
       setError(err.message || 'Failed to send reset email. Please try again.');
     } finally {
@@ -43,57 +51,22 @@ const ForgotPassword = () => {
     }
   };
 
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full space-y-8">
-          <div className="text-center">
-            <img src="/images/logo.png" alt="MobileUurka" className="mx-auto h-12 w-auto" />
-            <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Check Your Email</h2>
-            <p className="mt-2 text-sm text-gray-600">
-              We've sent a password reset link to <strong>{email}</strong>
-            </p>
-            <p className="mt-4 text-sm text-gray-600">
-              Didn't receive the email? Check your spam folder or{' '}
-              <button
-                onClick={() => setSuccess(false)}
-                className="text-primary hover:underline"
-              >
-                try again
-              </button>
-            </p>
-            <div className="mt-6">
-              <button
-                onClick={() => navigate('/auth')}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-              >
-                Back to Sign In
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <img src="/images/logo.png" alt="MobileUurka" className="mx-auto h-12 w-auto" />
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Forgot your password?
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Enter your email address and we'll send you a link to reset your password.
-          </p>
+  // Left side - Forgot Password Form
+  const Left = useMemo(
+    () => (
+      <div className="form">
+        <div className="logo-auth">
+          <img src="/images/logo.png" alt="company-logo" />
         </div>
         
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Email address
-            </label>
+        <div className="text-center mb-6">
+          <h2 className="text-xl font-semibold mb-2">Forgot Password?</h2>
+          <p className="text-gray-600 text-sm">Enter your email to reset your password</p>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="input-group">
+            <label htmlFor="email">Email Address</label>
             <input
               id="email"
               name="email"
@@ -102,38 +75,83 @@ const ForgotPassword = () => {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
               placeholder="Enter your email address"
             />
           </div>
 
           {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-700">{error}</div>
-            </div>
+            <p className="text-[#514334] text-[0.9rem] text-center mt-2">{error}</p>
           )}
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          <button
+            type="submit"
+            disabled={loading}
+            className="p-4 rounded-[8px] border-0 cursor-pointer bg-primary text-white mt-4 w-full disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Sending...' : 'Send Reset Link'}
+          </button>
+
+          <p className="text-center decoration-0 text-[0.8rem] mt-3">
+            Remember your password?{' '}
+            <span
+              onClick={() => navigate('/auth')}
+              className="text-primary cursor-pointer hover:underline"
             >
-              {loading ? 'Sending...' : 'Send Reset Link'}
-            </button>
+              Sign In
+            </span>
+          </p>
+        </form>
+      </div>
+    ), [email, loading, error, handleSubmit, navigate]
+  );
+
+  // Right side - Success Message
+  const Right = useMemo(
+    () => (
+      <div className="form">
+        <div className="logo-auth">
+          <img src="/images/logo.png" alt="company-logo" />
+        </div>
+        
+        <div className="text-center">
+          <div className="mb-6">
+           
+            <h2 className="text-xl font-semibold mb-2">Check Your Email</h2>
+            <p className="text-gray-600 text-sm mb-4">
+              We've sent a password reset link to <span className='font-bold'>{email}</span>
+            </p>
+            <p className="text-gray-600 text-sm">
+              Didn't receive the email? Check your spam folder
+            </p>
           </div>
 
-          <div className="text-center">
+          <div className="space-y-3 flex flex-row items-center justify-center gap-4">
             <button
-              type="button"
+              onClick={() => setSuccess(false)}
+              className="w-full p-4 rounded-[8px] border border-gray-300 cursor-pointer bg-white text-gray-700 hover:bg-gray-50"
+            >
+              Try Again
+            </button>
+            
+            <button
               onClick={() => navigate('/auth')}
-              className="text-sm text-primary hover:underline"
+              className="w-full p-4 rounded-[8px] border-0 cursor-pointer bg-primary text-white hover:bg-primary/90"
             >
               Back to Sign In
             </button>
           </div>
-        </form>
+        </div>
       </div>
+    ), [email, navigate]
+  );
+
+  return isMobile ? (
+    <div className="auth">{success ? Right : Left}</div>
+  ) : (
+    <div className="flex flex-row h-screen relative">
+      {Left}
+      {Right}
+      <Overlay isActive={success} />
     </div>
   );
 };

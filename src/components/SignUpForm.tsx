@@ -236,7 +236,7 @@ function SignUpForm({ onSwitch }: SignUpFormProps) {
             </div>
 
 
-            <div className="input-group">
+            {/* <div className="input-group">
                 <label htmlFor="licenseNumber">KMPDC License Number (Optional - Testing Mode)</label>
                 <input
                     type="text"
@@ -249,7 +249,7 @@ function SignUpForm({ onSwitch }: SignUpFormProps) {
                 <small className="text-gray-500 text-xs mt-1 block">
                     License verification is disabled for testing. You can leave this blank or enter any value.
                 </small>
-            </div>
+            </div> */}
 
             <div className="input-group">
                 <label htmlFor="password">Password *</label>
@@ -290,7 +290,7 @@ function SignUpForm({ onSwitch }: SignUpFormProps) {
 
             {error && <p className="text-red-500 text-[0.9rem] text-center mt-2">{error}</p>}
 
-            <div className="flex gap-3 mt-4">
+            <div className="flex flex-col lg:flex-row gap-3 mt-4">
                 <button
                     type="button"
                     onClick={handlePreviousStep}

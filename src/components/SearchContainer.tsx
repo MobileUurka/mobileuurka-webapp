@@ -96,7 +96,7 @@ const SearchContainer: React.FC<SearchProps> = ({
           </button>
         )}
       </div>
-      <div className='w-10 aspect-square rounded-full bg-[#008540] text-sm text-white flex items-center justify-center'>
+      <div className='hidden lg:flex w-10 aspect-square rounded-full bg-[#008540] text-sm text-white items-center justify-center'>
         {initial}
       </div>
     </div>

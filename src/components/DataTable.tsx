@@ -45,10 +45,15 @@ function DataTable<T extends { id?: string | number }>({
   // Create responsive grid layout - use minmax for better mobile handling
   const gridLayout = columns.map(col => {
     if (col.width) {
-      return `minmax(${col.width}, 1fr)`;
+      return `minmax(${col.width}, 0.9fr)`;
     }
-    return "minmax(120px, 1fr)";
+    return "minmax(100px, 1fr)";
   }).join(" ");
+
+  // const gridLayout = columns.map(col => {
+  //   if (col.width) return col.width;
+  //   return "minmax(150px, 1fr)";
+  // }).join(" ");
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">

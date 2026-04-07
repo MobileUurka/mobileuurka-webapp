@@ -217,6 +217,25 @@ const ScreeningForm = ({ fields, onSubmit, initialData = {}, isLastStep = false 
       }
     }
 
+    // Auto-calculate EDD when last menstrual period is entered
+    if (name === 'lastPeriodDate' && value) {
+      try {
+        const lmpDate = new Date(value);
+        // Add 280 days (40 weeks) to LMP to get EDD
+        const eddDate = new Date(lmpDate.getTime() + (280 * 24 * 60 * 60 * 1000));
+        const eddString = eddDate.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+        
+        setFormData(prev => ({ 
+          ...prev, 
+          [name]: value, 
+          estimatedDueDate: eddString 
+        }));
+      } catch (error) {
+        console.error('Error calculating EDD:', error);
+        setFormData(prev => ({ ...prev, [name]: value }));
+      }
+    }
+
     // Clear errors for the field
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
@@ -345,6 +364,11 @@ const ScreeningForm = ({ fields, onSubmit, initialData = {}, isLastStep = false 
               (Auto-filled from last visit)
             </span>
           )}
+          {field.name === 'estimatedDueDate' && formData.lastPeriodDate && formData[field.name] && (
+            <span className="text-xs text-green-600 ml-2 font-normal">
+              (Auto-calculated from LMP)
+            </span>
+          )}
         </label>
 
         {/* Special handling for patientId field */}
@@ -401,10 +425,18 @@ const ScreeningForm = ({ fields, onSubmit, initialData = {}, isLastStep = false 
 
           <input
             type={field.type}
-            value={formData[field.name] || ''}
-            onChange={(e) => handleInputChange(field.name, field.type === 'number' ? Number(e.target.value) : e.target.value)}
+            value={formData[field.name] ?? ''}
+            onChange={(e) => {
+              if (field.type === 'number') {
+                const numValue = e.target.value === '' ? '' : Number(e.target.value);
+                handleInputChange(field.name, numValue);
+              } else {
+                handleInputChange(field.name, e.target.value);
+              }
+            }}
             placeholder={field.placeholder || (field.name === 'bmi' ? 'Will calculate automatically' : field.name === 'map' ? 'Will calculate automatically' : '')}
             readOnly={isReadonly}
+            min={field.type === 'number' ? 0 : undefined}
             className={`px-3 py-3 border rounded-lg focus:outline-none focus:ring-0 focus:ring-[#008540] ${hasError ? 'border-red-500' : 'border-gray-300'
               } ${isReadonly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
           />

@@ -67,7 +67,7 @@ const Riskassessment: React.FC<RiskAssessmentProps> = ({ patient }) => {
         <span className="font-bold text-sm text-gray-700">Risk Assessment Overview</span>
       </div>
 
-      <div className="grid grid-cols-[42%_58%] w-full h-[calc(100%-45px)]">
+      <div className="grid grid-cols-1 lg:grid-cols-[42%_58%] w-full h-[calc(100%-45px)]">
         {/* Left Side: The Pie Chart */}
         <div className="w-full h-full flex justify-center items-center">
           <Piechart patient={patient} selectedDate={selectedDate} />
@@ -93,7 +93,7 @@ const Riskassessment: React.FC<RiskAssessmentProps> = ({ patient }) => {
                 <div
                   key={index}
                   onClick={() => setSelectedDate(date)}
-                  className={`h-[90%] w-[50px] rounded-[30px] lg:rounded-[20px] lg:h-full cursor-pointer transition-colors
+                  className={`h-[90%] w-[50px] rounded-[30px] lg:rounded-[20px] pb-2 lg:h-full cursor-pointer transition-colors
                     ${isActive 
                       ? "bg-[rgba(133,198,154,0.16)]" 
                       : isFutureVisit 

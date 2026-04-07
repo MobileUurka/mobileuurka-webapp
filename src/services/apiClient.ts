@@ -7,13 +7,19 @@ let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
 
 async function request(endpoint: string, options: any = {}) {
-    // 1. Validate and refresh token proactively
-    const isTokenValid = await authService.validateAndRefreshToken();
-    if (!isTokenValid && !endpoint.includes('/auth/')) {
-      console.error('No valid token available for endpoint:', endpoint);
-      authService.logout();
-      window.dispatchEvent(new Event('auth-logout'));
-      throw new Error('Authentication required');
+    // List of endpoints that don't require authentication
+    const publicEndpoints = ['/auth/', '/payments/auth', '/payments/callback'];
+    const isPublicEndpoint = publicEndpoints.some(publicPath => endpoint.includes(publicPath));
+
+    // 1. Validate and refresh token proactively (skip for public endpoints)
+    if (!isPublicEndpoint) {
+        const isTokenValid = await authService.validateAndRefreshToken();
+        if (!isTokenValid) {
+            console.error('No valid token available for endpoint:', endpoint);
+            authService.logout();
+            window.dispatchEvent(new Event('auth-logout'));
+            throw new Error('Authentication required');
+        }
     }
 
     // 2. Prepare Headers
@@ -21,15 +27,17 @@ async function request(endpoint: string, options: any = {}) {
     const sessionId = authService.getSessionId();
 
     console.log('Making request to:', endpoint, {
-      hasToken: !!token,
-      hasSessionId: !!sessionId,
-      tokenLength: token?.length || 0
+        hasToken: !!token,
+        hasSessionId: !!sessionId,
+        tokenLength: token?.length || 0,
+        isPublicEndpoint
     });
 
     const headers = {
         'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` }),
-        ...(sessionId && { 'x-session-id': sessionId }),
+        // Only add auth headers for non-public endpoints
+        ...(!isPublicEndpoint && token && { 'Authorization': `Bearer ${token}` }),
+        ...(!isPublicEndpoint && sessionId && { 'x-session-id': sessionId }),
         ...options.headers,
     };
 
@@ -46,8 +54,8 @@ async function request(endpoint: string, options: any = {}) {
         data = null;
     }
 
-    // 4. Handle Token Expiration (401) - Fallback if proactive refresh failed
-    if (response.status === 401 && !options._retry) {
+    // 4. Handle Token Expiration (401) - Fallback if proactive refresh failed (skip for public endpoints)
+    if (response.status === 401 && !options._retry && !isPublicEndpoint) {
         console.warn(`Access token expired for ${endpoint}, handling refresh...`);
 
         // IF NOT ALREADY REFRESHING: Start the refresh process

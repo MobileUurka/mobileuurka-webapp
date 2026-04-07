@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { MdOutlineSpaceDashboard } from "react-icons/md";
 import { HiOutlineUserGroup } from "react-icons/hi";
 import { IoSettingsOutline } from "react-icons/io5";
@@ -11,6 +11,7 @@ import { BiChevronLeft } from "react-icons/bi";
 import { TbNurse } from "react-icons/tb";
 import { IoLogOutOutline } from "react-icons/io5";
 
+
 type SidebarProps = {
     activeItem: string;
     setActiveItem: React.Dispatch<React.SetStateAction<string>>;
@@ -22,7 +23,28 @@ type SidebarProps = {
 const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, sideBarActive }: SidebarProps) => {
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 900);
-    
+    const [user, setUser] = useState<any>(null);
+    const [initial, setInitial] = useState()
+    // We use useCallback so this function doesn't change on every render
+    const checkAuth = useCallback(async () => {
+        // 1. Initialize encryption keys first      
+        const data = await authService.getUser();
+        setUser(data)
+
+    }, []);
+
+    useEffect(() => {
+        checkAuth();
+    }, [checkAuth]);
+
+    useEffect(() => {
+        if (user?.firstName && user?.lastName) {
+            const initials =
+                user.firstName.charAt(0).toUpperCase() +
+                user.lastName.charAt(0).toUpperCase();
+            setInitial(initials);
+        }
+    }, [user]);
 
     const navigate = useNavigate();
 
@@ -30,7 +52,7 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
         { name: "Dashboard", icon: <MdOutlineSpaceDashboard /> },
         { name: "Patients", icon: <HiOutlineUserGroup /> },
         { name: "Hospital", icon: <LuBuilding2 /> },
-        { name: "Staff", icon: <TbNurse />        },
+        { name: "Staff", icon: <TbNurse /> },
         { name: "Screening", icon: <RiBubbleChartLine /> },
     ];
 
@@ -61,12 +83,12 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
     const handleLogout = async () => {
         try {
             await authService.logout();
-            
+
         } catch (error) {
             console.error("Logout failed, cleaning up local state anyway:", error);
             // Force clear if the network request fails
         }
-        finally{
+        finally {
             localStorage.clear();
             sessionStorage.clear();
             window.location.reload();
@@ -102,13 +124,18 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
 
                 {/* Hamburger for mobile */}
                 {isMobile && (
-                    <div
-                        className={`hamburger hamburger--collapse ${isSidebarOpen ? "is-active" : ""}`}
-                        onClick={() => setSidebarOpen(prev => !prev)}
-                    >
-                        <span className="hamburger-box">
-                            <span className="hamburger-inner"></span>
-                        </span>
+                    <div className="flex flex-row items-center gap-3">
+                        <div className='w-10 aspect-square rounded-full bg-[#008540] text-sm text-white flex items-center justify-center mr-13 -mt-2'>
+                            {initial}
+                        </div>
+                        <div
+                            className={`hamburger hamburger--collapse ${isSidebarOpen ? "is-active" : ""}`}
+                            onClick={() => setSidebarOpen(prev => !prev)}
+                        >
+                            <span className="hamburger-box">
+                                <span className="hamburger-inner"></span>
+                            </span>
+                        </div>
                     </div>
                 )}
             </div>
@@ -146,25 +173,25 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
                 <ul className="space-y-1">
                     {activityItems.map(item => (
                         <li
-                        key={item.name}
-                        onClick={() => handleClick(item.name)}
-                        className={`
+                            key={item.name}
+                            onClick={() => handleClick(item.name)}
+                            className={`
                             transition-all duration-300 ease-in-out flex items-center 
                             ${sideBarActive ? 'px-4 gap-3 justify-start' : 'px-0 justify-center'} 
                             py-3 rounded-lg text-sm cursor-pointer 
                             ${activeItem === item.name ? "bg-bgColor" : "hover:bg-bgColor"}
                         `}
-                    >
-                        <span className="text-[#aca287] text-lg shrink-0">
-                            {item.icon}
-                        </span>
-
-                        {sideBarActive && (
-                            <span className="flex-1 whitespace-nowrap overflow-hidden">
-                                {item.name}
+                        >
+                            <span className="text-[#aca287] text-lg shrink-0">
+                                {item.icon}
                             </span>
-                        )}
-                        {item.showBadge && (
+
+                            {sideBarActive && (
+                                <span className="flex-1 whitespace-nowrap overflow-hidden">
+                                    {item.name}
+                                </span>
+                            )}
+                            {item.showBadge && (
                                 <span className={`bg-[#f05b56] text-white text-xs w-5 h-5 rounded-full flex items-center justify-center ${sideBarActive ? 'flex' : 'hidden'}`}>
                                     2
                                 </span>
@@ -172,7 +199,7 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
                         </li>
                     ))}
                 </ul>
-                
+
             </div>
 
             {/* Mobile Sidebar */}
@@ -221,7 +248,7 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
                             ))}
                         </ul>
 
-                       
+
                     </div>
                 </>
             )}
