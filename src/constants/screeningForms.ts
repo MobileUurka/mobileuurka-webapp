@@ -216,11 +216,11 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'bun', label: 'BUN (mg/dL)', type: 'number', required: true },
 
       // Blood Sugar Tests
-      { name: 'fbs', label: 'Fasting Blood Sugar', type: 'select', required: true, options: ['normal', 'elevated', 'high'] },
+      { name: 'fbs', label: 'Fasting Blood Sugar', type: 'number', required: true },
       { name: 'fbs1', label: 'FBS 1 Hour (mg/dL)', type: 'number' },
       { name: 'fbs2', label: 'FBS 2 Hour (mg/dL)', type: 'number' },
       { name: 'hba1c', label: 'HbA1c', type: 'select', required: true, options: ['normal', 'prediabetic', 'diabetic'] },
-      { name: 'hba1cValue', label: 'HbA1c Value (%)', type: 'number' },
+      { name: 'hba1c_value', label: 'HbA1c Value (%)', type: 'number' },
       { name: 'randombloodsugar', label: 'Random Blood Sugar (mg/dL)', type: 'number', required: true },
 
       // Hematology
