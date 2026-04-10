@@ -240,15 +240,15 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'tsh', label: 'TSH (mIU/L)', type: 'number', required: true },
 
       // Urine Analysis
-      { name: 'ketones', label: 'Ketones', type: 'select', required: true, options: ['negative', 'trace', '+', '++', '+++'] },
+      { name: 'ketones', label: 'Ketones', type: 'select', required: true, options: ['negative', '+', '++', '+++'] },
       { name: 'clarity', label: 'Clarity', type: 'select', required: true, options: ['clear', 'slightly cloudy', 'cloudy', 'turbid'] },
       { name: 'sg', label: 'Specific Gravity', type: 'number', required: true },
       { name: 'ph', label: 'pH', type: 'number', required: true },
       { name: 'urineColor', label: 'Urine Color', type: 'select', required: true, options: ['pale yellow', 'yellow', 'dark yellow', 'amber', 'red', 'brown'] },
-      { name: 'urineGlucose', label: 'Urine Glucose', type: 'select', required: true, options: ['negative', 'trace', '+', '++', '+++', '++++'] },
-      { name: 'urineNitrite', label: 'Urine Nitrite', type: 'select', required: true, options: ['negative', 'positive'] },
+      { name: 'urineGlucose', label: 'Urine Glucose', type: 'select', required: true, options: ['Negative', '+', '++', '+++'] },
+      { name: 'urineNitrite', label: 'Urine Nitrite', type: 'select', required: true, options: ['Negative', 'Positive'] },
       { name: 'urineOdor', label: 'Urine Odor', type: 'select', required: true, options: ['normal', 'sweet', 'fishy', 'ammonia', 'foul'] },
-      { name: 'urineProtein', label: 'Urine Protein', type: 'select', required: true, options: ['negative', 'trace', '+', '++', '+++', '++++'] },
+      { name: 'urineProtein', label: 'Urine Protein', type: 'select', required: true, options: ['negative', '+', '++', '+++'] },
 
       // Diagnosis
       // { name: 'diagnosis', label: 'Diagnosis', type: 'textarea', required: true, placeholder: 'Clinical diagnosis based on results' },

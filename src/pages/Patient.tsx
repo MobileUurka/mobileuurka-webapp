@@ -87,7 +87,6 @@ const Patient: React.FC = () => {
       const response = await patientService.getPatientCompleteProfile(patientId);
       if (response.success) {
         setPatient(response.data);
-        console.log(response.data)
       } else {
         setError("Patient profile not found");
       }

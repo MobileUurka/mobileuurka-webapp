@@ -11,6 +11,42 @@ const Screening = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
 
+
+  const fetchLatestTriage = async (patientId: string) => {
+    try {
+      const response = await patientService.getRecords("triage", {
+        patientId: patientId,
+        limit: 1,
+        orderBy: 'date',
+        order: 'desc'
+      });
+
+      // Return the first record if it exists
+      return response.data?.records?.[0] || null;
+    } catch (error) {
+      console.error("Error fetching triage:", error);
+      return null;
+    }
+  }
+
+  const fetchLatestPregnancy = async (patientId: string) => {
+    try {
+      const response = await patientService.getRecords("currentPregnancyInfo", {
+        patientId: patientId,
+        limit: 1,
+        orderBy: 'date',
+        order: 'desc'
+      });
+
+      // Return the first record if it exists
+      return response.data?.records?.[0] || null;
+    } catch (error) {
+      console.error("Error fetching triage:", error);
+      return null;
+    }
+  }
+
+
   // 1. Navigation Logic
   const handleCategoryClick = (id: string) => {
     setSearchTerm(""); // Clear search when moving into a component
@@ -279,10 +315,17 @@ const Screening = () => {
         return;
 
       case 'Lab':
+        const latestTriage = await fetchLatestTriage(data.patientId);
+        console.log(latestTriage)
+
+        const latestPregnancy = await fetchLatestPregnancy(data.patientId);
+        console.log(latestPregnancy)
+
         structuredData = {
-          patientId: data.patientId,
+          patient_Id: data.patientId,
           editor: data.editor,
           date: data.date,
+          user_id:data.user_id,
           gestationweek: data.gestationweek,
 
           // Blood Chemistry
@@ -298,7 +341,7 @@ const Screening = () => {
           glutamyl: data.glutamyl,
           potassium: data.potassium,
           sodium: data.sodium,
-          uricAcid: data.uricAcid,
+          uric: data.uricAcid,
           bun: data.bun,
 
           // Blood Sugar Tests
@@ -306,7 +349,7 @@ const Screening = () => {
           fbs1: data.fbs1,
           fbs2: data.fbs2,
           hba1c: data.hba1c,
-          hba1cValue: data.hba1cValue,
+          hba1c_Value: data.hba1c_value,
           randombloodsugar: data.randombloodsugar,
 
           // Hematology
@@ -330,18 +373,22 @@ const Screening = () => {
           clarity: data.clarity,
           sg: data.sg,
           ph: data.ph,
-          urineColor: data.urineColor,
-          urineGlucose: data.urineGlucose,
-          urineNitrite: data.urineNitrite,
-          urineOdor: data.urineOdor,
-          urineProtein: data.urineProtein,
+          urine_Color: data.urineColor,
+          urine_Glucose: data.urineGlucose,
+          urine_Nitrite: data.urineNitrite,
+          urine_Odor: data.urineOdor,
+          urine_Protein: data.urineProtein,
+
+          //
+          systolic: latestTriage?.systolic || 0,
+          diastolic: latestTriage?.diastolic || 0,
+          edema:latestPregnancy?.edema || "No",
 
           // Diagnosis
-          diagnosis: data.diagnosis,
-          diagnosisId: data.diagnosisId
         };
 
         try {
+          console.log(structuredData)
           const response = await patientService.createRecord('labwork', structuredData);
           if (response.success) {
             alert('Laboratory record created successfully!');

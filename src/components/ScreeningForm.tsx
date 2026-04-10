@@ -122,12 +122,14 @@ const ScreeningForm = ({ fields, onSubmit, initialData = {}, isLastStep = false 
   // Get current user data for editor fields
   useEffect(() => {
     const currentUser = authService.getUser();
+    console.log(currentUser)
     if (currentUser) {
       // Pre-populate editor fields with current user's name
       const editorFields = fields.filter(field => field.name === 'editor');
       if (editorFields.length > 0) {
         setFormData(prev => ({
           ...prev,
+          user_id:currentUser.id,
           editor: currentUser.name || currentUser.firstName + ' ' + currentUser.lastName || currentUser.email
         }));
       }

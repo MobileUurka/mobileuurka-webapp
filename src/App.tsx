@@ -28,8 +28,7 @@ function App() {
     // 1. Initialize encryption keys first
     const hasKeys = await authService.initializeEncryption();
     
-    const data = await authService.getUser();
-    console.log(data)
+    // const data = await authService.getUser();
 
     // 2. Check if we actually have a valid token (decrypted)
     const hasToken = authService.isAuthenticated();
