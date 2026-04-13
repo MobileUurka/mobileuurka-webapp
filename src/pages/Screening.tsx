@@ -29,6 +29,17 @@ const Screening = () => {
     }
   }
 
+  const fetchLatestPatient = async (patientId: string) => {
+    try {
+      const response = await patientService.getPatient(patientId);
+
+      // Return the first record if it exists
+      return response.data.patient || null;
+    } catch (error) {
+      console.error("Error fetching triage:", error);
+      return null;
+    }
+  }
   const fetchLatestPregnancy = async (patientId: string) => {
     try {
       const response = await patientService.getRecords("currentPregnancyInfo", {
@@ -45,6 +56,76 @@ const Screening = () => {
       return null;
     }
   }
+
+  const fetchLatestUltrasound = async (patientId: string) => {
+    try {
+      const response = await patientService.getRecords("ultrasounds", {
+        patientId: patientId,
+        limit: 1,
+        orderBy: 'date',
+        order: 'desc'
+      });
+
+      // Return the first record if it exists
+      return response.data?.records?.[0] || null;
+    } catch (error) {
+      console.error("Error fetching triage:", error);
+      return null;
+    }
+  }
+
+  const fetchLatestLabwork = async (patientId: string) => {
+    try {
+      const response = await patientService.getRecords("labwork", {
+        patientId: patientId,
+        limit: 1,
+        orderBy: 'date',
+        order: 'desc'
+      });
+
+      // Return the first record if it exists
+      return response.data?.records?.[0] || null;
+    } catch (error) {
+      console.error("Error fetching triage:", error);
+      return null;
+    }
+  }
+
+  const fetchLatestHistory = async (patientId: string) => {
+    try {
+      const response = await patientService.getRecords("patientHistory", {
+        patientId: patientId,
+        limit: 1,
+        orderBy: 'date',
+        order: 'desc'
+      });
+
+      // Return the first record if it exists
+      return response.data?.records?.[0] || null;
+    } catch (error) {
+      console.error("Error fetching triage:", error);
+      return null;
+    }
+  }
+
+  const fetchLatestLifestyle = async (patientId: string) => {
+    try {
+      const response = await patientService.getRecords("patientLifestyle", {
+        patientId: patientId,
+        limit: 1,
+        orderBy: 'date',
+        order: 'desc'
+      });
+
+      // Return the first record if it exists
+      return response.data?.records?.[0] || null;
+    } catch (error) {
+      console.error("Error fetching triage:", error);
+      return null;
+    }
+  }
+
+
 
 
   // 1. Navigation Logic
@@ -71,8 +152,11 @@ const Screening = () => {
   const handleFormSubmit = async (data: Record<string, any>) => {
     let structuredData: Record<string, any> = {};
 
+
     // Structure data based on the form type (tabId)
     switch (tabId) {
+
+
       case 'Intake':
         // For patient creation - structure as per API
         structuredData = {
@@ -266,42 +350,145 @@ const Screening = () => {
         return;
 
       case 'Journey':
-        structuredData = {
-          patientId: data.patientId,
-          editor: data.editor,
-          date: data.date,
-          gestationweek: data.gestationweek,
+        const latestTriage1 = await fetchLatestTriage(data.patientId);
+        const latestUltrasound = await fetchLatestUltrasound(data.patientId);
+        const latestLabwork = await fetchLatestLabwork(data.patientId);
+        const latestHistory = await fetchLatestHistory(data.patientId);
+        const latestLifestyle = await fetchLatestLifestyle(data.patientId);
+        const latestPatient = await fetchLatestPatient(data.patientId);
 
-          // Pregnancy Complications
-          abnormaldoppler: data.abnormaldoppler,
-          bleeding: data.bleeding,
-          eclampsia: data.eclampsia,
-          edema: data.edema,
-          malpresentation: data.malpresentation,
-          multifetalgestation: data.multifetalgestation,
-          pprom: data.pprom,
-          prom: data.prom,
-          preeclampsia: data.preeclampsia,
-          gestationaldiabetes: data.gestationaldiabetes,
-          gesthypertension: data.gesthypertension,
-          placentaprevia: data.placentaprevia,
-          primipaternity: data.primipaternity,
+        console.log(latestPatient)
+        const getAge = (dobString: string) => {
+          if (!dobString) return 0;
 
-          // Fetal Information
-          sexOfFetus: data.sexOfFetus,
-          spe: data.spe,
+          const today = new Date();
+          const birthDate = new Date(dobString);
 
-          // Medical Conditions
-          anemia: data.anemia,
-          malaria: data.malaria,
-          hookworm: data.hookworm,
-          vitamindDeficiency: data.vitamindDeficiency,
-          severAnemia: data.severAnemia,
-          highHb: data.highHb
+          let age = today.getFullYear() - birthDate.getFullYear();
+          const monthDiff = today.getMonth() - birthDate.getMonth();
+
+          // If the current month is before the birth month, 
+          // or if it's the birth month but the day hasn't passed yet, subtract a year.
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+          }
+
+          return age;
         };
 
+        // Usage in your structuredData:
+        age: getAge(latestPatient?.dob),
+
+          structuredData = {
+            // --- IDENTIFICATION & SESSION ---
+            patient_Id: data.patientId,
+            editor: data.editor,
+            date: data.date,
+            user_id: data.user_id,
+            gestationweek: data.gestationweek,
+
+            // --- CURRENT PREGNANCY OBSERVATIONS (currentPregnancyInfo Table) ---
+            abnormaldoppler: data.abnormaldoppler,
+            bleeding: data.bleeding,
+            eclampsia: data.eclampsia,
+            edema: data.edema,
+            malpresentation: data.malpresentation,
+            multifetalgestation: data.multifetalgestation,
+            pprom: data.pprom,
+            prom: data.prom,
+            preeclampsia: data.preeclampsia,
+            gestationaldiabetes: data.gestationaldiabetes,
+            gesthypertension: data.gesthypertension,
+            placentaprevia: data.placentaprevia,
+            primipaternity: data.primipaternity,
+
+            // Fetal Information
+            sex_Of_Fetus: data.sexOfFetus,
+            spe: data.spe,
+
+            // Current Medical Flags
+            anemia: data.anemia,
+            malaria: data.malaria,
+            hookworm: data.hookworm,
+            vitamind_Deficiency: data.vitamindDeficiency,
+            sever_Anemia: data.severAnemia,
+            high_Hb: data.highHb,
+
+            // --- TRIAGE & VITALS (triage Table) ---
+            systolic: latestTriage1?.systolic || 0,
+            diastolic: latestTriage1?.diastolic || 0,
+            bmi: latestTriage1?.bmi || 0,
+
+            // --- LAB WORK & ULTRASOUND (labwork & ultrasounds Tables) ---
+            haemoglobin: latestLabwork?.haemoglobin,
+            urineProtein: latestLabwork?.urineProtein,
+            randombloodsugar: latestLabwork?.randombloodsugar,
+
+            amniotic: Number(latestUltrasound?.amniotic) || 0, csectionNum: latestHistory?.csectionNum || 0,
+            csection: latestHistory?.csection || "No",
+            PREGNANCYHISTORYANEMIA: latestHistory?.pregnancyHistoryAnemia || "No",
+
+            // --- HISTORICAL RISK FACTORS (patientHistory Table) ---
+            // Personal & Chronic History
+            chronicHypertension: latestHistory?.chronicHypertension || "No",
+            chronicRenalDisease: latestHistory?.chronicRenalDisease || "No",
+            diabetesMelitus: latestHistory?.diabetesMelitus || "No",
+            autoimmune: latestHistory?.autoimmune || "No",
+            rheumatoid_Arthritis: latestHistory?.rheumatoidArthritis || "No",
+            cardiacDisease: latestHistory?.cardiacDisease || "No",
+            thyroid: latestHistory?.thyroid || "Normal",
+            liver: latestHistory?.liver || "Normal",
+            menorrhagia: latestHistory?.menorrhagia || "No",
+            pcos: latestHistory?.pcos || "No",
+
+            // Family History (Updated for new schema requirements)
+            famHistoryPreeclampsia: latestHistory?.famHistoryPreeclampsia || "No",
+            famHypertensionHistory: latestHistory?.famHistoryHypertension || "No",
+            famHistoryGestationalDiabetes: latestHistory?.famHistoryGestationalDiabetes || "No",
+            famHistoryDiabetes: latestHistory?.famHistoryDiabetes || "No",
+            famHistoryAutoimmune: latestHistory?.famHistoryAutoimmune || "No",
+            famAnemiaHistory: latestHistory?.famHistoryAnemia || "No",
+            FAM_SICKLE_CELL_HISTORY: latestHistory?.famSickleCell || "No",
+            PREG_HIST_ANEMIA: latestHistory?.pregnancyHistoryAnemia || "No",
+            FAM_THALASSEMIA_HISTORY: latestHistory?.famThalassemia || "No",
+
+
+            HYPERTENSIONHISTORY: latestHistory.HYPERTENSIONHISTORY || "No",
+            ANEMIAHISTORY: latestHistory.ANEMIAHISTORY || "No",
+
+
+            // Past Pregnancy History
+            firstPreeclampsiaHistory: latestHistory?.firstPreeclampsiaHistory || "No",
+            preeclampsiaHistory: latestHistory?.preeclampsiaHistory || "No",
+            eclampsiaHistory: latestHistory?.eclampsiaHistory || "No",
+            gestationalHypertensionHistory: latestHistory?.gestationalHypertensionHistory || "No",
+            gestationalDiabetesHistory: latestHistory?.gestationalDiabetesHistory || "No",
+
+            // Obstetric Stats
+            parity: latestHistory?.parity || 0,
+            gravida: latestHistory?.gravida || 0,
+            interval: latestHistory?.interval,
+            miscarriage: latestHistory?.miscarriage || "No",
+            miscarriageNum: latestHistory?.miscarriageNum || 0,
+            stillbirth: latestHistory?.stillbirth || "No",
+            pph: latestHistory?.pph || "No",
+            prevChildWeight: latestHistory?.prevChildWeight || 0,
+
+            // Surgical & Assessment
+            prevGynaSurgery: latestHistory?.prevGynaSurgery || "None",
+            prolongedLabour: latestHistory?.prolongedLabour || "No",
+            infertility: latestHistory?.infertility || "No",
+
+            // --- LIFESTYLE & BASE (patients & lifestyle Tables) ---
+            race: latestPatient?.race || "None",
+            age: getAge(latestPatient?.dob),
+            rh: latestPatient?.rh || null,
+
+            diet: latestLifestyle?.diet || "balanced",
+          };
+
         try {
-          const response = await patientService.createRecord('journey', structuredData);
+          const response = await patientService.createRecord('currentPregnancyInfo', structuredData);
           if (response.success) {
             alert('Pregnancy journey record created successfully!');
             navigate('/Screening');
@@ -316,16 +503,13 @@ const Screening = () => {
 
       case 'Lab':
         const latestTriage = await fetchLatestTriage(data.patientId);
-        console.log(latestTriage)
-
         const latestPregnancy = await fetchLatestPregnancy(data.patientId);
-        console.log(latestPregnancy)
 
         structuredData = {
           patient_Id: data.patientId,
           editor: data.editor,
           date: data.date,
-          user_id:data.user_id,
+          user_id: data.user_id,
           gestationweek: data.gestationweek,
 
           // Blood Chemistry
@@ -382,7 +566,7 @@ const Screening = () => {
           //
           systolic: latestTriage?.systolic || 0,
           diastolic: latestTriage?.diastolic || 0,
-          edema:latestPregnancy?.edema || "No",
+          edema: latestPregnancy?.edema || "No",
 
           // Diagnosis
         };

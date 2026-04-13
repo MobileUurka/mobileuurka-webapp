@@ -67,7 +67,7 @@ export const PATIENT_COLUMNS: ColumnConfig<Patient>[] = [
   {
     label: "Name",
     key: "name",
-    width:"180px",
+    width:"240px",
     render: (patient) => (
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-full bg-[#e5decb] flex items-center justify-center text-xs text-gray-700 shrink-0">
@@ -91,7 +91,7 @@ export const PATIENT_COLUMNS: ColumnConfig<Patient>[] = [
   {
     label: "Hospital",
     key: "hospital",
-    width:"150px",
+    width:"220px",
     render: (patient) => <span className="truncate">{patient.hospital || "—"}</span>
   },
   {
@@ -199,7 +199,7 @@ export const PATIENT_COLUMNS: ColumnConfig<Patient>[] = [
   {
     label: "Suspected Diagnosed Diseases",
     key: "suspected",
-    width: "250px",
+    width: "350px",
     render: (item: any) => {
       // Access the patient object inside the nested response
       const rawDiagnosis = item.diagnosis; 
@@ -227,7 +227,7 @@ export const PATIENT_COLUMNS: ColumnConfig<Patient>[] = [
               }}
             />
           )}
-          <span className="truncate max-w-[200px]">
+          <span className="truncate max-w-[300px]">
             {isEmpty ? "—" : formatted}
           </span>
         </span>

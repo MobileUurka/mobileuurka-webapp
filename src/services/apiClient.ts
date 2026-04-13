@@ -102,6 +102,8 @@ async function request(endpoint: string, options: any = {}) {
         });
         throw data;
     }
+
+    
     return data;
 }
 

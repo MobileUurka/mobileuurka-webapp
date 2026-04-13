@@ -49,7 +49,7 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
     const navigate = useNavigate();
 
     const ClientItems = [
-        { name: "Dashboard", icon: <MdOutlineSpaceDashboard /> },
+        // { name: "Dashboard", icon: <MdOutlineSpaceDashboard /> },
         { name: "Patients", icon: <HiOutlineUserGroup /> },
         { name: "Hospital", icon: <LuBuilding2 /> },
         { name: "Staff", icon: <TbNurse /> },

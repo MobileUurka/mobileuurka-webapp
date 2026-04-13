@@ -74,11 +74,12 @@ function App() {
           ) : 
           (
             <Route element={<Layout />}>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/Dashboard" element={<Dashboard />} />
               <Route path="/Staff" element={<Staff />} />
               <Route path="/Screening" element={<Screening />} />
               <Route path="/Screening/:tabId" element={<Screening />} />
               <Route path="/Patients" element={<Patients />} />
+              <Route path="/" element={<Patients />} />
               <Route path="/Hospital" element={<Hospital />} />
               <Route path="/Patient/:id" element={<Patient />} />
               <Route path="/Alerts" element={<Alerts />} />
