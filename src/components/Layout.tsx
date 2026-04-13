@@ -14,6 +14,7 @@ function Layout() {
   const [activeItem, setActiveItem] = useState(getActiveFromPath(location.pathname));
   const [internalTab, setInternalTab] = useState<string | null>(null);
   const [ sideBarActive , setSideBarActive] = useState(true)
+  console.log(internalTab)
 
   useEffect(() => {
     setActiveItem(getActiveFromPath(location.pathname));
