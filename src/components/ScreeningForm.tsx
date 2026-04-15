@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { MdOutlineKeyboardArrowDown } from 'react-icons/md';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { authService } from '../services/authServices';
 import { hospitalService } from '../services/hospitalServices';
 import { patientService } from '../services/patientServices';
 import HospitalSelector from './HospitalSelector';
 import PatientSelector from './PatientSelector';
-import { type PatientData } from '../types/patient';
+// import { type PatientData } from '../types/patient';
 
 // Simple loading spinner component
 const LoadingSpinner = ({ size = 20 }: { size?: number }) => (
@@ -97,6 +97,25 @@ const ScreeningForm = ({ fields, onSubmit, initialData = {}, isLastStep = false 
     state: ''
   });
 
+  const location = useLocation();
+
+  useEffect(() => {
+    // Access the state object
+    const state = location.state;
+
+    if (state) {
+      console.log("Patient ID:", state.patientId);
+      console.log("Patient Name:", state.patientName);
+      
+      handlePatientSelection(state.patientId, state.patientName)
+      // You can also initialize local state here if needed
+      // setLocalPatient(state.patientData);
+    } else {
+      console.warn("No navigation state found. Handle redirect or fallback.");
+    }
+  }, [location]); // Re-run if location changes
+
+
   // Load hospital options for hospital dropdown
   useEffect(() => {
     const loadHospitals = async () => {
@@ -129,12 +148,31 @@ const ScreeningForm = ({ fields, onSubmit, initialData = {}, isLastStep = false 
       if (editorFields.length > 0) {
         setFormData(prev => ({
           ...prev,
-          user_id:currentUser.id,
+          user_id: currentUser.id,
           editor: currentUser.name || currentUser.firstName + ' ' + currentUser.lastName || currentUser.email
         }));
       }
     }
   }, [fields]);
+
+  useEffect(() => {
+    if (formData.gestationWeek > 0) {
+      const getTrimester = (gestationWeek: number): number => {
+        if (gestationWeek <= 0) return 0;
+        if (gestationWeek <= 12) return 1;
+        if (gestationWeek <= 26) return 2;
+        return 3;
+      };
+
+      const weekNumber = Number(formData.gestationWeek);
+
+      setFormData(prev => ({
+        ...prev,
+        trimester: getTrimester(weekNumber) // Call the function here
+      }));
+    }
+  }, [formData.gestationWeek])
+
 
   // Split fields into pages (2 columns, 5 rows max = 10 fields per page)
   const fieldsPerPage = 10;
@@ -142,12 +180,12 @@ const ScreeningForm = ({ fields, onSubmit, initialData = {}, isLastStep = false 
   const currentFields = fields.slice(currentPage * fieldsPerPage, (currentPage + 1) * fieldsPerPage);
 
   // Handle patient selection and auto-fill gestation week
-  const handlePatientSelection = async (patientId: string, patientName: string, patientData?: PatientData) => {
+  const handlePatientSelection = async (patientId: string, patientName: string) => {
     handleInputChange('patientId', patientId);
     setFormData(prev => ({ ...prev, patientName }));
 
     // Auto-fill gestation week based on last visit
-    if (patientData) {
+    if (patientId) {
       try {
         // Get complete patient profile to access visit history
         const response = await patientService.getPatientCompleteProfile(patientId);
@@ -162,6 +200,7 @@ const ScreeningForm = ({ fields, onSubmit, initialData = {}, isLastStep = false 
             const currentGestationWeek = calculateGestationWeek(lastVisit.date, lastVisit.gestationWeek);
             if (currentGestationWeek > 0) {
               // Auto-fill gestation week fields
+
               setFormData(prev => ({
                 ...prev,
                 gestationWeek: currentGestationWeek,
@@ -226,11 +265,11 @@ const ScreeningForm = ({ fields, onSubmit, initialData = {}, isLastStep = false 
         // Add 280 days (40 weeks) to LMP to get EDD
         const eddDate = new Date(lmpDate.getTime() + (280 * 24 * 60 * 60 * 1000));
         const eddString = eddDate.toISOString().split('T')[0]; // Format as YYYY-MM-DD
-        
-        setFormData(prev => ({ 
-          ...prev, 
-          [name]: value, 
-          estimatedDueDate: eddString 
+
+        setFormData(prev => ({
+          ...prev,
+          [name]: value,
+          estimatedDueDate: eddString
         }));
       } catch (error) {
         console.error('Error calculating EDD:', error);

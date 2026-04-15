@@ -44,7 +44,7 @@ function DataTable<T extends { id?: string | number }>({
   
   // Create responsive grid layout - use minmax for better mobile handling
   const gridLayout = columns.map(col => {
-    if (columns.length > 5) return col.width ?? "minmax(150px, 1fr)";
+    if (columns.length > 3) return col.width ?? "minmax(150px, 1fr)";
     return col.width ? `minmax(${col.width}, 0.9fr)` : "minmax(100px, 1fr)";
   }).join(" ");
 

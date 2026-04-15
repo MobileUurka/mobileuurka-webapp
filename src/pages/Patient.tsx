@@ -32,6 +32,7 @@ import type { PatientData, TabType } from "../types/patient";
 const Patient: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
+
   // State
   const [patient, setPatient] = useState<PatientData | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -87,6 +88,7 @@ const Patient: React.FC = () => {
       const response = await patientService.getPatientCompleteProfile(patientId);
       if (response.success) {
         setPatient(response.data);
+        console.log("Fetched patient:", response.data);
       } else {
         setError("Patient profile not found");
       }
@@ -150,7 +152,6 @@ const Patient: React.FC = () => {
           <div className="w-[90%] mx-auto flex justify-between py-2.5 border-b border-gray-200/50 last:border-0" key={index}>
             <div className="text-[#09090980] text-[13px] flex items-center">{item.label}</div>
             <div className={`font-medium text-xs capitalize text-right ${item.color || "text-black/80"}`}>
-              {item.value || "—"}
             </div>
           </div>
         ))}
@@ -246,8 +247,22 @@ const Patient: React.FC = () => {
   if (error || !patient) return <div className="patient-page"><div className="error text-red-500 text-center p-10">{error || "Patient not found"}</div></div>;
 
   return (
+    loading ? (
+      <div className="p-10">Loading...</div>
+    ) : 
+    error || !patient ? (
+      <div className="p-10 text-center">
+        <div className="text-red-500 mb-4">Error: {error || "Patient not found"}</div>
+        <button
+          onClick={() => window.history.back()}
+          className="px-4 py-2 bg-[#008540] text-white rounded-md hover:bg-[#006633]"
+        >
+          Go Back
+        </button>
+      </div>
+    ) : (
     <div className="w-full">
-      <div className={`w-full h-[90vh] transition-all duration-300 ease-in-out relative ${chatActive ? 'lg:grid lg:grid-cols-[25%_47%_28%] flex flex-col' : 'lg:grid lg:grid-cols-[25%_75%] flex flex-col'
+      <div className={`w-full h-[90vh] transition-[transform] duration-300 ease-in-out relative ${chatActive ? `lg:grid lg:grid-cols-[25%_75%_28%] flex flex-col lg:-translate-x-[28%]` : 'lg:grid lg:grid-cols-[25%_75%] flex flex-col'
         }`}>
 
         {/* Mobile Header */}
@@ -440,14 +455,12 @@ const Patient: React.FC = () => {
                 </button>
               </div>
             )}
-            <div className="flex-1 overflow-hidden">
               <Chat patient={patient} user={currentUser} />
-            </div>
           </div>
         )}
 
       </div>
-    </div>
+    </div>)
   );
 };
 

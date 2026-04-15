@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useNavigate } from "react-router-dom";
+// import { useNavigate } from "react-router-dom";
 import { hospitalService, type Hospital } from '../services/hospitalServices';
 import { authService } from '../services/authServices';
 import SearchContainer from "../components/SearchContainer";
@@ -8,7 +8,7 @@ import DataTable from '../components/DataTable';
 import HospitalSelector from '../components/HospitalSelector';
 
 const Hospitals = () => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -123,7 +123,7 @@ const Hospitals = () => {
       <DataTable<Hospital>
         columns={HOSPITAL_COLUMNS}
         data={filteredHospitals}
-        onRowClick={(hospital) => navigate(`/Hospital/${hospital.id}`)}
+        // onRowClick={(hospital) => navigate(`/Hospital/${hospital.id}`)}
         emptyMessage={searchTerm ? `No hospitals found matching "${searchTerm}"` : "No hospitals found."}
         initialItemsPerPage={10}
       />

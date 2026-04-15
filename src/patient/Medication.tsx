@@ -23,20 +23,18 @@ const Medication: React.FC<MedicationProps> = ({ patient, setActiveTab }) => {
   // Filter for Medication Allergies (Case Insensitive)
   const medicationAllergies = (patient.allergies ?? [])
     .filter((item: any) => {
-        const type = item.allergyType || item.allergy_type || "";
-        return type.toLowerCase() === "medication";
+      const type = item.allergyType || item.allergy_type || "";
+      return type.toLowerCase() === "medication";
     })
     .map((item: any) => item.allergies)
     .join(", ");
 
   const handleAddMedication = () => {
-    navigate("/Screening", { 
-      state: { 
+    navigate("/Screening/Prescription", {
+      state: {
         patientId: patient?.id,
-        formType: 'prescription',
-        returnTo: 'medication',
-        internalTab: 2.9 
-      } 
+        patientName: `${patient.firstName} ${patient.lastName}`,
+      }
     });
   };
 
@@ -62,7 +60,7 @@ const Medication: React.FC<MedicationProps> = ({ patient, setActiveTab }) => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button 
+        <button
           onClick={handleAddMedication}
           className="h-[50px] px-[25px] rounded-[11px] bg-[#008540] text-white flex items-center justify-center gap-2.5 text-[0.9em] cursor-pointer hover:bg-[#007036] transition-colors"
         >
@@ -73,10 +71,10 @@ const Medication: React.FC<MedicationProps> = ({ patient, setActiveTab }) => {
 
       {/* Main Grid Layout */}
       <div className="w-full min-h-[78vh] grid gap-[1%]" style={{ gridTemplateColumns: "68.5% 31.5%" }}>
-        
+
         {/* Medications List */}
         <div className="mt-[50px]">
-          <div className="grid grid-cols-[25%_30%_30%] m-2.5 mb-[15px] text-[0.9em] text-[#333]">
+          <div className="grid grid-cols-[30%_30%_30%] m-2.5 mb-[15px] text-[0.9em] text-[#333]">
             <div className="font-[500] text-black">Name</div>
             <div className="font-[500] text-black">Dosage</div>
             <div className="font-[500] text-black">Duration</div>
@@ -88,9 +86,9 @@ const Medication: React.FC<MedicationProps> = ({ patient, setActiveTab }) => {
                 (med.medicine || med.name || "").toLowerCase().includes(searchTerm.toLowerCase())
               )
               .map((med: any, index: number) => (
-                <div 
+                <div
                   key={med.id || index}
-                  className="grid grid-cols-[25%_30%_30%] items-center py-5 px-2.5 text-[0.9em] text-[#333] border-b border-[#dfdede80] cursor-pointer transition-all hover:pl-5"
+                  className="grid grid-cols-[30%_30%_30%] items-center py-5 px-2.5 text-[0.9em] text-[#333] border-b border-[#dfdede80] cursor-pointer transition-all hover:pl-5"
                 >
                   <div className="flex flex-row items-center gap-[15px]">
                     <div className="w-10 h-10 rounded-full bg-[#ffae1b] flex justify-center items-center text-white text-[1.1em]">
@@ -104,9 +102,9 @@ const Medication: React.FC<MedicationProps> = ({ patient, setActiveTab }) => {
                   </div>
                 </div>
               ))}
-              
+
             {(!patient.medications || patient.medications.length === 0) && (
-               <div className="py-20 text-center text-gray-400 italic">No active medications prescribed.</div>
+              <div className="py-20 text-center text-gray-400 italic">No active medications prescribed.</div>
             )}
           </div>
         </div>
@@ -122,7 +120,7 @@ const Medication: React.FC<MedicationProps> = ({ patient, setActiveTab }) => {
                 <div className="flex-1">
                   <div className="font-[900] text-[0.9em] text-black mb-1">Medication Alert</div>
                   <p className="text-[#22110a] text-[0.8em] leading-normal m-0">
-                    The patient has a known adverse reaction to <span className="font-bold underline">{medicationAllergies}</span>. 
+                    The patient has a known adverse reaction to <span className="font-bold underline">{medicationAllergies}</span>.
                     Please review the allergy history and consider alternative medications.
                   </p>
                   <button

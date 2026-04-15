@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 // import { MdOutlineSpaceDashboard } from "react-icons/md";
 import { HiOutlineUserGroup } from "react-icons/hi";
-import { IoSettingsOutline } from "react-icons/io5";
+// import { IoSettingsOutline } from "react-icons/io5";
 import { FiBell } from "react-icons/fi";
 import { RiBubbleChartLine } from "react-icons/ri";
 import { useNavigate } from "react-router-dom";
@@ -57,7 +57,7 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
     ];
 
     const activityItems = [
-        { name: "Settings", icon: <IoSettingsOutline /> },
+        // { name: "Settings", icon: <IoSettingsOutline /> },
         { name: "Alerts", icon: <FiBell />, showBadge: true },
         { name: "Logout", icon: <IoLogOutOutline /> }
     ];

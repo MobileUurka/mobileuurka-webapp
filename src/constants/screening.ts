@@ -68,5 +68,11 @@ export const Categories = [
         "Document prescribed medications and monitor dosage schedules.",
       id: "Prescription",
     },
+    {
+      title: "Notes",
+      description:
+        "Capture additional clinical observations, comments, and physician notes.",
+      id: "Notes",
+    }
   ];
   

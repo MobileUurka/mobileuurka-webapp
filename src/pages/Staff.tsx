@@ -1,14 +1,13 @@
 import { useEffect, useState, useMemo } from 'react'
 import { userService, type User } from '../services/userServices';
 import { authService } from '../services/authServices';
-import { useNavigate } from 'react-router-dom';
+// import { useNavigate } from 'react-router-dom';
 import DataTable from '../components/DataTable';
 import SearchContainer from '../components/SearchContainer';
 import AddStaffModal, { type StaffFormData } from '../components/AddStaffModal';
 import { useToast } from '../contexts/ToastContext';
 
 const Staff = () => {
-  const navigate = useNavigate();
   const { showSuccess, showError } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -85,7 +84,7 @@ const Staff = () => {
     {
       label: "Name",
       key: "name",
-      width: "180px",
+      width: "280px",
       render: (user: User) => (
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-[#e5decb] flex items-center justify-center text-xs text-gray-700 shrink-0">
@@ -98,7 +97,7 @@ const Staff = () => {
     {
       label: "Email",
       key: "email",
-      width: "200px",
+      width: "250px",
       render: (user: User) => (
         <span className="text-gray-600 truncate">{user.email}</span>
       )
@@ -116,7 +115,7 @@ const Staff = () => {
     {
       label: "Department",
       key: "department",
-      width: "150px",
+      width: "180px",
       render: (user: User) => (
         <span className="text-gray-600 truncate">{user.department || '—'}</span>
       )
@@ -164,7 +163,7 @@ const Staff = () => {
       <DataTable<User>
         columns={STAFF_COLUMNS}
         data={filteredUsers}
-        onRowClick={(user) => navigate(`/Staff/${user.id}`)}
+        // onRowClick={(user) => navigate(`/Staff/${user.id}`)}
         emptyMessage={searchTerm ? `No staff found matching "${searchTerm}"` : "No staff members found."}
         initialItemsPerPage={10}
       />

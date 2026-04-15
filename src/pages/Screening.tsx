@@ -28,7 +28,6 @@ const Screening = () => {
       return null;
     }
   }
-
   const fetchLatestPatient = async (patientId: string) => {
     try {
       const response = await patientService.getPatient(patientId);
@@ -56,7 +55,6 @@ const Screening = () => {
       return null;
     }
   }
-
   const fetchLatestUltrasound = async (patientId: string) => {
     try {
       const response = await patientService.getRecords("ultrasounds", {
@@ -73,7 +71,6 @@ const Screening = () => {
       return null;
     }
   }
-
   const fetchLatestLabwork = async (patientId: string) => {
     try {
       const response = await patientService.getRecords("labwork", {
@@ -90,7 +87,6 @@ const Screening = () => {
       return null;
     }
   }
-
   const fetchLatestHistory = async (patientId: string) => {
     try {
       const response = await patientService.getRecords("patientHistory", {
@@ -107,7 +103,6 @@ const Screening = () => {
       return null;
     }
   }
-
   const fetchLatestLifestyle = async (patientId: string) => {
     try {
       const response = await patientService.getRecords("patientLifestyle", {
@@ -124,8 +119,6 @@ const Screening = () => {
       return null;
     }
   }
-
-
 
 
   // 1. Navigation Logic
@@ -715,6 +708,30 @@ const Screening = () => {
         } catch (error: any) {
           console.error('Prescription creation error:', error);
           alert('Failed to create prescription record: ' + (error.message || 'Network error'));
+        }
+        return;
+
+      case 'Notes':
+        structuredData = {
+          patientId: data.patientId, // This will be the actual patient ID
+          editor: data.editor,
+          date: data.date,
+          gestationWeek: data.gestationWeek,
+          title: data.title,
+          notes: data.notes,
+        };
+
+        try {
+          const response = await patientService.createRecord('notes', structuredData);
+          if (response.success) {
+            alert('Notes record created successfully!');
+            navigate('/Screening');
+          } else {
+            alert('Failed to create Notes record: ' + (response.message || 'Unknown error'));
+          }
+        } catch (error: any) {
+          console.error('Notes creation error:', error);
+          alert('Failed to create Notes record: ' + (error.message || 'Network error'));
         }
         return;
 

@@ -180,7 +180,7 @@ const Chat: React.FC<ChatProps> = ({ patient, user }) => {
   };
 
   return (
-    <div className="flex flex-col h-[95%] mt-7.5 w-full bg-[#F6F6F6] rounded-xl overflow-hidden">
+    <div className="flex flex-col h-full lg:h-[95%]  mt-7.5 w-full bg-[#F6F6F6] rounded-xl overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-6 border-b border-gray-100 sticky top-0 z-10">
         <div>Sabi</div>

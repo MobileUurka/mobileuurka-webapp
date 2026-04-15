@@ -7,6 +7,7 @@ import DataTable from "../components/DataTable";
 
 // Types
 import { type PatientData, type TabType } from '../types/patient';
+import { userService } from "../services/userServices";
 
 interface DocumentsProps {
   patient: PatientData;
@@ -24,6 +25,27 @@ const Documents: React.FC<DocumentsProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
+  const [editorNames, setEditorNames] = useState<Record<string, string>>({});
+
+  // 2. Fetch names when patient data/notes change
+  useEffect(() => {
+    const fetchNames = async () => {
+      if (patient?.notes) {
+        const namesMap: Record<string, string> = {};
+
+        for (const note of patient.notes) {
+          if (note.editor && !namesMap[note.editor]) {
+            const response = await userService.getUserById(note.editor);
+            const user = response?.data?.user;
+            namesMap[note.editor] = user ? `${user.firstName} ${user.lastName}` : "System";
+          }
+        }
+        setEditorNames(namesMap);
+      }
+    };
+
+    fetchNames();
+  }, [patient?.notes]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -75,7 +97,7 @@ const Documents: React.FC<DocumentsProps> = ({
     };
     let positives = [];
     let negatives = [];
-    
+
     for (const key in infectionFields) {
       if (item[key] === "Positive") {
         positives.push(infectionFields[key]);
@@ -83,11 +105,11 @@ const Documents: React.FC<DocumentsProps> = ({
         negatives.push(infectionFields[key]);
       }
     }
-    
+
     if (positives.length > 0) {
       return `Positive: ${positives.join(", ")}${negatives.length > 0 ? ` | Negative: ${negatives.join(", ")}` : ""}`;
     }
-    
+
     return negatives.length > 0 ? `All Negative: ${negatives.join(", ")}` : "No infection data";
   };
 
@@ -121,7 +143,7 @@ const Documents: React.FC<DocumentsProps> = ({
     {
       label: "Name",
       key: "name",
-      width: "25%",
+      width: "200px",
       render: (record: any) => (
         <div className="flex flex-row items-center gap-[15px]">
           <div className="w-10 h-10 rounded-full bg-[#ffae1b] flex justify-center items-center text-white text-[1.1em] shrink-0">
@@ -137,15 +159,17 @@ const Documents: React.FC<DocumentsProps> = ({
     {
       label: "Editor",
       key: "editor",
-      width: "20%",
+      width: "150px",
       render: (record: any) => (
-        <div className="text-black/70 truncate">{record.editor}</div>
+        <div className="text-black/70 truncate">
+          {editorNames[record.editor] || "System"}
+        </div>
       )
     },
     {
       label: "Date",
       key: "date",
-      width: "15%",
+      width: "150px",
       render: (record: any) => (
         <div className="text-[#333]">{formatDate(record.date_of_visit)}</div>
       )
@@ -153,7 +177,7 @@ const Documents: React.FC<DocumentsProps> = ({
     {
       label: "Analysis",
       key: "analysis",
-      width: "39%",
+      width: "250px",
       render: (record: any) => (
         <div className="flex items-center text-[#838383] overflow-hidden">
           {(record.result !== "" && record.result !== "All Negative" && !record.result.startsWith("All Negative:")) && (

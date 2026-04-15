@@ -5,6 +5,8 @@ import { IoMdAdd } from "react-icons/io";
 
 // Types
 import { type PatientData, type TabType } from '../types/patient';
+import { useNavigate } from "react-router-dom";
+import { userService } from "../services/userServices";
 
 interface NotesProps {
   patient: PatientData;
@@ -14,6 +16,28 @@ interface NotesProps {
 
 const Notes: React.FC<NotesProps> = ({ patient, setActiveTitle, setNotes }) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const navigate = useNavigate();
+  const [editorNames, setEditorNames] = useState<Record<string, string>>({});
+
+  // 2. Fetch names when patient data/notes change
+  useEffect(() => {
+    const fetchNames = async () => {
+      if (patient?.notes) {
+        const namesMap: Record<string, string> = {};
+
+        for (const note of patient.notes) {
+          if (note.editor && !namesMap[note.editor]) {
+            const response = await userService.getUserById(note.editor);
+            const user = response?.data?.user;
+            namesMap[note.editor] = user ? `${user.firstName} ${user.lastName}` : "System";
+          }
+        }
+        setEditorNames(namesMap);
+      }
+    };
+
+    fetchNames();
+  }, [patient?.notes]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -34,13 +58,19 @@ const Notes: React.FC<NotesProps> = ({ patient, setActiveTitle, setNotes }) => {
   };
 
   const handleAddNote = () => {
-    setActiveTitle("notepad" as TabType);
+    navigate("/Screening/Notes", {
+      state: {
+        patientId: patient?.id,
+        patientName: `${patient.firstName} ${patient.lastName}`,
+      }
+    });
   };
 
   // Safe filtering
   const filteredNotes = (patient?.notes ?? []).filter((note: any) =>
     (note.title || note.content || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
+
 
   return (
     <div className="w-full">
@@ -56,7 +86,7 @@ const Notes: React.FC<NotesProps> = ({ patient, setActiveTitle, setNotes }) => {
             onChange={handleSearchChange}
           />
         </div>
-        <button 
+        <button
           onClick={handleAddNote}
           className="h-[50px] px-[25px] rounded-[11px] bg-[#008540] text-white flex items-center justify-center gap-2.5 text-[0.9em] cursor-pointer hover:bg-[#007036] transition-all"
         >
@@ -102,8 +132,7 @@ const Notes: React.FC<NotesProps> = ({ patient, setActiveTitle, setNotes }) => {
 
               {/* Editor Name */}
               <div className="text-black/70 truncate">
-                {note.editor || note.author || "System"}
-              </div>
+                {editorNames[note.editor] || "System"}              </div>
 
               {/* Date Column */}
               <div className="text-[#333]">

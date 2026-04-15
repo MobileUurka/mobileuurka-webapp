@@ -191,8 +191,6 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
     ]
   },
 
-  
-
   Lab: {
     title: "Laboratory Results",
     fields: [
@@ -255,6 +253,18 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       // Diagnosis
       // { name: 'diagnosis', label: 'Diagnosis', type: 'textarea', required: true, placeholder: 'Clinical diagnosis based on results' },
       // { name: 'diagnosisId', label: 'Diagnosis ID', type: 'text' }
+    ]
+  },
+
+  Notes:{
+    title:"Clinical Notes",
+    fields: [
+      { name: 'editor', label: 'Tested By', type: 'text', required: true, readonly: true },
+      { name: 'title', label:'Title', type:"text" },
+      { name: 'notes', label: 'Clinical Notes', type: 'textarea', required: true, placeholder: 'Enter clinical notes here...' },
+      { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
+      { name: 'date', label: 'Date', type: 'date', required: true },
+      { name: 'gestationWeek', label: 'Gestation Week', type: 'number', required: true },
     ]
   },
 
