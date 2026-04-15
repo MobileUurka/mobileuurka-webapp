@@ -262,7 +262,7 @@ const Patient: React.FC = () => {
       </div>
     ) : (
     <div className="w-full">
-      <div className={`w-full h-[90vh] transition-[transform] duration-300 ease-in-out relative ${chatActive ? `lg:grid lg:grid-cols-[25%_75%_28%] flex flex-col lg:-translate-x-[28%]` : 'lg:grid lg:grid-cols-[25%_75%] flex flex-col'
+      <div className={`w-full h-[90vh] transition-[translate] duration-300 ease-in-out relative ${chatActive ? `lg:grid lg:grid-cols-[25%_75%_28%] flex flex-col lg:-translate-x-[28%] ` : 'lg:grid lg:grid-cols-[25%_75%] flex flex-col'
         }`}>
 
         {/* Mobile Header */}

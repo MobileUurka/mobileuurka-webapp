@@ -41,6 +41,22 @@ body {
 html {
   scrollbar-width: none;
 }
+/* Add this to your existing Doc.css */
+.doc-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #008540;
+  font-size: 0.82em;
+  padding: 4px 4%;
+  margin-bottom: 8px;
+}
+.doc-back:hover {
+  opacity: 0.75;
+}
 
 /* General body and layout styles */
 input:-webkit-autofill,

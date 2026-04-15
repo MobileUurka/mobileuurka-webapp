@@ -7,412 +7,355 @@ interface DocumentProps {
   onBack?: () => void;
 }
 
-// Format object keys into readable labels
-const formatKey = (key: string): string => {
-  // Handle specific medical field names
-  const fieldMappings: Record<string, string> = {
-    'gestationweek': 'Gestation Week',
-    'abnormaldoppler': 'Abnormal Doppler',
-    'multifetalgestation': 'Multifetal Gestation',
-    'pprom': 'PPROM',
-    'prom': 'PROM',
-    'gestationaldiabetes': 'Gestational Diabetes',
-    'gesthypertension': 'Gestational Hypertension',
-    'placentaprevia': 'Placenta Previa',
-    'primipaternity': 'Primipaternity',
-    'sexOfFetus': 'Sex of Fetus',
-    'vitamindDeficiency': 'Vitamin D Deficiency',
-    'severAnemia': 'Severe Anemia',
-    'highHb': 'High Hemoglobin',
-    'alp': 'ALP',
-    'alt': 'ALT',
-    'ast': 'AST',
-    'glutamyl': 'Gamma-GT',
-    'uricAcid': 'Uric Acid',
-    'bun': 'BUN',
-    'fbs': 'FBS',
-    'fbs1': 'FBS 1hr',
-    'fbs2': 'FBS 2hr',
-    'hba1c': 'HbA1c',
-    'hba1cValue': 'HbA1c Value',
-    'randombloodsugar': 'Random Blood Sugar',
-    'ht': 'Hematocrit',
-    'haemoglobin': 'Hemoglobin',
-    'mch': 'MCH',
-    'mchc': 'MCHC',
-    'mcv': 'MCV',
-    'rbc': 'RBC',
-    'wbc': 'WBC',
-    't3': 'T3',
-    't4': 'T4',
-    'tsh': 'TSH',
-    'sg': 'Specific Gravity',
-    'ph': 'pH',
-    'urineColor': 'Urine Color',
-    'urineGlucose': 'Urine Glucose',
-    'urineNitrite': 'Urine Nitrite',
-    'urineOdor': 'Urine Odor',
-    'urineProtein': 'Urine Protein',
-    'diagnosisId': 'Diagnosis ID'
-  };
-
-  if (fieldMappings[key]) {
-    return fieldMappings[key];
-  }
-
-  return key
+// ---------------------------------------------------------------------------
+// Key → readable label: camelCase / snake_case only. No mapping table.
+// ---------------------------------------------------------------------------
+const cleanKey = (key: string): string =>
+  key
     .replace(/_/g, " ")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/\b\w/g, (l: string) => l.toUpperCase());
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+// ---------------------------------------------------------------------------
+// Attach unit where inferable from key
+// ---------------------------------------------------------------------------
+const withUnit = (value: string, key: string): string => {
+  const k = key.toLowerCase().replace(/[^a-z]/g, "");
+  if (isNaN(parseFloat(value))) return value;
+  const map: [string[], string][] = [
+    [["height"], "cm"],
+    [["weight"], "kg"],
+    [["temperature"], "°C"],
+    [["gestationweek"], "wks"],
+    [["alp", "alt", "ast"], "U/L"],
+    [["albumin"], "g/dL"],
+    [["bilirubin", "creatinine", "uricacid", "bun", "fbs", "randombloodsugar"], "mg/dL"],
+    [["potassium", "sodium", "chloride", "bicarbonate"], "mEq/L"],
+    [["hba1c", "ht"], "%"],
+    [["haemoglobin", "mchc"], "g/dL"],
+    [["wbc"], "/μL"],
+    [["rbc"], "M/μL"],
+    [["platelets"], "/μL"],
+    [["mch"], "pg"],
+    [["mcv"], "fL"],
+    [["t3"], "ng/dL"],
+    [["t4"], "μg/dL"],
+    [["tsh"], "mIU/L"],
+    [["pulse"], "bpm"],
+    [["systolic", "diastolic"], "mmHg"],
+  ];
+  for (const [keys, unit] of map) {
+    if (keys.some((m) => k.includes(m))) return `${value} ${unit}`;
+  }
+  return value;
 };
 
-// Helper function to format values with medical units
-const formatValue = (value: any, label: string): string => {
-  if (value === -1 || value === "-1") return "Unknown";
-  if (value === null || value === "" || value === undefined) return "—";
-
-  const stringValue = String(value);
-  const lowerLabel = label.toLowerCase();
-
-  // Basic measurements
-  if (lowerLabel.includes("height") && !stringValue.includes("cm")) return `${stringValue} cm`;
-  if (lowerLabel.includes("weight") && !stringValue.includes("kg")) return `${stringValue} kg`;
-  if (lowerLabel.includes("temperature") && !stringValue.includes("°")) return `${stringValue}°C`;
-  if (lowerLabel.includes("pressure") && stringValue.includes("/")) return `${stringValue} mmHg`;
-
-  // Lab values with units
-  if (lowerLabel.includes("gestationweek")) return `${stringValue} weeks`;
-  
-  // Blood chemistry units
-  if (lowerLabel.includes("alp") || lowerLabel.includes("alt") || lowerLabel.includes("ast")) return `${stringValue} U/L`;
-  if (lowerLabel.includes("albumin")) return `${stringValue} g/dL`;
-  if (lowerLabel.includes("bilirubin")) return `${stringValue} mg/dL`;
-  if (lowerLabel.includes("calcium")) return `${stringValue} mg/dL`;
-  if (lowerLabel.includes("creatinine")) return `${stringValue} mg/dL`;
-  if (lowerLabel.includes("potassium") || lowerLabel.includes("sodium") || lowerLabel.includes("chloride") || lowerLabel.includes("bicarbonate")) return `${stringValue} mEq/L`;
-  if (lowerLabel.includes("uric")) return `${stringValue} mg/dL`;
-  if (lowerLabel.includes("bun")) return `${stringValue} mg/dL`;
-  
-  // Blood sugar units
-  if (lowerLabel.includes("fbs") || lowerLabel.includes("randombloodsugar")) return `${stringValue} mg/dL`;
-  if (lowerLabel.includes("hba1c") && !lowerLabel.includes("value")) return `${stringValue}%`;
-  
-  // Hematology units
-  if (lowerLabel.includes("haemoglobin")) return `${stringValue} g/dL`;
-  if (lowerLabel.includes("ht")) return `${stringValue}%`;
-  if (lowerLabel.includes("leukocyte") || lowerLabel.includes("wbc")) return `${stringValue} /μL`;
-  if (lowerLabel.includes("rbc")) return `${stringValue} M/μL`;
-  if (lowerLabel.includes("platelets")) return `${stringValue} /μL`;
-  if (lowerLabel.includes("mch")) return `${stringValue} pg`;
-  if (lowerLabel.includes("mchc")) return `${stringValue} g/dL`;
-  if (lowerLabel.includes("mcv")) return `${stringValue} fL`;
-  
-  // Thyroid units
-  if (lowerLabel.includes("t3")) return `${stringValue} ng/dL`;
-  if (lowerLabel.includes("t4")) return `${stringValue} μg/dL`;
-  if (lowerLabel.includes("tsh")) return `${stringValue} mIU/L`;
-  
-  // Urine analysis units
-  if (lowerLabel.includes("sg")) return `${stringValue}`;
-  if (lowerLabel.includes("ph")) return `${stringValue}`;
-  
-  // Pregnancy measurements
-  if (lowerLabel.includes("spe")) return `${stringValue} mm`;
-
-  return stringValue;
+const displayValue = (raw: any, key: string): string => {
+  if (raw === -1 || raw === "-1") return "Unknown";
+  if (raw === null || raw === undefined || raw === "") return "—";
+  const s = String(raw);
+  if (s.toLowerCase() === "true") return "Yes";
+  if (s.toLowerCase() === "false") return "No";
+  return withUnit(s, key);
 };
 
-// Format date for hospital documents
 const formatDate = (iso: string): string => {
   if (!iso) return "—";
-  const date = new Date(iso);
-  return date.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "2-digit", 
-    year: "numeric"
-  }) + " " + date.toLocaleTimeString("en-GB", { 
-    hour: "2-digit", 
-    minute: "2-digit" 
-  });
+  const d = new Date(iso);
+  return isNaN(d.getTime())
+    ? "—"
+    : d.toLocaleString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
 };
 
-// Dynamic document templates based on type
-const getDocumentTemplate = (title: string, items: Array<{label: string, value: string}>) => {
-  const lowerTitle = title.toLowerCase();
-  
-  if (lowerTitle.includes("triage")) {
-    return {
-      title: "Triage Assessment",
-      sections: [
-        {
-          name: "Patient Information",
-          fields: items.filter(item => 
-            ["editor", "date", "patient id"].some(field => 
-              item.label.toLowerCase().includes(field)
-            )
-          )
-        },
-        {
-          name: "Vital Signs",
-          fields: items.filter(item => 
-            ["height", "weight", "blood pressure", "temperature", "pulse", "systolic", "diastolic"].some(field => 
-              item.label.toLowerCase().includes(field)
-            )
-          )
-        },
-        {
-          name: "Assessment",
-          fields: items.filter(item => 
-            !["editor", "date", "patient id", "height", "weight", "blood pressure", "temperature", "pulse", "systolic", "diastolic"].some(field => 
-              item.label.toLowerCase().includes(field)
-            )
-          )
-        }
-      ]
-    };
+const isBool = (raw: any) =>
+  ["yes", "no", "true", "false", "0", "1"].includes(String(raw).toLowerCase().trim());
+const isTrue = (raw: any) =>
+  ["yes", "true", "1"].includes(String(raw).toLowerCase().trim());
+
+// ---------------------------------------------------------------------------
+// Section groupings
+// ---------------------------------------------------------------------------
+type SectionDef = { name: string; keys: string[] };
+
+const SECTION_MAP: Record<string, SectionDef[]> = {
+  triage: [
+    { name: "Patient & Visit", keys: ["editor", "date", "patient", "id"] },
+    { name: "Vital Signs", keys: ["height", "weight", "bloodpressure", "systolic", "diastolic", "temperature", "pulse", "oxygen", "spo2"] },
+    { name: "Notes", keys: [] },
+  ],
+  lab: [
+    { name: "Request", keys: ["editor", "date", "patient", "id", "gestationweek", "diagnosisid"] },
+    { name: "Blood Chemistry", keys: ["alp", "alt", "ast", "albumin", "bicarbonate", "bilirubin", "calcium", "chloride", "creatinine", "glutamyl", "potassium", "sodium", "uricacid", "bun"] },
+    { name: "Blood Sugar", keys: ["fbs", "fbs1", "fbs2", "hba1c", "randombloodsugar"] },
+    { name: "Haematology", keys: ["ht", "haemoglobin", "mch", "mchc", "mcv", "rbc", "wbc", "platelets", "leukocyte"] },
+    { name: "Thyroid", keys: ["t3", "t4", "tsh"] },
+    { name: "Urinalysis", keys: ["sg", "ph", "urinecolor", "urineglucose", "urinenitrite", "urineodor", "urineprotein", "ketones", "clarity", "urine"] },
+  ],
+  pregnancy: [
+    { name: "Visit", keys: ["editor", "date", "patient", "id", "gestationweek", "sexoffetus", "spe"] },
+    { name: "Obstetric Findings", keys: ["doppler", "bleeding", "eclampsia", "edema", "malpresentation", "multifetal", "pprom", "prom", "preeclampsia", "placenta", "primipaternity"] },
+    { name: "Comorbidities", keys: ["anemia", "diabetes", "hypertension", "malaria", "hookworm", "vitamind", "severanemia", "highhb"] },
+  ],
+  infection: [
+    { name: "Request", keys: ["editor", "date", "patient", "id"] },
+    { name: "Screening Results", keys: [] },
+  ],
+};
+
+const FALLBACK: SectionDef[] = [
+  { name: "Header", keys: ["editor", "date", "patient", "id"] },
+  { name: "Details", keys: [] },
+];
+
+const getSectionDefs = (title: string): SectionDef[] => {
+  const t = title.toLowerCase();
+  for (const [k, v] of Object.entries(SECTION_MAP)) {
+    if (t.includes(k)) return v;
   }
-  
-  if (lowerTitle.includes("lab")) {
-    return {
-      title: "Laboratory Report",
-      sections: [
-        {
-          name: "Test Information",
-          fields: items.filter(item => 
-            ["editor", "date", "patient id", "gestationweek", "diagnosis"].some(field => 
-              item.label.toLowerCase().includes(field)
-            )
-          )
-        },
-        {
-          name: "Blood Chemistry",
-          fields: items.filter(item => 
-            ["alp", "alt", "ast", "albumin", "bicarbonate", "bilirubin", "calcium", "chloride", "creatinine", "glutamyl", "potassium", "sodium", "uric", "bun"].some(field => 
-              item.label.toLowerCase().includes(field)
-            )
-          )
-        },
-        {
-          name: "Blood Sugar Tests",
-          fields: items.filter(item => 
-            ["fbs", "hba1c", "randombloodsugar"].some(field => 
-              item.label.toLowerCase().includes(field)
-            )
-          )
-        },
-        {
-          name: "Hematology",
-          fields: items.filter(item => 
-            ["ht", "leukocyte", "haemoglobin", "mch", "mchc", "mcv", "platelets", "rbc", "wbc"].some(field => 
-              item.label.toLowerCase().includes(field)
-            )
-          )
-        },
-        {
-          name: "Thyroid Function",
-          fields: items.filter(item => 
-            ["t3", "t4", "tsh"].some(field => 
-              item.label.toLowerCase().includes(field)
-            )
-          )
-        },
-        {
-          name: "Urine Analysis",
-          fields: items.filter(item => 
-            ["ketones", "clarity", "sg", "ph", "urine"].some(field => 
-              item.label.toLowerCase().includes(field)
-            )
-          )
-        }
-      ]
-    };
-  }
-  
-  if (lowerTitle.includes("pregnancy")) {
-    return {
-      title: "Pregnancy Assessment",
-      sections: [
-        {
-          name: "Visit Information",
-          fields: items.filter(item => 
-            ["editor", "date", "patient id", "gestationweek", "sex of fetus", "spe"].some(field => 
-              item.label.toLowerCase().includes(field)
-            )
-          )
-        },
-        {
-          name: "Pregnancy Complications",
-          fields: items.filter(item => 
-            ["abnormaldoppler", "bleeding", "eclampsia", "edema", "malpresentation", "multifetalgestation", "pprom", "prom", "preeclampsia", "placentaprevia", "primipaternity"].some(field => 
-              item.label.toLowerCase().includes(field)
-            )
-          )
-        },
-        {
-          name: "Medical Conditions",
-          fields: items.filter(item => 
-            ["anemia", "gestationaldiabetes", "gesthypertension", "malaria", "hookworm", "vitamind deficiency", "sever anemia", "high hb"].some(field => 
-              item.label.toLowerCase().includes(field)
-            )
-          )
-        }
-      ]
-    };
-  }
-  
-  if (lowerTitle.includes("infection")) {
-    return {
-      title: "Infection Screening",
-      sections: [
-        {
-          name: "Test Information",
-          fields: items.filter(item => 
-            ["editor", "date", "patient id"].some(field => 
-              item.label.toLowerCase().includes(field)
-            )
-          )
-        },
-        {
-          name: "Screening Results",
-          fields: items.filter(item => 
-            ["hiv", "syphilis", "hepatitis", "rubella", "hepb", "hepc", "positive", "negative"].some(field => 
-              item.label.toLowerCase().includes(field)
-            )
-          )
-        }
-      ]
-    };
-  }
-  
-  // Default template
-  return {
-    title: "Medical Document",
-    sections: [
-      {
-        name: "Document Information",
-        fields: items.filter(item => 
-          ["editor", "date", "patient id"].some(field => 
-            item.label.toLowerCase().includes(field)
-          )
-        )
-      },
-      {
-        name: "Details",
-        fields: items.filter(item => 
-          !["editor", "date", "patient id"].some(field => 
-            item.label.toLowerCase().includes(field)
-          )
-        )
+  return FALLBACK;
+};
+
+// ---------------------------------------------------------------------------
+// Assign items to sections; last is catch-all
+// ---------------------------------------------------------------------------
+type Item = { key: string; label: string; display: string; raw: any };
+
+const buildSections = (items: Item[], defs: SectionDef[]) => {
+  const used = new Set<string>();
+  const out = defs.map((d) => ({ name: d.name, items: [] as Item[] }));
+
+  defs.slice(0, -1).forEach((def, si) => {
+    items.forEach((item) => {
+      const norm = item.key.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (!used.has(item.key) && def.keys.some((k) => norm.includes(k))) {
+        out[si].items.push(item);
+        used.add(item.key);
       }
-    ]
-  };
+    });
+  });
+
+  items.forEach((item) => {
+    if (!used.has(item.key)) out[out.length - 1].items.push(item);
+  });
+
+  return out.filter((s) => s.items.length > 0);
 };
 
-const Document: React.FC<DocumentProps> = ({ document, title, onBack }) => {
+// ---------------------------------------------------------------------------
+// Download as .txt
+// ---------------------------------------------------------------------------
+const downloadTxt = (title: string, sections: { name: string; items: Item[] }[], editor: string, date: string) => {
+  const hr = "─".repeat(56);
+  const lines = [
+    "CONFIDENTIAL MEDICAL DOCUMENT",
+    hr,
+    `Document  : ${title}`,
+    `Recorded  : ${editor}`,
+    `Date/Time : ${date}`,
+    hr,
+  ];
+  sections.forEach((sec) => {
+    lines.push("", sec.name.toUpperCase());
+    sec.items.forEach((item) => {
+      lines.push(`  ${item.label.padEnd(28)} ${item.display}`);
+    });
+  });
+  lines.push("", hr, "Confidential — Authorised medical personnel only");
+
+  const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement("a"), {
+    href: url,
+    download: `${title.replace(/\s+/g, "_")}.txt`,
+  });
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+const Document: React.FC<DocumentProps> = ({ document, title = "Medical Document", onBack }) => {
   if (!document) return null;
 
-  // Process document data
-  const transformed: Record<string, any> = { ...document };
+  const raw = { ...document };
+  if (raw.date) raw.date = formatDate(raw.date);
+  delete raw.user_id;
+  delete raw.infections_id;
 
-  // Format date if present
-  if (transformed.date) {
-    transformed.date = formatDate(transformed.date);
-  }
+  const ordered: Record<string, any> = {};
+  if ("editor" in raw) ordered.editor = raw.editor;
+  for (const k in raw) if (k !== "editor") ordered[k] = raw[k];
 
-  // Clean up unwanted fields
-  delete transformed.user_id;
-  delete transformed.infections_id;
-
-  const allItems = Object.entries(transformed).map(([key, value]) => ({
-    label: formatKey(key),
-    value: formatValue(value, key),
+  const items: Item[] = Object.entries(ordered).map(([key, value]) => ({
+    key,
+    label: cleanKey(key),
+    display: displayValue(value, key),
+    raw: value,
   }));
 
-  const template = getDocumentTemplate(title || "", allItems);
+  const sections = buildSections(items, getSectionDefs(title));
+  const editor = items.find((i) => i.key === "editor")?.display ?? "—";
+  const date = items.find((i) => i.key === "date")?.display ?? "—";
+
+  const Pill = ({ val }: { val: any }) => {
+    const yes = isTrue(val);
+    return (
+      <span style={{
+        display: "inline-block",
+        fontSize: "10px",
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        padding: "2px 7px",
+        borderRadius: "3px",
+        background: yes ? "#fff1f0" : "#f2faf5",
+        color: yes ? "#b91c1c" : "#166534",
+        border: `1px solid ${yes ? "#fca5a5" : "#86efac"}`,
+      }}>
+        {yes ? "YES" : "NO"}
+      </span>
+    );
+  };
+
+  const cellStyle = (isLabel: boolean): React.CSSProperties => ({
+    width: "25%",
+    padding: "8px 16px",
+    fontSize: isLabel ? "12px" : "11px",
+    color: isLabel ? "#999" : "#111",
+    fontWeight: isLabel ? 400 : 400,
+    verticalAlign: "middle",
+    whiteSpace: isLabel ? "nowrap" : "normal",
+  });
 
   return (
-    <div className="w-full max-w-4xl mx-auto bg-white">
-      {/* Back Button */}
-      {onBack && (
-        <div className="mb-6">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-colors"
-          >
-            <IoArrowBackOutline />
-            <span>Back to Documents</span>
-          </button>
-        </div>
-      )}
+    <div style={{
+      width: "100%",
+      maxWidth: "820px",
+      background: "#fff",
+      border: "1px solid #d4d4d4",
+      borderRadius: "6px",
+      // fontFamily: "'DM Mono', 'Courier New', monospace",
+      color: "#1a1a1a",
+      overflow: "hidden",
+      marginBottom: "32px",
+    }}>
 
-      {/* Modern Document Layout */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-[#008540] to-[#007036] text-white p-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-2xl font-semibold mb-2">{template.title}</h1>
-              <div className="text-green-100 text-sm">
-                Generated on {new Date().toLocaleDateString("en-GB", { 
-                  day: "2-digit", 
-                  month: "long", 
-                  year: "numeric" 
-                })} at {new Date().toLocaleTimeString("en-GB", { 
-                  hour: "2-digit", 
-                  minute: "2-digit" 
-                })}
-              </div>
-            </div>
-            <div className="text-right text-green-100 text-sm">
-              <div>Medical Center</div>
-              <div>Patient Records</div>
-            </div>
+      {/* Top bar */}
+      <div style={{
+        background: "#f7f7f7",
+        borderBottom: "1px solid #d4d4d4",
+        padding: "11px 18px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {onBack && (
+            <>
+              <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: "#666", display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", padding: 0, fontFamily: "inherit" }}>
+                <IoArrowBackOutline size={13} /> Back
+              </button>
+              <span style={{ color: "#ccc", fontSize: "11px" }}>|</span>
+            </>
+          )}
+          <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#555" }}>
+            {title}
+          </span>
+        </div>
+        <button
+          onClick={() => downloadTxt(title, sections, editor, date)}
+          style={{
+            background: "#fff",
+            border: "1px solid #ccc",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "11px",
+            fontFamily: "inherit",
+            color: "#555",
+            padding: "4px 10px",
+          }}
+        >
+          ↓ Download
+        </button>
+      </div>
+
+      {/* Meta strip */}
+      <div style={{
+        borderBottom: "1px solid #e8e8e8",
+        padding: "10px 18px",
+        display: "flex",
+        gap: "36px",
+        background: "#fcfcfc",
+      }}>
+        {[{ label: "Recorded by", value: editor }, { label: "Date & time", value: date }].map(({ label, value }) => (
+          <div key={label}>
+            <div style={{ fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.1em", color: "#aaa", marginBottom: "2px" }}>{label}</div>
+            <div style={{ fontSize: "12px", fontWeight: 700, color: "#222" }}>{value}</div>
           </div>
-        </div>
+        ))}
+      </div>
 
-        {/* Document Content */}
-        <div className="p-6">
-          {template.sections.map((section, sectionIndex) => (
-            section.fields.length > 0 && (
-              <div key={sectionIndex} className="mb-8 last:mb-0">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">
-                  {section.name}
-                </h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {section.fields.map((item, index) => (
-                    <div key={index} className="bg-gray-50 rounded-lg p-4">
-                      <div className="text-sm font-medium text-gray-600 mb-1">
-                        {item.label}
-                      </div>
-                      <div className={`text-base ${
-                        item.value === "—" || item.value === "Unknown" 
-                          ? "text-gray-400 italic" 
-                          : "text-gray-900 font-medium"
-                      }`}>
-                        {item.value}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          ))}
-        </div>
+      {/* Sections */}
+      {sections.map((sec, si) => {
+        const pairs: [Item, Item | null][] = [];
+        for (let i = 0; i < sec.items.length; i += 2) {
+          pairs.push([sec.items[i], sec.items[i + 1] ?? null]);
+        }
 
-        {/* Footer */}
-        <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-          <div className="flex justify-between items-center text-sm text-gray-600">
-            <div>
-              <span className="font-medium">Physician:</span> {allItems.find(item => item.label.toLowerCase().includes('editor'))?.value || 'Not specified'}
+        return (
+          <div key={si} style={{ borderBottom: si < sections.length - 1 ? "1px solid #e8e8e8" : "none" }}>
+            <div style={{
+              padding: "6px 18px",
+              background: "#f7f7f7",
+              borderBottom: "1px solid #e8e8e8",
+              fontSize: "9px",
+              fontWeight: 700,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: "#888",
+            }}>
+              {sec.name}
             </div>
-            <div className="text-right">
-              <div className="text-xs text-gray-500">
-                This document contains confidential medical information
-              </div>
-            </div>
+
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <tbody>
+                {pairs.map(([a, b], ri) => (
+                  <tr key={ri} style={{ borderBottom: "1px solid #f2f2f2" }}>
+                    <td style={cellStyle(true)}>{a.label}</td>
+                    <td style={{ ...cellStyle(false), borderRight: "1px solid #ebebeb", color: a.display === "—" ? "#d0d0d0" : "#111" }}>
+                      {isBool(a.raw) ? <Pill val={a.raw} /> : a.display}
+                    </td>
+                    {b ? (
+                      <>
+                        <td style={cellStyle(true)}>{b.label}</td>
+                        <td style={{ ...cellStyle(false), color: b.display === "—" ? "#d0d0d0" : "#111" }}>
+                          {isBool(b.raw) ? <Pill val={b.raw} /> : b.display}
+                        </td>
+                      </>
+                    ) : (
+                      <td colSpan={2} />
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
+        );
+      })}
+
+      {/* Footer */}
+      <div style={{
+        padding: "7px 18px",
+        background: "#f7f7f7",
+        borderTop: "1px solid #d4d4d4",
+        display: "flex",
+        justifyContent: "space-between",
+      }}>
+        <span style={{ fontSize: "9px", letterSpacing: "0.06em", color: "#bbb" }}>
+          CONFIDENTIAL — AUTHORISED MEDICAL PERSONNEL ONLY
+        </span>
+        <span style={{ fontSize: "9px", color: "#bbb" }}>{new Date().getFullYear()}</span>
       </div>
     </div>
   );
