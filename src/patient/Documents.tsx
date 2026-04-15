@@ -177,7 +177,7 @@ const Documents: React.FC<DocumentsProps> = ({
     {
       label: "Analysis",
       key: "analysis",
-      width: "250px",
+      width: "350px",
       render: (record: any) => (
         <div className="flex items-center text-[#838383] overflow-hidden">
           {(record.result !== "" && record.result !== "All Negative" && !record.result.startsWith("All Negative:")) && (

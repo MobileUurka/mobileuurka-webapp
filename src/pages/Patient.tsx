@@ -151,7 +151,7 @@ const Patient: React.FC = () => {
         {items.map((item, index) => (
           <div className="w-[90%] mx-auto flex justify-between py-2.5 border-b border-gray-200/50 last:border-0" key={index}>
             <div className="text-[#09090980] text-[13px] flex items-center">{item.label}</div>
-            <div className={`font-medium text-xs capitalize text-right ${item.color || "text-black/80"}`}>
+            <div className={`font-medium text-xs capitalize text-right ${item.color || "text-black/80"}`}>{item.value}
             </div>
           </div>
         ))}
@@ -164,6 +164,8 @@ const Patient: React.FC = () => {
     if (!patient) return [];
     const history = patient.patientHistory?.[0] || {};
     const lastVisit = patient.visits?.[patient.visits.length - 1] || {};
+
+    console.log(history,lastVisit)
 
     return [
       { label: "Age", value: calculateAge(patient.dob) },
