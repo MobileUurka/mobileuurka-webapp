@@ -1,0 +1,20 @@
+import { configureStore } from '@reduxjs/toolkit';
+import patientsReducer from './patientsSlice';
+import hospitalsReducer from './hospitalsSlice';
+import staffReducer from './staffSlice';
+import patientProfileReducer from './patientProfileSlice';
+
+export const store = configureStore({
+    reducer: {
+        patients: patientsReducer,
+        hospitals: hospitalsReducer,
+        staff: staffReducer,
+        patientProfile: patientProfileReducer,
+    },
+});
+
+// Dispatch this to wipe all cached data on logout
+export const resetStore = () => ({ type: 'RESET_ALL' as const });
+
+export type RootState = ReturnType<typeof store.getState>;
+export type AppDispatch = typeof store.dispatch;

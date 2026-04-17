@@ -155,6 +155,7 @@ const Screening = () => {
         structuredData = {
           name: `${data.firstName} ${data.lastName}`,
           firstName: data.firstName,
+          nationalId:data.nationalId,
           lastName: data.lastName,
           dob: data.dob,
           address: data.address,
@@ -413,9 +414,9 @@ const Screening = () => {
             bmi: latestTriage1?.bmi || 0,
 
             // --- LAB WORK & ULTRASOUND (labwork & ultrasounds Tables) ---
-            haemoglobin: latestLabwork?.haemoglobin,
-            urineProtein: latestLabwork?.urineProtein,
-            randombloodsugar: latestLabwork?.randombloodsugar,
+            haemoglobin: latestLabwork?.haemoglobin || 0,
+            urineProtein: latestLabwork?.urineProtein || 0,
+            randombloodsugar: latestLabwork?.randombloodsugar || 0,
 
             amniotic: Number(latestUltrasound?.amniotic) || 0, csectionNum: latestHistory?.csectionNum || 0,
             csection: latestHistory?.csection || "No",
@@ -446,8 +447,8 @@ const Screening = () => {
             FAM_THALASSEMIA_HISTORY: latestHistory?.famThalassemia || "No",
 
 
-            HYPERTENSIONHISTORY: latestHistory.HYPERTENSIONHISTORY || "No",
-            ANEMIAHISTORY: latestHistory.ANEMIAHISTORY || "No",
+            HYPERTENSIONHISTORY: latestHistory?.HYPERTENSIONHISTORY || "No",
+            ANEMIAHISTORY: latestHistory?.ANEMIAHISTORY || "No",
 
 
             // Past Pregnancy History

@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "../pages/Sidebar";
 import { useState, useEffect} from "react";
+import SocketProvider from "./SocketProvider";
 
 function Layout() {
   const location = useLocation();
@@ -32,6 +33,7 @@ function Layout() {
        2. overflow-hidden: Prevents the whole window from scrolling.
     */
     <div className="w-full h-screen flex flex-col lg:flex-row overflow-hidden">
+      <SocketProvider />
 
       {/* The Sidebar container should stay full height. 
           If your Sidebar has its own internal scrolling, it will work here.

@@ -1,58 +1,40 @@
 import { useEffect, useState, useMemo } from 'react';
-// import { useNavigate } from "react-router-dom";
 import { hospitalService, type Hospital } from '../services/hospitalServices';
 import { authService } from '../services/authServices';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { fetchHospitals, invalidateHospitals } from '../store/hospitalsSlice';
 import SearchContainer from "../components/SearchContainer";
 import { HOSPITAL_COLUMNS } from '../constants/hospitalColumns';
 import DataTable from '../components/DataTable';
 import HospitalSelector from '../components/HospitalSelector';
 
-const Hospitals = () => {
-  // const navigate = useNavigate();
-  const [hospitals, setHospitals] = useState<Hospital[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(false);
+const emptyForm = { name: '', address: '', phone: '', email: '', city: '', state: '', type: 'hospital' };
+
+const HospitalPage = () => {
+  const dispatch = useAppDispatch();
+  const hospitals = useAppSelector(s => s.hospitals.data);
+  const status = useAppSelector(s => s.hospitals.status);
+
+  const [searchTerm, setSearchTerm] = useState('');
   const [showHospitalSelector, setShowHospitalSelector] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newHospitalData, setNewHospitalData] = useState({
-    name: '',
-    address: '',
-    phone: '',
-    email: '',
-    city: '',
-    state: '',
-    type: 'hospital'
-  });
+  const [newHospitalData, setNewHospitalData] = useState(emptyForm);
 
-  const fetchHospitals = async () => {
-    setLoading(true);
-    try {
+  // Hospital.tsx fetches by org ID via a different endpoint — keep that working
+  // by seeding the store if it's empty, otherwise use cached data
+  useEffect(() => {
+    if (status === 'idle') {
       const organization = authService.getOrganization();
-      const organizationId = organization?.id;
-
-      if (!organizationId) {
-        console.error('No organization ID found');
-        return;
-      }
-
-      const data = await hospitalService.getHospitals(organizationId, { page: 1, limit: 100 });
-      setHospitals(data);
-    } catch (err) {
-      console.error('Fetch Error:', err);
-    } finally {
-      setLoading(false);
+      if (!organization?.id) return;
+      dispatch(fetchHospitals());
     }
-  };
+  }, [dispatch, status]);
 
   const handleHospitalSelected = (hospital: Hospital) => {
     setShowHospitalSelector(false);
-    fetchHospitals(); // Refresh the list
+    dispatch(invalidateHospitals());
+    dispatch(fetchHospitals());
     alert(`${hospital.name} has been linked to your organization!`);
-  };
-
-  const handleCreateNewFromSelector = () => {
-    setShowHospitalSelector(false);
-    setShowCreateModal(true);
   };
 
   const handleCreateHospital = async () => {
@@ -61,33 +43,17 @@ const Hospitals = () => {
         alert('Hospital name is required');
         return;
       }
-
       await hospitalService.createHospital(newHospitalData);
       alert('Hospital created successfully!');
-      
-      // Reset form and close modal
-      setNewHospitalData({
-        name: '',
-        address: '',
-        phone: '',
-        email: '',
-        city: '',
-        state: '',
-        type: 'hospital'
-      });
+      setNewHospitalData(emptyForm);
       setShowCreateModal(false);
-      
-      // Refresh the list
-      fetchHospitals();
+      dispatch(invalidateHospitals());
+      dispatch(fetchHospitals());
     } catch (error: any) {
       console.error('Hospital creation error:', error);
       alert('Failed to create hospital: ' + (error.message || 'Network error'));
     }
   };
-
-  useEffect(() => {
-    fetchHospitals();
-  }, []);
 
   const filteredHospitals = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -112,9 +78,9 @@ const Hospitals = () => {
           onSearch={setSearchTerm}
           onAdd={() => setShowHospitalSelector(true)}
           addButtonText="Link Hospital"
-          onRefresh={fetchHospitals}
+          onRefresh={() => { dispatch(invalidateHospitals()); dispatch(fetchHospitals()); }}
           showRefresh={true}
-          refreshing={loading}
+          refreshing={status === 'loading'}
           searchValue={searchTerm}
           onSearchChange={setSearchTerm}
         />
@@ -123,31 +89,26 @@ const Hospitals = () => {
       <DataTable<Hospital>
         columns={HOSPITAL_COLUMNS}
         data={filteredHospitals}
-        // onRowClick={(hospital) => navigate(`/Hospital/${hospital.id}`)}
         emptyMessage={searchTerm ? `No hospitals found matching "${searchTerm}"` : "No hospitals found."}
         initialItemsPerPage={10}
       />
 
-      {/* Hospital Selector Modal */}
       {showHospitalSelector && (
         <HospitalSelector
           onHospitalSelected={handleHospitalSelected}
-          onCreateNew={handleCreateNewFromSelector}
+          onCreateNew={() => { setShowHospitalSelector(false); setShowCreateModal(true); }}
           onCancel={() => setShowHospitalSelector(false)}
         />
       )}
 
-      {/* Create Hospital Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">Create New Hospital</h3>
-            
+
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Hospital Name *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Hospital Name *</label>
                 <input
                   type="text"
                   value={newHospitalData.name}
@@ -158,9 +119,7 @@ const Hospitals = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Type
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
                 <select
                   value={newHospitalData.type}
                   onChange={(e) => setNewHospitalData(prev => ({ ...prev, type: e.target.value }))}
@@ -172,11 +131,9 @@ const Hospitals = () => {
                   <option value="pharmacy">Pharmacy</option>
                 </select>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Address
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
                 <textarea
                   value={newHospitalData.address}
                   onChange={(e) => setNewHospitalData(prev => ({ ...prev, address: e.target.value }))}
@@ -185,12 +142,10 @@ const Hospitals = () => {
                   rows={2}
                 />
               </div>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    City
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
                   <input
                     type="text"
                     value={newHospitalData.city}
@@ -199,11 +154,8 @@ const Hospitals = () => {
                     placeholder="City"
                   />
                 </div>
-                
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    State
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
                   <input
                     type="text"
                     value={newHospitalData.state}
@@ -213,12 +165,10 @@ const Hospitals = () => {
                   />
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                   <input
                     type="text"
                     value={newHospitalData.phone}
@@ -227,11 +177,8 @@ const Hospitals = () => {
                     placeholder="Phone number"
                   />
                 </div>
-                
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                   <input
                     type="email"
                     value={newHospitalData.email}
@@ -242,7 +189,7 @@ const Hospitals = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex flex-col sm:flex-row gap-3 mt-6">
               <button
                 onClick={() => setShowCreateModal(false)}
@@ -264,4 +211,4 @@ const Hospitals = () => {
   );
 };
 
-export default Hospitals;
+export default HospitalPage;

@@ -17,7 +17,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'lastName', label: 'Last Name', type: 'text', required: true },
       { name: 'dob', label: 'Date of Birth', type: 'date', required: true },
       { name: 'phone', label: 'Phone Number', type: 'text', required: true },
-      { name: 'national_id', label: 'National ID', type: 'text', required: false },
+      { name: 'nationalId', label: 'National ID', type: 'text', required: false },
       { name: 'email', label: 'Email Address', type: 'email' },
       { name: 'address', label: 'Address', type: 'text' },
 

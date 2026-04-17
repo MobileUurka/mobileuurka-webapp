@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams } from 'react-router-dom';
 import { IoFlagSharp } from "react-icons/io5";
-import { FaRegCopy } from "react-icons/fa";
-import { TiTick } from "react-icons/ti";
+// import { FaRegCopy } from "react-icons/fa";
+// import { TiTick } from "react-icons/ti";
 import { LuBell } from "react-icons/lu";
-import { FiChevronDown, FiMenu, FiX } from "react-icons/fi";
+import { FiChevronDown, FiMenu, FiX, FiRefreshCw } from "react-icons/fi";
 import { Tooltip } from "react-tooltip";
 
 // Assets & Styles
@@ -12,8 +12,9 @@ import "../Patient.css";
 import profilePic from "/images/Default.png"; // Ensure this path is correct
 
 // Services
-import { patientService } from '../services/patientServices';
 import { authService } from '../services/authServices';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { fetchPatientProfile, invalidateProfile } from '../store/patientProfileSlice';
 
 // Components
 import Chat from "../components/Chat";
@@ -25,22 +26,30 @@ import Notes from "../patient/Notes";
 import Document from "../patient/Document";
 import Note from "../patient/Note";
 import Notepad from "../components/Notepad";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 // Types
-import type { PatientData, TabType } from "../types/patient";
+import type { TabType } from "../types/patient";
 
 const Patient: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
+  // --- Store ---
+  const dispatch = useAppDispatch();
+  const patient = useAppSelector(s => id ? s.patientProfile.profiles[id] ?? null : null);
+  const status = useAppSelector(s => id ? s.patientProfile.statusById[id] ?? 'idle' : 'idle');
+  const error = useAppSelector(s => id ? s.patientProfile.errorById[id] ?? null : null);
+
+  // Only show full-page loading when there's no cached data at all
+  // When re-fetching after a socket invalidation, keep showing stale data silently
+  const isFirstLoad = (status === 'idle' || status === 'loading') && !patient;
+  const loading = isFirstLoad;
 
   // State
-  const [patient, setPatient] = useState<PatientData | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [chatActive, setChatActive] = useState<boolean>(false);
-  const [copied, setCopied] = useState<boolean>(false);
+  // const [copied, setCopied] = useState<boolean>(false);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [tabDropdownOpen, setTabDropdownOpen] = useState<boolean>(false);
@@ -75,28 +84,24 @@ const Patient: React.FC = () => {
   useEffect(() => {
     const user = authService.getUser();
     setCurrentUser(user);
+  }, []);
 
-    if (id) {
-      fetchPatientData(id);
+  // Fires on mount (status starts as 'idle') and again when a socket record event
+  // calls invalidateProfile(id) — re-fetches silently in the background.
+  useEffect(() => {
+    if (id && status === 'idle') {
+      console.log(`🗂️ [Patient.tsx] status=idle, dispatching fetchPatientProfile(${id})`);
+      dispatch(fetchPatientProfile(id));
     }
-  }, [id]);
+  }, [id, status, dispatch]);
 
-  const fetchPatientData = async (patientId: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await patientService.getPatientCompleteProfile(patientId);
-      if (response.success) {
-        setPatient(response.data);
-        console.log("Fetched patient:", response.data);
-      } else {
-        setError("Patient profile not found");
-      }
-    } catch (err: any) {
-      setError(err.message || "Failed to load patient");
-    } finally {
-      setLoading(false);
-    }
+  const handleRefresh = () => {
+    if (!id) return;
+    console.log(`🔄 [Patient.tsx] manual refresh for: ${id}`);
+    // Delete lastFetched so the thunk bypasses the stale check, then fetch
+    dispatch(invalidateProfile(id));
+    // status → idle triggers the useEffect which dispatches fetchPatientProfile
+    // No need to dispatch it here too
   };
 
   // const handleHospitalAssignmentUpdate = (hospitalName: string) => {
@@ -126,16 +131,16 @@ const Patient: React.FC = () => {
     });
   };
 
-  const handleCopyId = async (): Promise<void> => {
-    if (!id) return;
-    try {
-      await navigator.clipboard.writeText(id);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Copy failed", err);
-    }
-  };
+  // const handleCopyId = async (): Promise<void> => {
+  //   if (!id) return;
+  //   try {
+  //     await navigator.clipboard.writeText(id);
+  //     setCopied(true);
+  //     setTimeout(() => setCopied(false), 2000);
+  //   } catch (err) {
+  //     console.error("Copy failed", err);
+  //   }
+  // };
 
   // --- Section Rendering Helper (Sidebar) ---
   const renderSidebarSection = (
@@ -245,12 +250,12 @@ const Patient: React.FC = () => {
     ];
   }, [patient]);
 
-  if (loading) return <div className="patient-page"><div className="loading text-center p-10">Loading Patient Data...</div></div>;
+  if (loading) return <div className="patient-page"><div className="loading"><LoadingSpinner message="Loading patient data..." size="lg" /></div></div>;
   if (error || !patient) return <div className="patient-page"><div className="error text-red-500 text-center p-10">{error || "Patient not found"}</div></div>;
 
   return (
     loading ? (
-      <div className="p-10">Loading...</div>
+      <LoadingSpinner message="Loading patient data..." size="lg" fullPage />
     ) : 
     error || !patient ? (
       <div className="p-10 text-center">
@@ -275,12 +280,12 @@ const Patient: React.FC = () => {
             </div>
             <div>
               <div className="font-bold text-black/80">{patient?.name}</div>
-              <div className="text-sm text-gray-500 flex items-center gap-2">
+              {/* <div className="text-sm text-gray-500 flex items-center gap-2">
                 ID: {id?.toString().slice(0, 8)}...
                 <span onClick={handleCopyId} className="cursor-pointer hover:text-gray-900" style={{ color: copied ? "#4CAF50" : "#666" }}>
                   {copied ? <TiTick size={16} /> : <FaRegCopy size={14} />}
                 </span>
-              </div>
+              </div> */}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -290,10 +295,17 @@ const Patient: React.FC = () => {
             >
               {sidebarOpen ? <FiX size={20} /> : <FiMenu size={20} />}
             </button>
+            <button
+              onClick={handleRefresh}
+              title="Refresh patient data"
+              className={`p-2 rounded-lg bg-[#f1ede97a] hover:bg-[#f1ede9] transition-colors ${status === 'loading' ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={status === 'loading'}
+            >
+              <FiRefreshCw size={18} className={`text-gray-600 ${status === 'loading' ? 'animate-spin' : ''}`} />
+            </button>
             <button className="p-2 rounded-lg bg-[#f1ede97a] hover:bg-[#f1ede9] transition-colors">
               <LuBell size={20} className="text-gray-600" />
             </button>
-
           </div>
         </div>
 
@@ -322,12 +334,12 @@ const Patient: React.FC = () => {
                 <div className="w-[calc(100%-70px)] flex justify-between items-center">
                   <div className="ml-[15px] flex flex-col gap-[3px] text-[0.9em] text-[#333]">
                     <div className="text-black/80 font-bold">{patient?.name}</div>
-                    <div className="text-[0.8em] text-[#09090980] flex items-center gap-2">
+                    {/* <div className="text-[0.8em] text-[#09090980] flex items-center gap-2">
                       ID: {id?.toString().slice(0, 8)}...
                       <span onClick={handleCopyId} className="cursor-pointer hover:text-gray-900" style={{ color: copied ? "#4CAF50" : "#666" }}>
                         {copied ? <TiTick size={16} /> : <FaRegCopy size={14} />}
                       </span>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               </div>
@@ -410,6 +422,14 @@ const Patient: React.FC = () => {
 
               {/* Desktop AI Buttons */}
               <div className="hidden lg:flex flex-row items-center gap-[10px]">
+                <button
+                  onClick={handleRefresh}
+                  title="Refresh patient data"
+                  className={`w-[50px] aspect-square rounded-[4px] bg-[#f1ede97a] hover:bg-[#f1ede9] flex justify-center items-center cursor-pointer transition-colors ${status === 'loading' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={status === 'loading'}
+                >
+                  <FiRefreshCw size={18} className={`text-gray-600 ${status === 'loading' ? 'animate-spin' : ''}`} />
+                </button>
                 <div className="w-[50px] aspect-square rounded-[4px] bg-[#f1ede97a] flex justify-center items-center cursor-pointer relative">
                   <LuBell size={20} className="text-gray-600" />
                 </div>
@@ -430,6 +450,7 @@ const Patient: React.FC = () => {
                 <Document
                   document={selectedDocument}
                   title={selectedDocumentTitle}
+                  patient={patient}
                   onBack={() => setActiveTab("documents")}
                 />
               )}

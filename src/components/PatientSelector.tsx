@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { MdOutlineKeyboardArrowDown, MdSearch, MdClose } from 'react-icons/md';
 import { patientService } from '../services/patientServices';
 import { type PatientData } from '../types/patient';
+import LoadingSpinner from './LoadingSpinner';
 
 interface PatientSelectorProps {
   value?: string; // patientId
@@ -149,8 +150,8 @@ const PatientSelector = ({
           {/* Patient list */}
           <div className="max-h-60 overflow-y-auto">
             {loading ? (
-              <div className="p-4 text-center text-gray-500">
-                Loading patients...
+              <div className="p-4 flex justify-center">
+                <LoadingSpinner message="Loading patients..." size="sm" />
               </div>
             ) : filteredPatients.length > 0 ? (
               filteredPatients.map((patient) => (

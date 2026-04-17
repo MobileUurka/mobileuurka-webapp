@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { hospitalService, type Hospital } from '../services/hospitalServices';
+import LoadingSpinner from './LoadingSpinner';
 
 interface HospitalSelectorProps {
   onHospitalSelected: (hospital: Hospital) => void;
@@ -103,8 +104,8 @@ const HospitalSelector = ({ onHospitalSelected, onCreateNew, onCancel }: Hospita
         {/* Hospital List */}
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
-            <div className="text-center py-8">
-              <div className="text-gray-500">Loading hospitals...</div>
+            <div className="flex justify-center py-8">
+              <LoadingSpinner message="Loading hospitals..." size="sm" />
             </div>
           ) : allHospitals.length === 0 ? (
             <div className="text-center py-8">

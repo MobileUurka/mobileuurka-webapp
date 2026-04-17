@@ -18,21 +18,19 @@ import Verify from './pages/Verify';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Onboarding from './pages/Onboarding';
+import LoadingSpinner from './components/LoadingSpinner';
+import { useAppDispatch } from './store/hooks';
+import { resetStore } from './store';
+import { socketService } from './services/socketService';
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const dispatch = useAppDispatch();
 
-  // We use useCallback so this function doesn't change on every render
   const checkAuth = useCallback(async () => {
-    // 1. Initialize encryption keys first
     const hasKeys = await authService.initializeEncryption();
-    
-    // const data = await authService.getUser();
-
-    // 2. Check if we actually have a valid token (decrypted)
     const hasToken = authService.isAuthenticated();
-
     setIsAuthenticated(hasKeys && hasToken);
     setIsInitialized(true);
   }, []);
@@ -40,19 +38,19 @@ function App() {
   useEffect(() => {
     checkAuth();
 
-    // OPTIONAL: Listen for a "logout" event if triggered by the apiClient
     const handleUnauthorized = () => {
+      dispatch(resetStore());
+      socketService.disconnect();
       setIsAuthenticated(false);
     };
     window.addEventListener('auth-logout', handleUnauthorized);
     return () => window.removeEventListener('auth-logout', handleUnauthorized);
-  }, [checkAuth]);
+  }, [checkAuth, dispatch]);
 
   if (!isInitialized) {
     return (
-      <div className="loading-screen">
-        <div className="spinner"></div>
-        <p>Initializing Secure Session...</p>
+      <div className="loading-screen m-auto h-screen flex items-center justify-center">
+        <LoadingSpinner message="Initializing secure session..." size="lg" />
       </div>
     );
   }

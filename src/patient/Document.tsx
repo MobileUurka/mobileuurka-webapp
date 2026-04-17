@@ -1,14 +1,18 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { IoArrowBackOutline } from "react-icons/io5";
+import { HiOutlineDownload } from "react-icons/hi";
+import { userService } from "../services/userServices";
+import type { PatientData } from "../types/patient";
 
 interface DocumentProps {
   document: any;
   title?: string;
   onBack?: () => void;
+  patient?: PatientData;
 }
 
 // ---------------------------------------------------------------------------
-// Key → readable label: camelCase / snake_case only. No mapping table.
+// Helpers
 // ---------------------------------------------------------------------------
 const cleanKey = (key: string): string =>
   key
@@ -17,9 +21,6 @@ const cleanKey = (key: string): string =>
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
-// ---------------------------------------------------------------------------
-// Attach unit where inferable from key
-// ---------------------------------------------------------------------------
 const withUnit = (value: string, key: string): string => {
   const k = key.toLowerCase().replace(/[^a-z]/g, "");
   if (isNaN(parseFloat(value))) return value;
@@ -65,7 +66,14 @@ const formatDate = (iso: string): string => {
   const d = new Date(iso);
   return isNaN(d.getTime())
     ? "—"
-    : d.toLocaleString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+    : d.toLocaleString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
 };
 
 const isBool = (raw: any) =>
@@ -73,93 +81,28 @@ const isBool = (raw: any) =>
 const isTrue = (raw: any) =>
   ["yes", "true", "1"].includes(String(raw).toLowerCase().trim());
 
-// ---------------------------------------------------------------------------
-// Section groupings
-// ---------------------------------------------------------------------------
-type SectionDef = { name: string; keys: string[] };
-
-const SECTION_MAP: Record<string, SectionDef[]> = {
-  triage: [
-    { name: "Patient & Visit", keys: ["editor", "date", "patient", "id"] },
-    { name: "Vital Signs", keys: ["height", "weight", "bloodpressure", "systolic", "diastolic", "temperature", "pulse", "oxygen", "spo2"] },
-    { name: "Notes", keys: [] },
-  ],
-  lab: [
-    { name: "Request", keys: ["editor", "date", "patient", "id", "gestationweek", "diagnosisid"] },
-    { name: "Blood Chemistry", keys: ["alp", "alt", "ast", "albumin", "bicarbonate", "bilirubin", "calcium", "chloride", "creatinine", "glutamyl", "potassium", "sodium", "uricacid", "bun"] },
-    { name: "Blood Sugar", keys: ["fbs", "fbs1", "fbs2", "hba1c", "randombloodsugar"] },
-    { name: "Haematology", keys: ["ht", "haemoglobin", "mch", "mchc", "mcv", "rbc", "wbc", "platelets", "leukocyte"] },
-    { name: "Thyroid", keys: ["t3", "t4", "tsh"] },
-    { name: "Urinalysis", keys: ["sg", "ph", "urinecolor", "urineglucose", "urinenitrite", "urineodor", "urineprotein", "ketones", "clarity", "urine"] },
-  ],
-  pregnancy: [
-    { name: "Visit", keys: ["editor", "date", "patient", "id", "gestationweek", "sexoffetus", "spe"] },
-    { name: "Obstetric Findings", keys: ["doppler", "bleeding", "eclampsia", "edema", "malpresentation", "multifetal", "pprom", "prom", "preeclampsia", "placenta", "primipaternity"] },
-    { name: "Comorbidities", keys: ["anemia", "diabetes", "hypertension", "malaria", "hookworm", "vitamind", "severanemia", "highhb"] },
-  ],
-  infection: [
-    { name: "Request", keys: ["editor", "date", "patient", "id"] },
-    { name: "Screening Results", keys: [] },
-  ],
+// Strip any field whose key ends with "id" or is exactly "id"
+const isIdField = (key: string): boolean => {
+  const k = key.toLowerCase().replace(/_/g, "");
+  return k === "id" || k.endsWith("id");
 };
 
-const FALLBACK: SectionDef[] = [
-  { name: "Header", keys: ["editor", "date", "patient", "id"] },
-  { name: "Details", keys: [] },
-];
-
-const getSectionDefs = (title: string): SectionDef[] => {
-  const t = title.toLowerCase();
-  for (const [k, v] of Object.entries(SECTION_MAP)) {
-    if (t.includes(k)) return v;
-  }
-  return FALLBACK;
-};
-
-// ---------------------------------------------------------------------------
-// Assign items to sections; last is catch-all
-// ---------------------------------------------------------------------------
 type Item = { key: string; label: string; display: string; raw: any };
 
-const buildSections = (items: Item[], defs: SectionDef[]) => {
-  const used = new Set<string>();
-  const out = defs.map((d) => ({ name: d.name, items: [] as Item[] }));
-
-  defs.slice(0, -1).forEach((def, si) => {
-    items.forEach((item) => {
-      const norm = item.key.toLowerCase().replace(/[^a-z0-9]/g, "");
-      if (!used.has(item.key) && def.keys.some((k) => norm.includes(k))) {
-        out[si].items.push(item);
-        used.add(item.key);
-      }
-    });
-  });
-
-  items.forEach((item) => {
-    if (!used.has(item.key)) out[out.length - 1].items.push(item);
-  });
-
-  return out.filter((s) => s.items.length > 0);
-};
-
-// ---------------------------------------------------------------------------
-// Download as .txt
-// ---------------------------------------------------------------------------
-const downloadTxt = (title: string, sections: { name: string; items: Item[] }[], editor: string, date: string) => {
+const downloadTxt = (title: string, items: Item[], editor: string, date: string, hospital: string) => {
   const hr = "─".repeat(56);
   const lines = [
+    hospital.toUpperCase(),
     "CONFIDENTIAL MEDICAL DOCUMENT",
     hr,
     `Document  : ${title}`,
     `Recorded  : ${editor}`,
     `Date/Time : ${date}`,
     hr,
+    "",
   ];
-  sections.forEach((sec) => {
-    lines.push("", sec.name.toUpperCase());
-    sec.items.forEach((item) => {
-      lines.push(`  ${item.label.padEnd(28)} ${item.display}`);
-    });
+  items.forEach((item) => {
+    lines.push(`  ${item.label.padEnd(28)} ${item.display}`);
   });
   lines.push("", hr, "Confidential — Authorised medical personnel only");
 
@@ -176,186 +119,243 @@ const downloadTxt = (title: string, sections: { name: string; items: Item[] }[],
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-const Document: React.FC<DocumentProps> = ({ document, title = "Medical Document", onBack }) => {
+const Document: React.FC<DocumentProps> = ({
+  document,
+  title = "Medical Document",
+  onBack,
+  patient,
+}) => {
+  const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({});
+
+  // Collect all UUID-like values from editor / patient fields and resolve them
+  useEffect(() => {
+    if (!document) return;
+
+    const uuidLike = /^[0-9a-f-]{20,}$/i;
+    const toResolve: string[] = [];
+
+    for (const [key, value] of Object.entries(document)) {
+      if (typeof value === "string" && uuidLike.test(value)) {
+        const k = key.toLowerCase();
+        if (k === "editor" || k === "patient" || k.endsWith("_id") || k.endsWith("id")) {
+          if (!toResolve.includes(value)) toResolve.push(value);
+        }
+      }
+    }
+
+    // Also resolve patient id from patient prop
+    if (patient?.id && !toResolve.includes(patient.id)) {
+      toResolve.push(patient.id);
+    }
+
+    if (toResolve.length === 0) return;
+
+    (async () => {
+      const map: Record<string, string> = {};
+      for (const uid of toResolve) {
+        // If it matches the patient we already have, use their name directly
+        if (patient && uid === patient.id) {
+          map[uid] = `${patient.firstName} ${patient.lastName}`;
+          continue;
+        }
+        try {
+          const res = await userService.getUserById(uid);
+          const u = res?.data?.user;
+          if (u) map[uid] = `${u.firstName} ${u.lastName}`;
+        } catch {
+          // leave unresolved
+        }
+      }
+      setResolvedNames(map);
+    })();
+  }, [document, patient]);
+
   if (!document) return null;
+
+  const hospitalName = patient?.hospital || "Medical Facility";
 
   const raw = { ...document };
   if (raw.date) raw.date = formatDate(raw.date);
-  delete raw.user_id;
-  delete raw.infections_id;
 
+  // editor first, then everything else — skip all id fields
   const ordered: Record<string, any> = {};
   if ("editor" in raw) ordered.editor = raw.editor;
-  for (const k in raw) if (k !== "editor") ordered[k] = raw[k];
+  for (const k in raw) {
+    if (k !== "editor" && !isIdField(k)) ordered[k] = raw[k];
+  }
 
-  const items: Item[] = Object.entries(ordered).map(([key, value]) => ({
-    key,
-    label: cleanKey(key),
-    display: displayValue(value, key),
-    raw: value,
-  }));
+  const items: Item[] = Object.entries(ordered).map(([key, value]) => {
+    const rawVal = value;
+    // Resolve UUID values to names
+    const resolved =
+      typeof rawVal === "string" && resolvedNames[rawVal]
+        ? resolvedNames[rawVal]
+        : null;
 
-  const sections = buildSections(items, getSectionDefs(title));
+    return {
+      key,
+      label: cleanKey(key),
+      display: resolved ?? displayValue(rawVal, key),
+      raw: resolved ? resolved : rawVal,
+    };
+  });
+
   const editor = items.find((i) => i.key === "editor")?.display ?? "—";
   const date = items.find((i) => i.key === "date")?.display ?? "—";
 
-  const Pill = ({ val }: { val: any }) => {
+  // Split into pairs for strict 2-column layout
+  const pairs: [Item, Item | null][] = [];
+  for (let i = 0; i < items.length; i += 2) {
+    pairs.push([items[i], items[i + 1] ?? null]);
+  }
+
+  const BoolBadge = ({ val }: { val: any }) => {
     const yes = isTrue(val);
     return (
       <span style={{
-        display: "inline-block",
-        fontSize: "10px",
-        fontWeight: 700,
-        letterSpacing: "0.06em",
-        padding: "2px 7px",
-        borderRadius: "3px",
-        background: yes ? "#fff1f0" : "#f2faf5",
-        color: yes ? "#b91c1c" : "#166534",
-        border: `1px solid ${yes ? "#fca5a5" : "#86efac"}`,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "5px",
+        fontSize: "12px",
+        fontWeight: 600,
+        padding: "2px 9px",
+        borderRadius: "20px",
+        background: yes ? "#fef2f2" : "#f0fdf4",
+        color: yes ? "#dc2626" : "#16a34a",
+        border: `1px solid ${yes ? "#fecaca" : "#bbf7d0"}`,
       }}>
-        {yes ? "YES" : "NO"}
+        <span style={{ width: 6, height: 6, borderRadius: "50%", background: yes ? "#dc2626" : "#16a34a", display: "inline-block" }} />
+        {yes ? "Positive" : "Negative"}
       </span>
     );
   };
 
-  const cellStyle = (isLabel: boolean): React.CSSProperties => ({
-    width: "25%",
-    padding: "8px 16px",
-    fontSize: isLabel ? "12px" : "11px",
-    color: isLabel ? "#999" : "#111",
-    fontWeight: isLabel ? 400 : 400,
-    verticalAlign: "middle",
-    whiteSpace: isLabel ? "nowrap" : "normal",
-  });
-
   return (
     <div style={{
       width: "100%",
-      maxWidth: "820px",
+      maxWidth: "720px",
       background: "#fff",
-      border: "1px solid #d4d4d4",
-      borderRadius: "6px",
-      // fontFamily: "'DM Mono', 'Courier New', monospace",
-      color: "#1a1a1a",
+      borderRadius: "10px",
+      border: "1px solid #e5e7eb",
       overflow: "hidden",
+      fontFamily: "var(--font-title, 'DM Sans', sans-serif)",
+      color: "#111827",
       marginBottom: "32px",
     }}>
 
-      {/* Top bar */}
+      {/* Hospital header */}
       <div style={{
-        background: "#f7f7f7",
-        borderBottom: "1px solid #d4d4d4",
-        padding: "11px 18px",
+        background: "#008540",
+        padding: "16px 24px 14px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           {onBack && (
-            <>
-              <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: "#666", display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", padding: 0, fontFamily: "inherit" }}>
-                <IoArrowBackOutline size={13} /> Back
-              </button>
-              <span style={{ color: "#ccc", fontSize: "11px" }}>|</span>
-            </>
+            <button onClick={onBack} style={{
+              background: "rgba(255,255,255,0.15)",
+              border: "1px solid rgba(255,255,255,0.25)",
+              borderRadius: "6px",
+              cursor: "pointer",
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              fontSize: "12px",
+              padding: "4px 10px",
+              fontFamily: "inherit",
+            }}>
+              <IoArrowBackOutline size={13} /> Back
+            </button>
           )}
-          <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#555" }}>
-            {title}
-          </span>
+          <div>
+            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "2px" }}>
+              {hospitalName}
+            </div>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "#fff", letterSpacing: "-0.01em" }}>
+              {title}
+            </div>
+          </div>
         </div>
         <button
-          onClick={() => downloadTxt(title, sections, editor, date)}
+          onClick={() => downloadTxt(title, items, editor, date, hospitalName)}
           style={{
-            background: "#fff",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
+            background: "rgba(255,255,255,0.15)",
+            border: "1px solid rgba(255,255,255,0.25)",
+            borderRadius: "6px",
             cursor: "pointer",
-            fontSize: "11px",
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            gap: "5px",
+            fontSize: "12px",
+            padding: "5px 11px",
             fontFamily: "inherit",
-            color: "#555",
-            padding: "4px 10px",
           }}
         >
-          ↓ Download
+          <HiOutlineDownload size={13} />
+          Download
         </button>
       </div>
 
       {/* Meta strip */}
       <div style={{
-        borderBottom: "1px solid #e8e8e8",
-        padding: "10px 18px",
+        padding: "12px 24px",
+        borderBottom: "1px solid #f3f4f6",
         display: "flex",
-        gap: "36px",
-        background: "#fcfcfc",
+        gap: "32px",
+        background: "#fafafa",
       }}>
         {[{ label: "Recorded by", value: editor }, { label: "Date & time", value: date }].map(({ label, value }) => (
           <div key={label}>
-            <div style={{ fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.1em", color: "#aaa", marginBottom: "2px" }}>{label}</div>
-            <div style={{ fontSize: "12px", fontWeight: 700, color: "#222" }}>{value}</div>
+            <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.07em", color: "#9ca3af", marginBottom: "3px" }}>{label}</div>
+            <div style={{ fontSize: "13px", fontWeight: 600, color: "#111827" }}>{value}</div>
           </div>
         ))}
       </div>
 
-      {/* Sections */}
-      {sections.map((sec, si) => {
-        const pairs: [Item, Item | null][] = [];
-        for (let i = 0; i < sec.items.length; i += 2) {
-          pairs.push([sec.items[i], sec.items[i + 1] ?? null]);
-        }
-
-        return (
-          <div key={si} style={{ borderBottom: si < sections.length - 1 ? "1px solid #e8e8e8" : "none" }}>
-            <div style={{
-              padding: "6px 18px",
-              background: "#f7f7f7",
-              borderBottom: "1px solid #e8e8e8",
-              fontSize: "9px",
-              fontWeight: 700,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              color: "#888",
-            }}>
-              {sec.name}
-            </div>
-
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <tbody>
-                {pairs.map(([a, b], ri) => (
-                  <tr key={ri} style={{ borderBottom: "1px solid #f2f2f2" }}>
-                    <td style={cellStyle(true)}>{a.label}</td>
-                    <td style={{ ...cellStyle(false), borderRight: "1px solid #ebebeb", color: a.display === "—" ? "#d0d0d0" : "#111" }}>
-                      {isBool(a.raw) ? <Pill val={a.raw} /> : a.display}
-                    </td>
-                    {b ? (
-                      <>
-                        <td style={cellStyle(true)}>{b.label}</td>
-                        <td style={{ ...cellStyle(false), color: b.display === "—" ? "#d0d0d0" : "#111" }}>
-                          {isBool(b.raw) ? <Pill val={b.raw} /> : b.display}
-                        </td>
-                      </>
-                    ) : (
-                      <td colSpan={2} />
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Fields — strict 2-column */}
+      <div style={{ padding: "8px 0 4px" }}>
+        {pairs.map(([a, b], ri) => (
+          <div key={ri} style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            borderBottom: ri < pairs.length - 1 ? "1px solid #f3f4f6" : "none",
+          }}>
+            {[a, b].map((item, ci) =>
+              item ? (
+                <div key={ci} style={{
+                  padding: "12px 24px",
+                  borderRight: ci === 0 ? "1px solid #f3f4f6" : "none",
+                }}>
+                  <div style={{ fontSize: "11px", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>
+                    {item.label}
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: 500, color: item.display === "—" ? "#d1d5db" : "#111827" }}>
+                    {isBool(item.raw) ? <BoolBadge val={item.raw} /> : item.display}
+                  </div>
+                </div>
+              ) : (
+                <div key={ci} />
+              )
+            )}
           </div>
-        );
-      })}
+        ))}
+      </div>
 
       {/* Footer */}
       <div style={{
-        padding: "7px 18px",
-        background: "#f7f7f7",
-        borderTop: "1px solid #d4d4d4",
+        padding: "10px 24px",
+        borderTop: "1px solid #f3f4f6",
+        background: "#fafafa",
         display: "flex",
         justifyContent: "space-between",
       }}>
-        <span style={{ fontSize: "9px", letterSpacing: "0.06em", color: "#bbb" }}>
+        <span style={{ fontSize: "10px", color: "#d1d5db", letterSpacing: "0.04em" }}>
           CONFIDENTIAL — AUTHORISED MEDICAL PERSONNEL ONLY
         </span>
-        <span style={{ fontSize: "9px", color: "#bbb" }}>{new Date().getFullYear()}</span>
+        <span style={{ fontSize: "10px", color: "#d1d5db" }}>{new Date().getFullYear()}</span>
       </div>
     </div>
   );
