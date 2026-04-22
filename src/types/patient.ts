@@ -21,10 +21,11 @@ export interface PatientData {
     patientLifestyle?: any[];
     allergies?: any[];
     medications?: any[];
+    symptomReasoningReport?: any[];
     riskAssessment?: any[];
     explanation?: any[];
     notes?: any[];
     [key: string]: any; // Fallback for other fields
   }
 
-  export type TabType = "overview" | "profile" | "medication" | "documents" | "notes" | "document" | "note" | "notepad";
+  export type TabType = "overview" | "profile" | "medication" | "documents" | "notes" | "document" | "note" | "notepad" | "symptomReport";

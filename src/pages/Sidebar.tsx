@@ -10,6 +10,7 @@ import { authService } from "../services/authServices";
 import { BiChevronLeft } from "react-icons/bi";
 import { TbNurse } from "react-icons/tb";
 import { IoLogOutOutline } from "react-icons/io5";
+import { useAppSelector } from "../store/hooks";
 
 
 type SidebarProps = {
@@ -48,6 +49,10 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
 
     const navigate = useNavigate();
 
+    const unreadCount = useAppSelector(s =>
+        s.notifications.data.filter(n => !n.readAt).length
+    );
+
     const ClientItems = [
         // { name: "Dashboard", icon: <MdOutlineSpaceDashboard /> },
         { name: "Patients", icon: <HiOutlineUserGroup /> },
@@ -58,7 +63,7 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
 
     const activityItems = [
         // { name: "Settings", icon: <IoSettingsOutline /> },
-        { name: "Alerts", icon: <FiBell />, showBadge: true },
+        { name: "Notifications", icon: <FiBell />, showBadge: true },
         { name: "Logout", icon: <IoLogOutOutline /> }
     ];
 
@@ -193,7 +198,7 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
                             )}
                             {item.showBadge && (
                                 <span className={`bg-[#f05b56] text-white text-xs w-5 h-5 rounded-full flex items-center justify-center ${sideBarActive ? 'flex' : 'hidden'}`}>
-                                    2
+                                    {unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : null}
                                 </span>
                             )}
                         </li>
@@ -241,7 +246,7 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
                                     <span className="flex-1">{item.name}</span>
                                     {item.showBadge && (
                                         <span className="bg-[#f05b56] text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                                            2
+                                            {unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : null}
                                         </span>
                                     )}
                                 </li>

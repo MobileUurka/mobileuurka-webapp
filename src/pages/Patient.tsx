@@ -26,6 +26,7 @@ import Notes from "../patient/Notes";
 import Document from "../patient/Document";
 import Note from "../patient/Note";
 import Notepad from "../components/Notepad";
+import SymptomReport from "../patient/SymptomReport";
 import LoadingSpinner from "../components/LoadingSpinner";
 
 // Types
@@ -170,7 +171,6 @@ const Patient: React.FC = () => {
     const history = patient.patientHistory?.[0] || {};
     const lastVisit = patient.visits?.[patient.visits.length - 1] || {};
 
-    console.log(history,lastVisit)
 
     return [
       { label: "Age", value: calculateAge(patient.dob) },
@@ -383,8 +383,7 @@ const Patient: React.FC = () => {
                               setSelectedDocument([]);
                               setSelectedDocumentTitle("");
                             }
-                          }}
-                          className={`w-full p-3 text-left text-sm hover:bg-gray-50 transition-colors capitalize ${activeTab === tab ? 'bg-[#008540]/10 text-[#008540] font-medium' : 'text-gray-700'
+                          }}                          className={`w-full p-3 text-left text-sm hover:bg-gray-50 transition-colors capitalize ${activeTab === tab ? 'bg-[#008540]/10 text-[#008540] font-medium' : 'text-gray-700'
                             }`}
                         >
                           {tab}
@@ -450,6 +449,13 @@ const Patient: React.FC = () => {
                 <Document
                   document={selectedDocument}
                   title={selectedDocumentTitle}
+                  patient={patient}
+                  onBack={() => setActiveTab("documents")}
+                />
+              )}
+              {activeTab === "symptomReport" && (
+                <SymptomReport
+                  report={selectedDocument}
                   patient={patient}
                   onBack={() => setActiveTab("documents")}
                 />

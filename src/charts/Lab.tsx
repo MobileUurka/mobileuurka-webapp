@@ -46,31 +46,37 @@ const Lab: React.FC<OverviewProps> = ({ patient }) => {
 
   // Typing effect logic
   useEffect(() => {
-    const fullText =
-      "Findings suggest early preeclampsia, with proteinuria, elevated liver enzymes, and mild thrombocytopenia indicating renal and hepatic involvement. Elevated LDH may signal early HELLP syndrome";
+    const reports = patient?.symptomReasoningReport;
+    const latestReport = Array.isArray(reports) ? reports[reports.length - 1] : reports;
+    const fullText: string = latestReport?.laboratoryInterpretation
+      ?? latestReport?.laboratory_interpretation
+      ?? '';
 
-    if (active) {
-      setTypedText("");
-      let index = 0;
-
-      const type = () => {
-        setTypedText((prev) => {
-          const char = fullText.charAt(index);
-          index++;
-          if (index < fullText.length) {
-            timeoutRef.current = setTimeout(type, 20);
-          }
-          return prev + char;
-        });
-      };
-
-      timeoutRef.current = setTimeout(type, 10);
+    if (!active || !fullText) {
+      if (!active) setTypedText('');
+      return;
     }
+
+    setTypedText('');
+    let index = 0;
+
+    const type = () => {
+      setTypedText((prev) => {
+        const char = fullText.charAt(index);
+        index++;
+        if (index < fullText.length) {
+          timeoutRef.current = setTimeout(type, 20);
+        }
+        return prev + char;
+      });
+    };
+
+    timeoutRef.current = setTimeout(type, 10);
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [active]);
+  }, [active, patient]);
 
   return (
     <div className="mx-auto w-full h-full flex flex-col p-4">

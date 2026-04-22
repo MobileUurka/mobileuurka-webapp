@@ -5,6 +5,7 @@ import { invalidatePatients, patientRemoved } from '../store/patientsSlice';
 import { hospitalLinked, hospitalUnlinked, patientCountChanged } from '../store/hospitalsSlice';
 import { staffMemberAdded, staffMemberUpdated, staffMemberRemoved } from '../store/staffSlice';
 import { profileUpdated, profileEvicted, invalidateProfile } from '../store/patientProfileSlice';
+import { addNotification } from '../store/notificationsSlice';
 
 /**
  * Mounts once inside the authenticated layout.
@@ -74,6 +75,12 @@ export default function SocketProvider() {
             if (data?.userId) dispatch(staffMemberRemoved(data.userId));
         };
 
+        // --- Notifications ---
+        const onNotificationNew = (data: any) => {
+            console.log('🔌 [socket] notification:new received', data);
+            if (data) dispatch(addNotification(data));
+        };
+
         sock.on(SOCKET_EVENTS.PATIENT_CREATED, onPatientCreated);
         sock.on(SOCKET_EVENTS.PATIENT_UPDATED, onPatientUpdated);
         sock.on(SOCKET_EVENTS.PATIENT_DELETED, onPatientDeleted);
@@ -85,6 +92,7 @@ export default function SocketProvider() {
         sock.on(SOCKET_EVENTS.STAFF_ADDED, onStaffAdded);
         sock.on(SOCKET_EVENTS.STAFF_UPDATED, onStaffUpdated);
         sock.on(SOCKET_EVENTS.STAFF_DELETED, onStaffDeleted);
+        sock.on(SOCKET_EVENTS.NOTIFICATION_NEW, onNotificationNew);
 
         return () => {
             sock.off(SOCKET_EVENTS.PATIENT_CREATED, onPatientCreated);
@@ -98,6 +106,7 @@ export default function SocketProvider() {
             sock.off(SOCKET_EVENTS.STAFF_ADDED, onStaffAdded);
             sock.off(SOCKET_EVENTS.STAFF_UPDATED, onStaffUpdated);
             sock.off(SOCKET_EVENTS.STAFF_DELETED, onStaffDeleted);
+            sock.off(SOCKET_EVENTS.NOTIFICATION_NEW, onNotificationNew);
         };
     }, [dispatch]);
 

@@ -9,6 +9,7 @@ import Screening from './pages/Screening';
 import Patients from './pages/Patients';
 import Patient from './pages/Patient';
 import Alerts from './pages/Alerts';
+import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
 import { useEffect, useState, useCallback } from 'react';
 import { authService } from './services/authServices';
@@ -81,6 +82,7 @@ function App() {
               <Route path="/Hospital" element={<Hospital />} />
               <Route path="/Patient/:id" element={<Patient />} />
               <Route path="/Alerts" element={<Alerts />} />
+              <Route path="/Notifications" element={<Notifications />} />
               <Route path="/Settings" element={<Settings />} />
               {/* Redirect /auth to dashboard if already logged in */}
               <Route path="/auth" element={<Navigate to="/" replace />} />
