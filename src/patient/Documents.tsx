@@ -8,7 +8,6 @@ import { useNavigate } from "react-router-dom";
 import DataTable from "../components/DataTable";
 
 import { type PatientData, type TabType } from '../types/patient';
-import { userService } from "../services/userServices";
 
 interface DocumentsProps {
   patient: PatientData;
@@ -16,6 +15,7 @@ interface DocumentsProps {
   setDocument: (doc: any) => void;
   setDocumentTitle: (title: string) => void;
   document?: any;
+  editorNames?: Record<string, string>;
 }
 
 // ─── RISK BADGE — same palette as the rest of the app ────────────────────────
@@ -36,7 +36,7 @@ function RiskBadge({ level }: { level?: string }) {
       fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20,
       background: style.bg, color: style.text,
     }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: style.text, display: 'inline-block' }} />
+      {/* <span style={{ width: 6, height: 6, borderRadius: '50%', background: style.text, display: 'inline-block' }} /> */}
       {key || 'Unknown'}
     </span>
   );
@@ -49,48 +49,12 @@ const Documents: React.FC<DocumentsProps> = ({
   setActiveTitle,
   setDocument,
   setDocumentTitle,
+  editorNames = {},
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
-  const [editorNames, setEditorNames] = useState<Record<string, string>>({});
 
-  // Resolve all editor UUIDs across every record type up-front
-  useEffect(() => {
-    const fetchNames = async () => {
-      const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      const toResolve = new Set<string>();
-
-      const sources = [
-        ...(patient?.notes ?? []),
-        ...(patient?.triage ?? []),
-        ...(patient?.labwork ?? []),
-        ...(patient?.currentPregnancyInfo ?? []),
-        ...(patient?.infections ?? []),
-      ];
-
-      for (const item of sources) {
-        if (item?.editor && uuidLike.test(item.editor)) {
-          toResolve.add(item.editor);
-        }
-      }
-
-      if (toResolve.size === 0) return;
-
-      const namesMap: Record<string, string> = {};
-      for (const uid of toResolve) {
-        try {
-          const response = await userService.getUserById(uid);
-          const user = response?.data?.user;
-          if (user) namesMap[uid] = `${user.firstName} ${user.lastName}`;
-        } catch {
-          // leave unresolved — will fall back to "System"
-        }
-      }
-      setEditorNames(namesMap);
-    };
-
-    fetchNames();
-  }, [patient]);
+  // Remove the local editorNames state and useEffect since we're receiving it as a prop
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -179,34 +143,23 @@ const Documents: React.FC<DocumentsProps> = ({
         
         result = match?.risklevel || "No risk level";
       }
+      if (title === "Symptom Analysis") {
+        result = item.riskLevel ?? item.risk_level ?? "UNKNOWN";
+      }
       return {
         title,
-        date_of_visit: item.date || item.timestamp || "N/A",
-        editor: item.editor || "System",
+        date_of_visit: item.date || item.updatedAt || item.createdAt || item.timestamp || "N/A",
+        editor: title === "Symptom Analysis" ? "AI System" : (item.editor || "System"),
         source: item,
         result,
-        isSymptomReport: false,
+        isSymptomReport: title === "Symptom Analysis",
       };
     }) ?? [];
-
-  // ─── Symptom report row ────────────────────────────────────────────────────
-
-  const latestReport = patient?.symptomReasoningReport?.[0] ?? patient?.symptomReasoningReport ?? null;
-  const reportRow = latestReport
-    ? [{
-        title: "Symptom Analysis",
-        date_of_visit: latestReport.updatedAt ?? latestReport.createdAt ?? "N/A",
-        editor: "AI System",
-        source: latestReport,
-        result: latestReport.riskLevel ?? latestReport.risk_level ?? "UNKNOWN",
-        isSymptomReport: true,
-      }]
-    : [];
 
   // ─── Build + sort all records newest first ─────────────────────────────────
 
   const allRecords = [
-    ...reportRow,
+    ...buildRecord(patient?.symptomReasoningReport, "Symptom Analysis"),
     ...buildRecord(patient?.triage, "Triage"),
     ...buildRecord(patient?.labwork, "Lab Work"),
     ...buildRecord(patient?.currentPregnancyInfo, "Pregnancy Journey"),

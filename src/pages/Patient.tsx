@@ -13,6 +13,7 @@ import profilePic from "/images/Default.png"; // Ensure this path is correct
 
 // Services
 import { authService } from '../services/authServices';
+import { userService } from '../services/userServices';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchPatientProfile, invalidateProfile } from '../store/patientProfileSlice';
 
@@ -23,14 +24,14 @@ import Profile from "../patient/Profile";
 import Medication from "../patient/Medication";
 import Documents from "../patient/Documents";
 import Notes from "../patient/Notes";
-import Document from "../patient/Document";
 import Note from "../patient/Note";
 import Notepad from "../components/Notepad";
-import SymptomReport from "../patient/SymptomReport";
 import LoadingSpinner from "../components/LoadingSpinner";
 
 // Types
 import type { TabType } from "../types/patient";
+import SymptomReportNew from "../patient/SymptomReportNew";
+import DocumentNew from "../patient/DocumentNew";
 
 const Patient: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -54,6 +55,7 @@ const Patient: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [tabDropdownOpen, setTabDropdownOpen] = useState<boolean>(false);
+  const [editorNames, setEditorNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const checkMobile = () => {
@@ -86,6 +88,47 @@ const Patient: React.FC = () => {
     const user = authService.getUser();
     setCurrentUser(user);
   }, []);
+
+  // Resolve all editor UUIDs upfront when patient data loads
+  useEffect(() => {
+    if (!patient) return;
+
+    const fetchEditorNames = async () => {
+      const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const toResolve = new Set<string>();
+
+      // Collect all editor UUIDs from all document types
+      const sources = [
+        ...(patient?.notes ?? []),
+        ...(patient?.triage ?? []),
+        ...(patient?.labwork ?? []),
+        ...(patient?.currentPregnancyInfo ?? []),
+        ...(patient?.infections ?? []),
+      ];
+
+      for (const item of sources) {
+        if (item?.editor && uuidLike.test(item.editor)) {
+          toResolve.add(item.editor);
+        }
+      }
+
+      if (toResolve.size === 0) return;
+
+      const namesMap: Record<string, string> = {};
+      for (const uid of toResolve) {
+        try {
+          const response = await userService.getUserById(uid);
+          const user = response?.data?.user;
+          if (user) namesMap[uid] = `${user.firstName} ${user.lastName}`;
+        } catch {
+          // leave unresolved — will fall back to "System"
+        }
+      }
+      setEditorNames(namesMap);
+    };
+
+    fetchEditorNames();
+  }, [patient]);
 
   // Fires on mount (status starts as 'idle') and again when a socket record event
   // calls invalidateProfile(id) — re-fetches silently in the background.
@@ -443,18 +486,19 @@ const Patient: React.FC = () => {
               {activeTab === "overview" && <Overview patient={patient} setActiveTab={setActiveTab} />}
               {activeTab === "profile" && <Profile patient={patient} />}
               {activeTab === "medication" && <Medication patient={patient} setActiveTab={setActiveTab} />}
-              {activeTab === "documents" && <Documents patient={patient} setActiveTitle={setActiveTab} setDocument={setSelectedDocument} setDocumentTitle={setSelectedDocumentTitle} />}
+              {activeTab === "documents" && <Documents patient={patient} setActiveTitle={setActiveTab} setDocument={setSelectedDocument} setDocumentTitle={setSelectedDocumentTitle} editorNames={editorNames} />}
               {activeTab === "notes" && <Notes patient={patient} setActiveTitle={setActiveTab} setNotes={setSelectedNote} />}
               {activeTab === "document" && (
-                <Document
+                <DocumentNew
                   document={selectedDocument}
                   title={selectedDocumentTitle}
                   patient={patient}
                   onBack={() => setActiveTab("documents")}
+                  editorNames={editorNames}
                 />
               )}
               {activeTab === "symptomReport" && (
-                <SymptomReport
+                <SymptomReportNew
                   report={selectedDocument}
                   patient={patient}
                   onBack={() => setActiveTab("documents")}
