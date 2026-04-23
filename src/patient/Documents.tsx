@@ -36,7 +36,7 @@ function RiskBadge({ level }: { level?: string }) {
       fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20,
       background: style.bg, color: style.text,
     }}>
-      {/* <span style={{ width: 6, height: 6, borderRadius: '50%', background: style.text, display: 'inline-block' }} /> */}
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: style.text, display: 'inline-block' }} />
       {key || 'Unknown'}
     </span>
   );
@@ -224,7 +224,7 @@ const Documents: React.FC<DocumentsProps> = ({
         if (record.isSymptomReport) {
           return (
             <div className="flex items-center gap-2">
-              <LuShieldAlert size={16} className="text-[#984815] shrink-0" />
+              {/* <LuShieldAlert size={16} className="text-[#984815] shrink-0" /> */}
               <RiskBadge level={record.result} />
             </div>
           );
