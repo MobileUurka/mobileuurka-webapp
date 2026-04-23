@@ -161,14 +161,23 @@ const Documents: React.FC<DocumentsProps> = ({
       if (title === "Lab Work") result = item.diagnosis || "No diagnosis";
       if (title === "Infections") result = generateInfectionMessage(item);
       if (title === "Pregnancy Journey") {
-        const relatedExplanations = patient?.explanation?.filter((exp: any) => {
-          const expDate = new Date(exp.date).toISOString().split("T")[0];
-          const itemDate = new Date(item.date).toISOString().split("T")[0];
-          return expDate === itemDate;
-        });
-        result = relatedExplanations?.length
-          ? relatedExplanations.map((exp: any) => exp.risklevel || "No risk level").join(", ")
-          : "No explanations";
+        // Match explanation by gestationweek + date, then pick closest by updatedAt
+        const itemDate = new Date(item.date).toISOString().split("T")[0];
+        const itemUpdatedAt = new Date(item.updatedAt || item.date).getTime();
+        
+        const match = patient?.explanation
+          ?.filter((exp: any) => {
+            const expDate = new Date(exp.date).toISOString().split("T")[0];
+            return expDate === itemDate && exp.gestationweek === item.gestationweek;
+          })
+          ?.sort((a: any, b: any) => {
+            // Sort by closest updatedAt to the item's updatedAt
+            const aDiff = Math.abs(new Date(a.updatedAt || a.date).getTime() - itemUpdatedAt);
+            const bDiff = Math.abs(new Date(b.updatedAt || b.date).getTime() - itemUpdatedAt);
+            return aDiff - bDiff;
+          })?.[0];
+        
+        result = match?.risklevel || "No risk level";
       }
       return {
         title,
