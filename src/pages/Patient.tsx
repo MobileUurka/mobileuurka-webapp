@@ -82,7 +82,7 @@ const Patient: React.FC = () => {
   // Selection states for drill-down views
   const [selectedDocument, setSelectedDocument] = useState<any>([]);
   const [selectedDocumentTitle, setSelectedDocumentTitle] = useState<string>("");
-  const [selectedNote, setSelectedNote] = useState<string>("");
+  const [selectedNote, setSelectedNote] = useState<any>(null);
 
   useEffect(() => {
     const user = authService.getUser();
@@ -472,9 +472,9 @@ const Patient: React.FC = () => {
                 >
                   <FiRefreshCw size={18} className={`text-gray-600 ${status === 'loading' ? 'animate-spin' : ''}`} />
                 </button>
-                <div className="w-[50px] aspect-square rounded-[4px] bg-[#f1ede97a] flex justify-center items-center cursor-pointer relative">
+                {/* <div className="w-[50px] aspect-square rounded-[4px] bg-[#f1ede97a] flex justify-center items-center cursor-pointer relative">
                   <LuBell size={20} className="text-gray-600" />
-                </div>
+                </div> */}
                 <div className="w-[50px] aspect-square rounded-[4px] bg-[#f1ede97a] flex justify-center items-center cursor-pointer" onClick={() => setChatActive((prev) => !prev)}>
                   <img src="/images/logo.png" alt="AI Chat" className="w-1/2" />
                 </div>
@@ -504,7 +504,7 @@ const Patient: React.FC = () => {
                   onBack={() => setActiveTab("documents")}
                 />
               )}
-              {activeTab === "note" && <Note note={selectedNote} user={currentUser} />}
+              {activeTab === "note" && <Note note={selectedNote} user={currentUser} onBack={() => setActiveTab("notes")} />}
               {activeTab === "notepad" && <Notepad patient={patient} user={currentUser} />}
             </div>
           </div>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchNotifications, markRead, markAllRead, removeNotification } from '../store/notificationsSlice';
 import { notificationService, type Notification, type SendNotificationPayload } from '../services/notificationService';
-import { FiBell, FiTrash2, FiSend, FiChevronDown, FiX } from 'react-icons/fi';
+import { FiBell, FiTrash2, FiSend, FiChevronDown, FiX, FiInfo, FiAlertTriangle, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
 import { MdOutlineMarkEmailRead, MdOutlineMarkEmailUnread } from 'react-icons/md';
 import { IoMegaphoneOutline } from 'react-icons/io5';
 import { HiOutlineOfficeBuilding } from 'react-icons/hi';
@@ -15,6 +15,13 @@ const TYPE_STYLES: Record<string, string> = {
     warning: 'bg-amber-50 text-amber-600',
     alert: 'bg-red-50 text-red-600',
     update: 'bg-green-50 text-green-600',
+};
+
+const TYPE_ICON: Record<string, { icon: React.ReactNode; color: string }> = {
+    info:    { icon: <FiInfo size={14} />,         color: '#22c55e' },
+    warning: { icon: <FiAlertTriangle size={14} />, color: '#f59e0b' },
+    alert:   { icon: <FiAlertCircle size={14} />,   color: '#ef4444' },
+    update:  { icon: <FiCheckCircle size={14} />,   color: '#22c55e' },
 };
 
 const LEVEL_ICON: Record<string, React.ReactNode> = {
@@ -345,30 +352,31 @@ export default function Notifications() {
                             <span className="text-sm">No notifications here</span>
                         </div>
                     )}
-                    {filtered.map(n => (
+                    {filtered.map(n => {
+                        const typeIcon = TYPE_ICON[n.type] ?? { icon: <FiBell size={14} />, color: '#9ca3af' };
+                        const isUnread = !n.readAt;
+                        return (
                         <div
                             key={n.id}
                             onClick={() => handleOpen(n)}
                             className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-50 hover:bg-gray-50 transition group ${selected?.id === n.id ? 'bg-[#984815]/5' : ''}`}
                         >
-                            {/* Unread dot */}
-                            <div className="mt-1.5 shrink-0">
-                                {!n.readAt
-                                    ? <div className="w-2 h-2 rounded-full bg-[#984815]" />
-                                    : <div className="w-2 h-2 rounded-full bg-transparent" />
-                                }
+                            {/* Type icon */}
+                            <div
+                                className="mt-0.5 shrink-0 w-7 h-7 rounded-full flex items-center justify-center"
+                                style={{ background: `${typeIcon.color}18`, color: typeIcon.color }}
+                            >
+                                {typeIcon.icon}
                             </div>
 
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                    <span className={`text-sm truncate ${!n.readAt ? 'font-semibold text-gray-900' : 'font-normal text-gray-600'}`}>
+                                    <span className={`text-sm truncate ${isUnread ? 'font-bold text-gray-900' : 'font-normal text-gray-500'}`}>
                                         {n.title}
                                     </span>
-                                    <TypeBadge type={n.type} />
                                 </div>
                                 <p className="text-xs text-gray-400 truncate mt-0.5">{n.message}</p>
                                 <div className="flex items-center gap-1.5 mt-1">
-                                    <span className="text-[10px] text-gray-300">{LEVEL_ICON[n.level]}</span>
                                     <span className="text-[10px] text-gray-400">{timeAgo(n.createdAt)}</span>
                                 </div>
                             </div>
@@ -380,7 +388,8 @@ export default function Notifications() {
                                 <FiTrash2 size={13} />
                             </button>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
 
                 {/* Detail pane */}

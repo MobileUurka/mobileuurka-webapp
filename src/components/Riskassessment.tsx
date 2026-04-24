@@ -34,9 +34,9 @@ const Riskassessment: React.FC<RiskAssessmentProps> = ({ patient }) => {
       setDateRange(allDates);
 
       if (allDates.length > 0) {
-        const defaultIndex = allDates.length > 1 ? allDates.length - 2 : 0;
+        const defaultIndex = allDates.length - 1;
         setSelectedDate(allDates[defaultIndex]);
-        setCurrentIndex(Math.max(0, defaultIndex - 2));
+        setCurrentIndex(Math.max(0, defaultIndex - 3));
       }
     }
   }, [patient]);
@@ -46,7 +46,7 @@ const Riskassessment: React.FC<RiskAssessmentProps> = ({ patient }) => {
   };
 
   const handleNext = () => {
-    if (currentIndex + 5 < dateRange.length) setCurrentIndex(currentIndex + 1);
+    if (currentIndex + 4 < dateRange.length) setCurrentIndex(currentIndex + 1);
   };
 
   const formatDate = (dateStr: string): DateDisplay | null => {
@@ -58,7 +58,7 @@ const Riskassessment: React.FC<RiskAssessmentProps> = ({ patient }) => {
     };
   };
 
-  const visibleDates = dateRange.slice(currentIndex, currentIndex + 5);
+  const visibleDates = dateRange.slice(currentIndex, currentIndex + 4);
 
 
   return (
@@ -88,6 +88,7 @@ const Riskassessment: React.FC<RiskAssessmentProps> = ({ patient }) => {
               const formatted = formatDate(date);
               const isFutureVisit = patient?.visits?.[patient?.visits?.length - 1]?.nextVisit === date;
               const isActive = selectedDate === date;
+              const hasExp = patient?.explanation?.some((exp: any) => exp.date.split("T")[0] === date && exp.features);
 
               return (
                 <div
@@ -95,20 +96,24 @@ const Riskassessment: React.FC<RiskAssessmentProps> = ({ patient }) => {
                   onClick={() => setSelectedDate(date)}
                   className={`h-[90%] w-[50px] rounded-[30px] lg:rounded-[20px] pb-2 lg:h-full cursor-pointer transition-colors
                     ${isActive 
-                      ? "bg-[rgba(133,198,154,0.16)]" 
+                      ? "bg-[rgba(180,130,90,0.13)]" 
                       : isFutureVisit 
-                        ? "bg-[rgba(239,166,92,0.13)]" 
-                        : "bg-[rgba(196,196,196,0.12)]"}
+                        ? "bg-[rgba(239,166,92,0.13)]"
+                        : hasExp
+                          ? "bg-[rgba(133,198,154,0.16)]"
+                          : "bg-[rgba(196,196,196,0.12)]"}
                   `}
                 >
                   {formatted && (
                     <div className="flex flex-col items-center">
                       <div className={`w-[70%] aspect-square rounded-full mx-auto my-[16%] flex justify-center items-center text-[0.9em] font-extrabold transition-colors
                         ${isActive 
-                          ? "bg-[#008540] text-white" 
+                          ? "bg-[#A0714F] text-white" 
                           : isFutureVisit 
-                            ? "bg-[#EFA65C] text-white" 
-                            : "bg-[rgba(221,221,221,0.39)] text-black"}
+                            ? "bg-[#EFA65C] text-white"
+                            : hasExp
+                              ? "bg-[#008540] text-white"
+                              : "bg-[rgba(221,221,221,0.39)] text-black"}
                       `}>
                         {formatted.day}
                       </div>
@@ -122,7 +127,7 @@ const Riskassessment: React.FC<RiskAssessmentProps> = ({ patient }) => {
             })}
 
             <div
-              className={`cursor-pointer ${currentIndex + 5 >= dateRange.length ? "cursor-not-allowed opacity-50" : ""}`}
+              className={`cursor-pointer ${currentIndex + 4 >= dateRange.length ? "cursor-not-allowed opacity-50" : ""}`}
               onClick={handleNext}
             >
               <FaAngleRight />
@@ -131,22 +136,41 @@ const Riskassessment: React.FC<RiskAssessmentProps> = ({ patient }) => {
 
           {/* Bottom Analysis Box */}
           <div className="max-h-[calc(60%-20px)] w-[calc(100%-50px)] bg-white rounded-lg flex flex-col p-[5px_25px_15px] gap-[10px]">
-            <div className="flex flex-row items-center gap-[10px] text-[1.1em] my-[10px] lg:my-[6px]">
-              <div className="w-[6px] aspect-square rounded-full bg-[#008540]"></div>
-              <h4 className="m-0 text-[0.8em] lg:text-[0.75em] font-semibold">Risk Assessment Analysis</h4>
-            </div>
-            <p className="text-[rgba(51,51,51,0.75)] text-[0.8em] lg:text-[0.7em] m-0 w-[98%] -mt-2">
-              {(() => {
-                const isNextVisit = patient?.visits?.[patient?.visits?.length - 1]?.nextVisit === selectedDate;
-                const currentExp = patient?.explanation?.find((exp: any) => exp.date.split("T")[0] === selectedDate);
-                const currentVisit = patient?.visits?.find((v: any) => v.date.split("T")[0] === selectedDate);
+            {(() => {
+              const lastVisit = patient?.visits?.[patient?.visits?.length - 1];
+              const isNextVisitDate = lastVisit?.nextVisit === selectedDate;
+              const currentExp = patient?.explanation?.find((exp: any) => exp.date.split("T")[0] === selectedDate);
+              const currentVisit = patient?.visits?.find((v: any) => v.date.split("T")[0] === selectedDate);
 
-                if (isNextVisit) return "Patient is scheduled for their next visit. Risk analysis will be updated after the appointment.";
-                if (currentExp) return currentExp.features || "Detailed assessment recorded for this date.";
-                if (currentVisit) return currentVisit.visitExplanation || "No detailed notes provided for this visit.";
-                return "No assessment data available for the selected date.";
-              })()}
-            </p>
+              // A "next visit" date is only treated as scheduled if there's no actual visit on that date
+              const isScheduledOnly = isNextVisitDate && !currentVisit && !currentExp;
+
+              const title = isScheduledOnly
+                ? "Scheduled Visit"
+                : currentExp
+                  ? "Risk Assessment Analysis"
+                  : currentVisit
+                    ? "Visit Reason"
+                    : "Risk Assessment Analysis";
+
+              const text = isScheduledOnly
+                ? "Patient is scheduled for their next visit. Risk analysis will be updated after the appointment."
+                : currentExp
+                  ? currentExp.features || "Detailed assessment recorded for this date."
+                  : currentVisit
+                    ? currentVisit.visitReason || currentVisit.visitExplanation || "No detailed notes provided for this visit."
+                    : "No assessment data available for the selected date.";
+
+              return (
+                <>
+                  <div className="flex flex-row items-center gap-[10px] text-[1.1em] my-[10px] lg:my-[6px]">
+                    <div className="w-[6px] aspect-square rounded-full bg-[#008540]"></div>
+                    <h4 className="m-0 text-[0.8em] lg:text-[0.75em] font-semibold">{title}</h4>
+                  </div>
+                  <p className="text-[rgba(51,51,51,0.75)] text-[0.8em] lg:text-[0.7em] m-0 w-[98%] -mt-2">{text}</p>
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>

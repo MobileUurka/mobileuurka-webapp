@@ -196,9 +196,9 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
                                     {item.name}
                                 </span>
                             )}
-                            {item.showBadge && (
+                            {item.showBadge && unreadCount > 0 && (
                                 <span className={`bg-[#f05b56] text-white text-xs w-5 h-5 rounded-full flex items-center justify-center ${sideBarActive ? 'flex' : 'hidden'}`}>
-                                    {unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : null}
+                                    {unreadCount > 99 ? '99+' : unreadCount}
                                 </span>
                             )}
                         </li>
@@ -244,9 +244,9 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
                                 >
                                     <span className="text-[#aca287] text-lg">{item.icon}</span>
                                     <span className="flex-1">{item.name}</span>
-                                    {item.showBadge && (
+                                    {item.showBadge && unreadCount > 0 && (
                                         <span className="bg-[#f05b56] text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                                            {unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : null}
+                                            {unreadCount > 99 ? '99+' : unreadCount}
                                         </span>
                                     )}
                                 </li>
