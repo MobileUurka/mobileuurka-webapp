@@ -85,19 +85,16 @@ const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, 
         }
     };
 
-    const handleLogout = async () => {
-        try {
-            await authService.logout();
+    const handleLogout = () => {
+        // Clear local state immediately and navigate — don't wait for the API
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.href = '/';
 
-        } catch (error) {
-            console.error("Logout failed, cleaning up local state anyway:", error);
-            // Force clear if the network request fails
-        }
-        finally {
-            localStorage.clear();
-            sessionStorage.clear();
-            window.location.reload();
-        }
+        // Fire the server-side cleanup in the background (invalidates refresh token + session)
+        authService.logout().catch((error) => {
+            console.warn('Background logout cleanup failed (tokens may expire naturally):', error);
+        });
     };
 
     // Update mobile state on resize

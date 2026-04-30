@@ -2,9 +2,12 @@ import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "../pages/Sidebar";
 import { useState, useEffect} from "react";
 import SocketProvider from "./SocketProvider";
+import FeedbackWidget from "./FeedbackWidget";
+import { useFeedbackContext } from "../contexts/FeedbackContext";
 
 function Layout() {
   const location = useLocation();
+  const { patientId, patientName } = useFeedbackContext();
 
   const getActiveFromPath = (path: string) => {
     if (path === "/") return "Dashboard";
@@ -53,6 +56,9 @@ function Layout() {
       <main className="flex-1 h-full overflow-y-auto px-4 md:px-8 custom-scrollbar">
         <Outlet />
       </main>
+
+      {/* Feedback widget — visible to all authenticated users */}
+      <FeedbackWidget patientId={patientId} patientName={patientName} />
     </div>
   );
 }

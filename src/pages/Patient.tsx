@@ -16,6 +16,7 @@ import { authService } from '../services/authServices';
 import { userService } from '../services/userServices';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchPatientProfile, invalidateProfile } from '../store/patientProfileSlice';
+import { useFeedbackContext } from '../contexts/FeedbackContext';
 
 // Components
 import Chat from "../components/Chat";
@@ -41,6 +42,9 @@ const Patient: React.FC = () => {
   const patient = useAppSelector(s => id ? s.patientProfile.profiles[id] ?? null : null);
   const status = useAppSelector(s => id ? s.patientProfile.statusById[id] ?? 'idle' : 'idle');
   const error = useAppSelector(s => id ? s.patientProfile.errorById[id] ?? null : null);
+
+  // Feedback context — tag the widget with this patient's info
+  const { setPatientContext, clearPatientContext } = useFeedbackContext();
 
   // Only show full-page loading when there's no cached data at all
   // When re-fetching after a socket invalidation, keep showing stale data silently
@@ -88,6 +92,14 @@ const Patient: React.FC = () => {
     const user = authService.getUser();
     setCurrentUser(user);
   }, []);
+
+  // Keep the feedback widget aware of which patient we're viewing
+  useEffect(() => {
+    if (patient?.name && id) {
+      setPatientContext(id, patient.name);
+    }
+    return () => clearPatientContext();
+  }, [patient?.name, id]);
 
   // Resolve all editor UUIDs upfront when patient data loads
   useEffect(() => {

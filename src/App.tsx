@@ -15,6 +15,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { authService } from './services/authServices';
 import Hospital from './pages/Hospital';
 import { ToastProvider } from './contexts/ToastContext';
+import { FeedbackProvider } from './contexts/FeedbackContext';
 import Verify from './pages/Verify';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -58,6 +59,7 @@ function App() {
 
   return (
     <ToastProvider>
+      <FeedbackProvider>
       <BrowserRouter>
         <Routes>
           {!isAuthenticated ? (
@@ -91,6 +93,7 @@ function App() {
           )}
         </Routes>
       </BrowserRouter>
+      </FeedbackProvider>
     </ToastProvider>
   );
 }
