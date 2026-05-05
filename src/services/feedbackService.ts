@@ -42,4 +42,12 @@ export const feedbackService = {
         const query = params.toString();
         return api.get(`/feedback${query ? `?${query}` : ''}`);
     },
+
+    async updateStatus(id: string, status: string, adminNotes?: string): Promise<{ success: boolean }> {
+        return api.patch(`/feedback/${id}`, { status, adminNotes });
+    },
+
+    async deleteEntry(id: string): Promise<{ success: boolean }> {
+        return api.delete(`/feedback/${id}`);
+    },
 };

@@ -14,12 +14,15 @@ import profilePic from "/images/Default.png"; // Ensure this path is correct
 // Services
 import { authService } from '../services/authServices';
 import { userService } from '../services/userServices';
+import { api } from '../services/apiClient';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchPatientProfile, invalidateProfile } from '../store/patientProfileSlice';
 import { useFeedbackContext } from '../contexts/FeedbackContext';
 
+const SERVER = import.meta.env.VITE_API_URL || import.meta.env.VITE_SERVER_URL;
 // Components
 import Chat from "../components/Chat";
+import ChatStreamDemo from "../components/ChatStreamDemo";
 import Overview from "../patient/Overview";
 import Profile from "../patient/Profile";
 import Medication from "../patient/Medication";
@@ -60,6 +63,9 @@ const Patient: React.FC = () => {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [tabDropdownOpen, setTabDropdownOpen] = useState<boolean>(false);
   const [editorNames, setEditorNames] = useState<Record<string, string>>({});
+
+  // Symptom report history — fetched once when the patient loads
+  const [symptomHistory, setSymptomHistory] = useState<any[]>([]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -150,6 +156,24 @@ const Patient: React.FC = () => {
       dispatch(fetchPatientProfile(id));
     }
   }, [id, status, dispatch]);
+
+  // Fetch symptom report history for the timeline and diff view
+  useEffect(() => {
+    if (!id || !patient) return;
+    api.get(`/patients/${id}/symptom-history?limit=50`)
+      .then((data: any) => {
+        if (data?.success && Array.isArray(data.data?.history)) {
+          setSymptomHistory(data.data.history);
+        }
+      })
+      .catch(err => console.warn('[Patient.tsx] symptom-history fetch failed:', err));
+  }, [id, patient?.id]);
+
+  // Escalation handler — sends a CRITICAL alert notification to the org
+  const handleEscalate = async (message: string): Promise<void> => {
+    if (!id) return;
+    await api.post(`/patients/${id}/escalate`, { message });
+  };
 
   const handleRefresh = () => {
     if (!id) return;
@@ -514,6 +538,8 @@ const Patient: React.FC = () => {
                   report={selectedDocument}
                   patient={patient}
                   onBack={() => setActiveTab("documents")}
+                  reportHistory={symptomHistory}
+                  onEscalate={handleEscalate}
                 />
               )}
               {activeTab === "note" && <Note note={selectedNote} user={currentUser} onBack={() => setActiveTab("notes")} />}
@@ -540,7 +566,10 @@ const Patient: React.FC = () => {
                 </button>
               </div>
             )}
-              <Chat patient={patient} user={currentUser} />
+            {import.meta.env.VITE_CHATBOT_STREAM_ENABLED === 'true'
+              ? <ChatStreamDemo patient={patient} user={currentUser} />
+              : <Chat patient={patient} user={currentUser} />
+            }
           </div>
         )}
 

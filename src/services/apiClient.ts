@@ -26,12 +26,12 @@ async function request(endpoint: string, options: any = {}) {
     const token = authService.getAccessToken();
     const sessionId = authService.getSessionId();
 
-    console.log('Making request to:', endpoint, {
-        hasToken: !!token,
-        hasSessionId: !!sessionId,
-        tokenLength: token?.length || 0,
-        isPublicEndpoint
-    });
+    // console.log('Making request to:', endpoint, {
+    //     hasToken: !!token,
+    //     hasSessionId: !!sessionId,
+    //     tokenLength: token?.length || 0,
+    //     isPublicEndpoint
+    // });
 
     const headers = {
         'Content-Type': 'application/json',
@@ -111,5 +111,6 @@ export const api = {
     get: (url: string, options?: any) => request(url, { ...options, method: 'GET' }),
     post: (url: string, body: any, options?: any) => request(url, { ...options, method: 'POST', body: JSON.stringify(body) }),
     put: (url: string, body: any, options?: any) => request(url, { ...options, method: 'PUT', body: JSON.stringify(body) }),
+    patch: (url: string, body: any, options?: any) => request(url, { ...options, method: 'PATCH', body: JSON.stringify(body) }),
     delete: (url: string, options?: any) => request(url, { ...options, method: 'DELETE' }),
 };

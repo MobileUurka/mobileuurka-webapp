@@ -13,7 +13,6 @@ const Predisposition: React.FC<PredispositionProps> = ({ patient, setActiveTab }
   
   // 1. Diagnosis Parsing Logic
   const parseDiagnosis = (raw: string | undefined): string => {
-    console.log(raw)
     if (!raw) return "No diagnosis records";
 
     const parsePostgresArray = (str: string) => {

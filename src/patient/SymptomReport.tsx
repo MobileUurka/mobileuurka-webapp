@@ -1,14 +1,22 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { IoArrowBackOutline } from 'react-icons/io5';
 import { HiOutlineDownload } from 'react-icons/hi';
 import { TbBrain } from 'react-icons/tb';
-import { LuActivity, LuTriangleAlert, LuCircleCheck, LuFlaskConical, LuHeartPulse, LuHistory, LuListChecks, LuShieldAlert, LuStethoscope } from 'react-icons/lu';
+import { LuActivity, LuTriangleAlert, LuCircleCheck, LuFlaskConical, LuHeartPulse, LuHistory, LuListChecks, LuShieldAlert, LuStethoscope, LuGitCompare, LuBarChart2 } from 'react-icons/lu';
 import type { PatientData } from '../types/patient';
+import RiskScoreTimeline from './RiskScoreTimeline';
+import ReasoningDiff from './ReasoningDiff';
+import ActionChecklist from './ActionChecklist';
+import RiskFactorBreakdown from './RiskFactorBreakdown';
 
 interface SymptomReportProps {
   report: any;
   patient?: PatientData;
   onBack?: () => void;
+  /** Full history array from symptom_reasoning_report_history (newest-first) */
+  reportHistory?: any[];
+  /** Called when clinician escalates a CRITICAL alert */
+  onEscalate?: (message: string) => Promise<void>;
 }
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
@@ -142,7 +150,9 @@ const downloadReport = (report: any, patient?: PatientData) => {
 
 // ─── MAIN ────────────────────────────────────────────────────────────────────
 
-const SymptomReport: React.FC<SymptomReportProps> = ({ report, patient, onBack }) => {
+const SymptomReport: React.FC<SymptomReportProps> = ({ report, patient, onBack, reportHistory = [], onEscalate }) => {
+  const [activePanel, setActivePanel] = useState<'report' | 'diff' | 'timeline'>('report');
+
   if (!report) return null;
 
   // Normalise — API returns camelCase from DB, raw API uses snake_case
@@ -172,6 +182,9 @@ const SymptomReport: React.FC<SymptomReportProps> = ({ report, patient, onBack }
 
   const hospitalName = patient?.hospital ?? 'Medical Facility';
   const generatedAt  = formatDate(report?.createdAt ?? report?.updatedAt ?? report?.timestamp);
+
+  // History is newest-first; the second entry is the "previous" report
+  const previousReport = reportHistory.length > 1 ? reportHistory[1] : null;
 
   return (
     <div style={{
@@ -294,6 +307,53 @@ const SymptomReport: React.FC<SymptomReportProps> = ({ report, patient, onBack }
       {/* ── BODY ── */}
       <div style={{ padding: '20px 24px', background: '#fff', border: '1px solid #f3f4f6', borderTop: 'none' }}>
 
+        {/* ── Panel Tabs ── */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid #f3f4f6', paddingBottom: 12 }}>
+          {([
+            { key: 'report', label: 'Report', icon: <TbBrain size={13} /> },
+            { key: 'diff', label: 'Changes', icon: <LuGitCompare size={13} />, disabled: !previousReport },
+            { key: 'timeline', label: 'Timeline', icon: <LuBarChart2 size={13} />, disabled: reportHistory.length < 2 },
+          ] as const).map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => !tab.disabled && setActivePanel(tab.key)}
+              disabled={tab.disabled}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '5px 12px', borderRadius: 7, cursor: tab.disabled ? 'not-allowed' : 'pointer',
+                background: activePanel === tab.key ? '#008540' : 'transparent',
+                color: activePanel === tab.key ? '#fff' : tab.disabled ? '#d1d5db' : '#6b7280',
+                border: activePanel === tab.key ? 'none' : '1px solid #e5e7eb',
+                fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+                opacity: tab.disabled ? 0.5 : 1,
+                transition: 'all 0.15s',
+              }}
+            >
+              {tab.icon} {tab.label}
+              {tab.key === 'diff' && !tab.disabled && (
+                <span style={{ fontSize: 9, background: '#fef9c3', color: '#854d0e', borderRadius: 10, padding: '1px 5px', marginLeft: 2 }}>
+                  NEW
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* ── DIFF PANEL ── */}
+        {activePanel === 'diff' && previousReport && (
+          <ReasoningDiff current={report} previous={previousReport} />
+        )}
+
+        {/* ── TIMELINE PANEL ── */}
+        {activePanel === 'timeline' && reportHistory.length >= 2 && (
+          <div style={{ paddingBottom: 8 }}>
+            <RiskScoreTimeline history={reportHistory} />
+          </div>
+        )}
+
+        {/* ── MAIN REPORT PANEL ── */}
+        {activePanel === 'report' && (<>
+
         {/* Clinical Symptoms + Risk Factors chips */}
         {(clinicalSymptoms.length > 0 || riskFactorsList.length > 0) && (
           <Section icon={<LuActivity size={14} />} title="Presenting Symptoms & Risk Factors">
@@ -306,10 +366,10 @@ const SymptomReport: React.FC<SymptomReportProps> = ({ report, patient, onBack }
           </Section>
         )}
 
-        {/* Key Risk Factors */}
+        {/* Key Risk Factors — now with visual breakdown */}
         {keyRiskFactors.length > 0 && (
           <Section icon={<LuTriangleAlert size={14} />} title="Key Risk Factors">
-            <BulletList items={keyRiskFactors} variant="danger" />
+            <RiskFactorBreakdown keyRiskFactors={keyRiskFactors} />
           </Section>
         )}
 
@@ -320,26 +380,17 @@ const SymptomReport: React.FC<SymptomReportProps> = ({ report, patient, onBack }
           </Section>
         )}
 
-        {/* Immediate Actions */}
-        {immediateActions.length > 0 && (
-          <Section icon={<LuHeartPulse size={14} />} title="Immediate Actions">
-            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '12px 16px' }}>
-              <BulletList items={immediateActions} variant="danger" />
-            </div>
-          </Section>
-        )}
-
-        {/* Recommendations */}
-        {recommendations.length > 0 && (
-          <Section icon={<LuCircleCheck size={14} />} title="Recommendations">
-            <BulletList items={recommendations} variant="ok" />
-          </Section>
-        )}
-
-        {/* Monitoring */}
-        {monitoring.length > 0 && (
-          <Section icon={<LuListChecks size={14} />} title="Monitoring Requirements">
-            <BulletList items={monitoring} variant="neutral" />
+        {/* Action Checklist — replaces the three separate bullet lists */}
+        {(immediateActions.length > 0 || monitoring.length > 0 || recommendations.length > 0) && (
+          <Section icon={<LuListChecks size={14} />} title="Action Checklist">
+            <ActionChecklist
+              immediateActions={immediateActions}
+              monitoringRequirements={monitoring}
+              recommendations={recommendations}
+              riskLevel={riskLevel}
+              patientName={patient?.name}
+              onEscalate={onEscalate}
+            />
           </Section>
         )}
 
@@ -379,6 +430,8 @@ const SymptomReport: React.FC<SymptomReportProps> = ({ report, patient, onBack }
             <ProseBlock text={gestationalNotes} />
           </Section>
         )}
+
+        </>)}
 
       </div>
 

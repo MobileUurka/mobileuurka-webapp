@@ -14,6 +14,7 @@ import Settings from './pages/Settings';
 import { useEffect, useState, useCallback } from 'react';
 import { authService } from './services/authServices';
 import Hospital from './pages/Hospital';
+import Feedback from './pages/Feedback';
 import { ToastProvider } from './contexts/ToastContext';
 import { FeedbackProvider } from './contexts/FeedbackContext';
 import Verify from './pages/Verify';
@@ -86,6 +87,7 @@ function App() {
               <Route path="/Alerts" element={<Alerts />} />
               <Route path="/Notifications" element={<Notifications />} />
               <Route path="/Settings" element={<Settings />} />
+              <Route path="/Feedback" element={<Feedback />} />
               {/* Redirect /auth to dashboard if already logged in */}
               <Route path="/auth" element={<Navigate to="/" replace />} />
               <Route path="*" element={<div>Page not found</div>} />
