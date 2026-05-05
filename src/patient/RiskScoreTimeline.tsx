@@ -308,11 +308,11 @@ const RiskScoreTimeline: React.FC<RiskScoreTimelineProps> = ({ history, compact 
   const displayPoints = [...points].reverse();
 
   // Count significant jumps (excluding the latest which is always shown)
-  const significantCount = displayPoints.slice(1).filter((p, i) => {
-    const prev = displayPoints[i + 2]; // the one before this in chronological order
-    const chronoPrev = points[points.length - 2 - i]; // previous in time
-    return chronoPrev && Math.abs(p.score - chronoPrev.score) > SIGNIFICANT_JUMP;
-  }).length;
+  // const significantCount = displayPoints.slice(1).filter((p, i) => {
+  //   const prev = displayPoints[i + 2]; // the one before this in chronological order
+  //   const chronoPrev = points[points.length - 2 - i]; // previous in time
+  //   return chronoPrev && Math.abs(p.score - chronoPrev.score) > SIGNIFICANT_JUMP;
+  // }).length;
 
   // When filter is on: keep latest + any entry that had a significant jump vs its predecessor
   const filteredPoints = significantOnly

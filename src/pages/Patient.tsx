@@ -19,7 +19,6 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchPatientProfile, invalidateProfile } from '../store/patientProfileSlice';
 import { useFeedbackContext } from '../contexts/FeedbackContext';
 
-const SERVER = import.meta.env.VITE_API_URL || import.meta.env.VITE_SERVER_URL;
 // Components
 import Chat from "../components/Chat";
 import ChatStreamDemo from "../components/ChatStreamDemo";

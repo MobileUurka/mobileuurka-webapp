@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { IoArrowBackOutline } from 'react-icons/io5';
 import { HiOutlineDownload } from 'react-icons/hi';
 import { TbBrain } from 'react-icons/tb';
-import { LuActivity, LuTriangleAlert, LuCircleCheck, LuFlaskConical, LuHeartPulse, LuHistory, LuListChecks, LuShieldAlert, LuStethoscope, LuGitCompare, LuBarChart2 } from 'react-icons/lu';
+import { LuActivity, LuTriangleAlert, LuFlaskConical, LuHeartPulse, LuHistory, LuListChecks, LuShieldAlert, LuStethoscope, LuGitCompare } from 'react-icons/lu';
 import type { PatientData } from '../types/patient';
 import RiskScoreTimeline from './RiskScoreTimeline';
 import ReasoningDiff from './ReasoningDiff';
@@ -308,7 +308,7 @@ const SymptomReport: React.FC<SymptomReportProps> = ({ report, patient, onBack, 
       <div style={{ padding: '20px 24px', background: '#fff', border: '1px solid #f3f4f6', borderTop: 'none' }}>
 
         {/* ── Panel Tabs ── */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid #f3f4f6', paddingBottom: 12 }}>
+        {/* <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid #f3f4f6', paddingBottom: 12 }}>
           {([
             { key: 'report', label: 'Report', icon: <TbBrain size={13} /> },
             { key: 'diff', label: 'Changes', icon: <LuGitCompare size={13} />, disabled: !previousReport },
@@ -337,7 +337,7 @@ const SymptomReport: React.FC<SymptomReportProps> = ({ report, patient, onBack, 
               )}
             </button>
           ))}
-        </div>
+        </div> */}
 
         {/* ── DIFF PANEL ── */}
         {activePanel === 'diff' && previousReport && (

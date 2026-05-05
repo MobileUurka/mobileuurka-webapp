@@ -13,7 +13,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   LuCircleCheck, LuCircle,
-  LuListChecks, LuHeartPulse, LuClipboardList,
+  LuHeartPulse
 } from 'react-icons/lu';
 
 interface ActionChecklistProps {
@@ -29,7 +29,7 @@ type CheckState = Record<string, boolean>;
 
 const ActionChecklist: React.FC<ActionChecklistProps> = ({
   immediateActions,
-  riskLevel,
+  
 }) => {
   const [checked, setChecked] = useState<CheckState>({});
 
