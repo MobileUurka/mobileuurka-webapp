@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { IoArrowBackOutline } from 'react-icons/io5';
 import { HiOutlineDownload } from 'react-icons/hi';
 import { TbBrain } from 'react-icons/tb';
-import { LuActivity, LuTriangleAlert, LuFlaskConical, LuHeartPulse, LuHistory, LuListChecks, LuShieldAlert, LuStethoscope, LuGitCompare } from 'react-icons/lu';
+import { LuActivity, LuTriangleAlert, LuFlaskConical, LuHeartPulse, LuHistory, LuListChecks, LuShieldAlert, LuStethoscope} from 'react-icons/lu';
 import type { PatientData } from '../types/patient';
 import RiskScoreTimeline from './RiskScoreTimeline';
 import ReasoningDiff from './ReasoningDiff';
@@ -151,7 +151,7 @@ const downloadReport = (report: any, patient?: PatientData) => {
 // ─── MAIN ────────────────────────────────────────────────────────────────────
 
 const SymptomReport: React.FC<SymptomReportProps> = ({ report, patient, onBack, reportHistory = [], onEscalate }) => {
-  const [activePanel, setActivePanel] = useState<'report' | 'diff' | 'timeline'>('report');
+  const [activePanel] = useState<'report' | 'diff' | 'timeline'>('report');
 
   if (!report) return null;
 
