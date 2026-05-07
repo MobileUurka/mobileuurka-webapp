@@ -1,14 +1,19 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { IoArrowBackOutline } from 'react-icons/io5';
 import { HiOutlineDownload } from 'react-icons/hi';
-import { LuActivity, LuListChecks, LuCircleCheck, LuCircle } from 'react-icons/lu';
+import { LuActivity, LuListChecks, LuCircleCheck, LuCircle, LuMessageSquare } from 'react-icons/lu';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import type { PatientData } from '../types/patient';
 import RiskScoreTimeline from './RiskScoreTimeline';
 import ReasoningDiff from './ReasoningDiff';
 import ActionChecklist from './ActionChecklist';
+import useSelectionMenu from "../hooks/useSelectionMenu";
+import SelectionMenu from "../components/SelectionMenu"
 import RiskFactorBreakdown from './RiskFactorBreakdown';
+import CommentsPanel, { type CommentPayload } from '../components/CommentsPanel';
+import NotesDrawer from '../components/NotesDrawer';
+import { patientService } from '../services/patientServices';
 
 interface SymptomReportProps {
   report: any;
@@ -18,6 +23,8 @@ interface SymptomReportProps {
   reportHistory?: any[];
   /** Called when clinician escalates a CRITICAL alert */
   onEscalate?: (message: string) => Promise<void>;
+  /** Called when a comment is saved — receives the quoted text + note */
+  onSaveComment?: (payload: CommentPayload) => Promise<void>;
 }
 
 const RISK_COLORS: Record<string, string> = {
@@ -33,7 +40,7 @@ const parseList = (raw: any): string[] => {
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
-  } catch {}
+  } catch { }
   return String(raw)
     .replace(/^\[|\]$/g, '')
     .split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)
@@ -45,11 +52,11 @@ const formatDate = (iso?: string, format: 'long' | 'short' = 'long') => {
   if (!iso) return '—';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
-  
+
   if (format === 'short') {
     return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
   }
-  
+
   return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 };
 
@@ -152,12 +159,100 @@ const ClinicalReasoningBlock: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBack, reportHistory = [], onEscalate }) => {
+const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBack, reportHistory = [], onEscalate, onSaveComment }) => {
   const printRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [activePanel, setActivePanel] = useState<'report' | 'diff' | 'timeline' | 'monitoring' | 'recommendations'>('report');
+  // null = panel closed; string = the highlighted text being commented on
+  const [activeComment, setActiveComment] = useState<string | null>(null);
+  // locally stored notes — seeded from DB on mount
+  const [savedNotes, setSavedNotes] = useState<CommentPayload[]>([]);
+  // DB comment IDs keyed by index so we can delete them
+  const [commentIds, setCommentIds] = useState<(string | undefined)[]>([]);
+  const [notesDrawerOpen, setNotesDrawerOpen] = useState(false);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const toggle = useCallback((key: string) => setChecked(p => ({ ...p, [key]: !p[key] })), []);
+  const menu = useSelectionMenu(printRef, menuRef);
 
+  // The document ID is the report's history record ID (stable across reloads)
+  const documentId: string = report?.id ?? report?.historyId ?? '';
+
+  // ── Load existing comments from DB on mount ──────────────────────────────
+  useEffect(() => {
+    if (!patient?.id || !documentId) return;
+    patientService.getComments(patient.id, documentId)
+      .then((res: any) => {
+        const rows: any[] = res?.data?.comments ?? [];
+        setSavedNotes(rows.map(r => ({
+          quotedText: r.selection,
+          note: r.text,
+          savedAt: r.createdAt ?? r.date ?? new Date().toISOString(),
+        })));
+        setCommentIds(rows.map(r => r.id));
+      })
+      .catch(() => { /* silently ignore — offline or no comments yet */ });
+  }, [patient?.id, documentId]);
+
+  // ── Highlight saved quoted texts in the report DOM ───────────────────────
+  // Runs after the report renders and whenever savedNotes changes.
+  useEffect(() => {
+    if (!printRef.current || savedNotes.length === 0) return;
+
+    // Remove any previous marks first
+    printRef.current.querySelectorAll('mark[data-comment-highlight]').forEach(m => {
+      const parent = m.parentNode;
+      if (parent) {
+        parent.replaceChild(document.createTextNode(m.textContent ?? ''), m);
+        parent.normalize();
+      }
+    });
+
+    // Walk text nodes and wrap matches
+    const phrases = [...new Set(savedNotes.map(n => n.quotedText).filter(Boolean))];
+    if (phrases.length === 0) return;
+
+    const walker = document.createTreeWalker(
+      printRef.current,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: (node) => {
+          // Skip nodes already inside a mark
+          if ((node.parentElement as HTMLElement)?.closest('mark[data-comment-highlight]')) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      }
+    );
+
+    const textNodes: Text[] = [];
+    let node: Node | null;
+    while ((node = walker.nextNode())) textNodes.push(node as Text);
+
+    for (const textNode of textNodes) {
+      const text = textNode.textContent ?? '';
+      for (const phrase of phrases) {
+        const idx = text.indexOf(phrase);
+        if (idx === -1) continue;
+
+        const before = text.slice(0, idx);
+        const after = text.slice(idx + phrase.length);
+
+        const mark = document.createElement('mark');
+        mark.setAttribute('data-comment-highlight', 'true');
+        mark.style.cssText = 'background:#fef08a;border-radius:2px;padding:0 1px;';
+        mark.textContent = phrase;
+
+        const frag = document.createDocumentFragment();
+        if (before) frag.appendChild(document.createTextNode(before));
+        frag.appendChild(mark);
+        if (after) frag.appendChild(document.createTextNode(after));
+
+        textNode.parentNode?.replaceChild(frag, textNode);
+        break; // one phrase per text node pass — re-walk handles the rest
+      }
+    }
+  }, [savedNotes, activePanel]);
   if (!report) return null;
 
   const previousReport = reportHistory.length > 1 ? reportHistory[1] : null;
@@ -182,6 +277,8 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
   const gestationTotal = report?.gestationWeeksTotal ?? 40;
   const generatedDate = formatDate(report?.createdAt ?? report?.updatedAt, 'long');
 
+
+
   const handleDownloadPDF = async () => {
     if (!printRef.current) return;
 
@@ -202,11 +299,11 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
       // Calculate PDF dimensions (A4 size)
       const imgWidth = 210; // A4 width in mm
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
+
       // Create PDF
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgData = canvas.toDataURL('image/png');
-      
+
       pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
       pdf.save(filename);
     } catch (error) {
@@ -215,8 +312,13 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
     }
   };
 
+  const handleComment = (text: string) => {
+    setActiveComment(text); // captures the highlighted word, opens the panel
+  };
+
   return (
     <>
+      <SelectionMenu ref={menuRef} menu={menu} onComment={handleComment} />
       {/* Screen-only controls */}
       <div className="print:hidden mb-3 flex items-center gap-2">
         {onBack && (
@@ -235,18 +337,41 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
           <HiOutlineDownload size={14} />
           Download PDF
         </button>
+
+        {/* View Notes button — only shown when there are saved notes */}
+        {savedNotes.length > 0 && (
+          <button
+            onClick={() => setNotesDrawerOpen(true)}
+            className="px-3 py-1.5 rounded text-[13px] font-medium transition-colors flex items-center gap-1.5"
+            style={{
+              background: "#f0fdf4",
+              color: "#008540",
+              border: "1px solid #bbf7d0",
+            }}
+          >
+            <LuMessageSquare size={14} />
+            Notes
+            <span style={{
+              background: "#008540", color: "#fff",
+              borderRadius: 10, fontSize: 10, fontWeight: 700,
+              padding: "0 5px", lineHeight: "16px",
+            }}>
+              {savedNotes.length}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Panel tabs — screen only */}
       <div className="print:hidden flex gap-2 mb-4 flex-wrap">
         {(
           [
-            { key: 'report' as const,           label: 'Report',          icon: null as React.ReactNode,                                    disabled: false },
-            { key: 'monitoring' as const,        label: 'Monitoring',      icon: <LuListChecks size={12} /> as React.ReactNode,              disabled: monitoring.length === 0 },
-            { key: 'recommendations' as const,   label: 'Recommendations', icon: <LuCircleCheck size={12} /> as React.ReactNode,             disabled: recommendations.length === 0 },
+            { key: 'report' as const, label: 'Report', icon: null as React.ReactNode, disabled: false },
+            { key: 'monitoring' as const, label: 'Monitoring', icon: <LuListChecks size={12} /> as React.ReactNode, disabled: monitoring.length === 0 },
+            { key: 'recommendations' as const, label: 'Recommendations', icon: <LuCircleCheck size={12} /> as React.ReactNode, disabled: recommendations.length === 0 },
             // Changes tab hidden for now — will be re-enabled later
             // { key: 'diff' as const,           label: 'Changes',         icon: <LuGitCompare size={12} /> as React.ReactNode,              disabled: !previousReport },
-            { key: 'timeline' as const,          label: 'Timeline',        icon: <LuActivity size={12} /> as React.ReactNode,                disabled: reportHistory.length < 2 },
+            { key: 'timeline' as const, label: 'Timeline', icon: <LuActivity size={12} /> as React.ReactNode, disabled: reportHistory.length < 2 },
           ]
         ).map(tab => (
           <button
@@ -396,157 +521,208 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
 
       {/* Printable Report — only shown on the Report tab */}
       {activePanel === 'report' && (
-      <div
-        ref={printRef}
-        className="mt-5 w-full max-w-[210mm] p-8 print:p-0 rounded-lg"
-        style={{ 
-          fontSize: '13px',
-          backgroundColor: '#ffffff',
-          border: '1px solid #e5e7eb',
-          color: '#000000'
-        }}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <img src="/images/logo.png" alt="Mobileuurka" className="w-12 h-12" />
-            <div>
-              <h1 className="text-base font-bold" style={{ color: '#111827' }}>Mobileuurka</h1>
-              <p className="text-[13px]" style={{ color: '#4b5563' }}>Healthcare Services</p>
+        <div
+          ref={printRef}
+          className="mt-5 w-full max-w-[210mm] p-8 print:p-0 rounded-lg"
+          style={{
+            fontSize: '13px',
+            backgroundColor: '#ffffff',
+            border: '1px solid #e5e7eb',
+            color: '#000000'
+          }}
+        >
+          {/* Header */}
+          <div className="flex items-start justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <img src="/images/logo.png" alt="Mobileuurka" className="w-12 h-12" />
+              <div>
+                <h1 className="text-base font-bold" style={{ color: '#111827' }}>Mobileuurka</h1>
+                <p className="text-[13px]" style={{ color: '#4b5563' }}>Healthcare Services</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <h2 className="text-sm font-bold" style={{ color: '#111827' }}>AI Analysis</h2>
+              <p className="text-[13px]" style={{ color: '#4b5563' }}>Date: {generatedDate}</p>
             </div>
           </div>
-          <div className="text-right">
-            <h2 className="text-sm font-bold" style={{ color: '#111827' }}>AI Analysis</h2>
-            <p className="text-[13px]" style={{ color: '#4b5563' }}>Date: {generatedDate}</p>
-          </div>
-        </div>
 
-        {/* Patient Information */}
-        <div className="mb-5">
-          <h3 className="text-sm font-bold mb-3" style={{ color: '#111827' }}>Patient Information</h3>
-          
-          <div className="grid grid-cols-3 gap-x-6 gap-y-2.5">
-             <div>
-              <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>FULL NAME</p>
-              <p className="text-[13px] font-medium" style={{ color: '#111827' }}>{patient?.name || '—'}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>GESTATION</p>
-              <p className="text-[13px] font-medium" style={{ color: '#111827' }}>{gestationWeeks} weeks (of {gestationTotal})</p>
-            </div>
-           
-            <div>
-              <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>NATIONAL ID</p>
-              <p className="text-[13px] font-medium" style={{ color: '#111827' }}>{patient?.nationalId || '—'}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>PHONE NUMBER</p>
-              <p className="text-[13px] font-medium" style={{ color: '#111827' }}>{patient?.phone || '—'}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>EMAIL ADDRESS</p>
-              <p className="text-[13px] font-medium" style={{ color: '#111827' }}>{patient?.email || '—'}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>ADDRESS</p>
-              <p className="text-[13px] font-medium" style={{ color: '#111827' }}>{patient?.address || '—'}</p>
+          {/* Patient Information */}
+          <div className="mb-5">
+            <h3 className="text-sm font-bold mb-3" style={{ color: '#111827' }}>Patient Information</h3>
+
+            <div className="grid grid-cols-3 gap-x-6 gap-y-2.5">
+              <div>
+                <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>FULL NAME</p>
+                <p className="text-[13px] font-medium" style={{ color: '#111827' }}>{patient?.name || '—'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>GESTATION</p>
+                <p className="text-[13px] font-medium" style={{ color: '#111827' }}>{gestationWeeks} weeks (of {gestationTotal})</p>
+              </div>
+
+              <div>
+                <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>NATIONAL ID</p>
+                <p className="text-[13px] font-medium" style={{ color: '#111827' }}>{patient?.nationalId || '—'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>PHONE NUMBER</p>
+                <p className="text-[13px] font-medium" style={{ color: '#111827' }}>{patient?.phone || '—'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>EMAIL ADDRESS</p>
+                <p className="text-[13px] font-medium" style={{ color: '#111827' }}>{patient?.email || '—'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>ADDRESS</p>
+                <p className="text-[13px] font-medium" style={{ color: '#111827' }}>{patient?.address || '—'}</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Risk Assessment */}
-        <div className="mb-5">
-          <h3 className="text-sm font-bold mb-3" style={{ color: '#111827' }}>Risk Assessment</h3>
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>RISK LEVEL</p>
-              <p className="font-bold " style={{ color: riskColor }}>{riskLevel}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>RISK SCORE</p>
-              <p className="font-bold" style={{ color: '#111827' }}>{riskScore.toFixed(2)}</p>
+          {/* Risk Assessment */}
+          <div className="mb-5">
+            <h3 className="text-sm font-bold mb-3" style={{ color: '#111827' }}>Risk Assessment</h3>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>RISK LEVEL</p>
+                <p className="font-bold " style={{ color: riskColor }}>{riskLevel}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>RISK SCORE</p>
+                <p className="font-bold" style={{ color: '#111827' }}>{riskScore.toFixed(2)}</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Key Risk Factors */}
-        {keyRiskFactors.length > 0 && (
-          <div className="mb-4">
-            <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Key Risk Factors</h3>
-            <RiskFactorBreakdown keyRiskFactors={keyRiskFactors} compact />
-          </div>
-        )}
+          {/* Key Risk Factors */}
+          {keyRiskFactors.length > 0 && (
+            <div className="mb-4">
+              <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Key Risk Factors</h3>
+              <RiskFactorBreakdown keyRiskFactors={keyRiskFactors} compact />
+            </div>
+          )}
 
-        {/* Primary Concerns */}
-        {primaryConcerns.length > 0 && (
-          <div className="mb-4">
-            <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Primary Concerns</h3>
-            <p className="text-[13px] leading-relaxed" style={{ color: '#374151' }}>
-              {primaryConcerns.join(', ')}
+          {/* Primary Concerns */}
+          {primaryConcerns.length > 0 && (
+            <div className="mb-4">
+              <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Primary Concerns</h3>
+              <p className="text-[13px] leading-relaxed" style={{ color: '#374151' }}>
+                {primaryConcerns.join(', ')}
+              </p>
+            </div>
+          )}
+
+          {/* Clinical Reasoning */}
+          {clinicalReasoning && (
+            <div className="mb-4">
+              <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Clinical Reasoning</h3>
+              <ClinicalReasoningBlock text={clinicalReasoning} />
+            </div>
+          )}
+
+          {/* Vital Signs Assessment */}
+          {vitalSigns && (
+            <div className="mb-4">
+              <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Vital Signs Assessment</h3>
+              <ClinicalReasoningBlock text={vitalSigns} />
+            </div>
+          )}
+
+          {/* Laboratory Interpretation */}
+          {labInterpretation && (
+            <div className="mb-4">
+              <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Laboratory Interpretation</h3>
+              <ClinicalReasoningBlock text={labInterpretation} />
+            </div>
+          )}
+
+          {/* Historical Risk Factors */}
+          {historicalFactors && (
+            <div className="mb-4">
+              <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Historical Risk Factors</h3>
+              <ClinicalReasoningBlock text={historicalFactors} />
+            </div>
+          )}
+
+          {/* Immediate Actions — shown in ActionChecklist above the report, not repeated here */}
+
+          {/* Follow Up Timing */}
+          {followUpTiming && (
+            <div className="mb-4">
+              <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Follow Up Timing</h3>
+              <p className="text-[13px] leading-relaxed whitespace-pre-wrap" style={{ color: '#374151' }}>
+                {followUpTiming}
+              </p>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="mt-8 pt-3" style={{ borderTop: '1px solid #e5e7eb' }}>
+            <p className="text-[10px] text-center mb-1" style={{ color: '#6b7280' }}>
+              This document is confidential and contains protected health information.
+            </p>
+            <p className="text-[10px] text-center" style={{ color: '#9ca3af' }}>
+              Generated on {formatDate(report?.createdAt ?? report?.updatedAt, 'short')} at{' '}
+              {new Date(report?.createdAt ?? report?.updatedAt).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false,
+              }).replace(/:/g, '')}
             </p>
           </div>
-        )}
-
-        {/* Clinical Reasoning */}
-        {clinicalReasoning && (
-          <div className="mb-4">
-            <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Clinical Reasoning</h3>
-            <ClinicalReasoningBlock text={clinicalReasoning} />
-          </div>
-        )}
-
-        {/* Vital Signs Assessment */}
-        {vitalSigns && (
-          <div className="mb-4">
-            <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Vital Signs Assessment</h3>
-            <ClinicalReasoningBlock text={vitalSigns} />
-          </div>
-        )}
-
-        {/* Laboratory Interpretation */}
-        {labInterpretation && (
-          <div className="mb-4">
-            <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Laboratory Interpretation</h3>
-            <ClinicalReasoningBlock text={labInterpretation} />
-          </div>
-        )}
-
-        {/* Historical Risk Factors */}
-        {historicalFactors && (
-          <div className="mb-4">
-            <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Historical Risk Factors</h3>
-            <ClinicalReasoningBlock text={historicalFactors} />
-          </div>
-        )}
-
-        {/* Immediate Actions — shown in ActionChecklist above the report, not repeated here */}
-
-        {/* Follow Up Timing */}
-        {followUpTiming && (
-          <div className="mb-4">
-            <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Follow Up Timing</h3>
-            <p className="text-[13px] leading-relaxed whitespace-pre-wrap" style={{ color: '#374151' }}>
-              {followUpTiming}
-            </p>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="mt-8 pt-3" style={{ borderTop: '1px solid #e5e7eb' }}>
-          <p className="text-[10px] text-center mb-1" style={{ color: '#6b7280' }}>
-            This document is confidential and contains protected health information.
-          </p>
-          <p className="text-[10px] text-center" style={{ color: '#9ca3af' }}>
-            Generated on {formatDate(report?.createdAt ?? report?.updatedAt, 'short')} at{' '}
-            {new Date(report?.createdAt ?? report?.updatedAt).toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-              hour12: false,
-            }).replace(/:/g, '')}
-          </p>
         </div>
-      </div>
+      )}
+
+      {/* Comments panel — slides in when a selection is commented on */}
+      {activeComment !== null && (
+        <CommentsPanel
+          quotedText={activeComment}
+          onClose={() => setActiveComment(null)}
+          onSave={async (payload) => {
+            // 1. Save to DB
+            let newId: string | undefined;
+            if (patient?.id && documentId) {
+              try {
+                const res: any = await patientService.createComment(patient.id, {
+                  documentId,
+                  selection: payload.quotedText,
+                  text: payload.note,
+                });
+                newId = res?.data?.comment?.id;
+              } catch (err) {
+                console.error('Failed to persist comment:', err);
+              }
+            }
+            // 2. Add to local state
+            setSavedNotes(prev => [...prev, payload]);
+            setCommentIds(prev => [...prev, newId]);
+            // 3. Notify parent if needed
+            await onSaveComment?.(payload);
+            setActiveComment(null);
+          }}
+        />
+      )}
+
+      {/* Notes drawer — lists all saved notes */}
+      {notesDrawerOpen && (
+        <NotesDrawer
+          notes={savedNotes}
+          onClose={() => setNotesDrawerOpen(false)}
+          onDelete={async (i) => {
+            // Delete from DB if we have an ID
+            const id = commentIds[i];
+            if (id && patient?.id) {
+              try {
+                await patientService.deleteComment(patient.id, id);
+              } catch (err) {
+                console.error('Failed to delete comment from DB:', err);
+              }
+            }
+            setSavedNotes(prev => prev.filter((_, idx) => idx !== i));
+            setCommentIds(prev => prev.filter((_, idx) => idx !== i));
+          }}
+        />
       )}
 
       {/* Print Styles */}

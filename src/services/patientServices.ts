@@ -69,5 +69,19 @@ export const patientService = {
 
     async getAllPatientsAcrossOrgs() {
         return api.get('/patients/admin/all');
-    }
+    },
+
+    // ===== REPORT COMMENTS =====
+
+    async createComment(patientId: string, payload: { documentId: string; selection: string; text: string; y?: number; yPercentage?: number }) {
+        return api.post(`/patients/${patientId}/comments`, payload);
+    },
+
+    async getComments(patientId: string, documentId: string) {
+        return api.get(`/patients/${patientId}/comments?documentId=${encodeURIComponent(documentId)}`);
+    },
+
+    async deleteComment(patientId: string, commentId: string) {
+        return api.delete(`/patients/${patientId}/comments/${commentId}`);
+    },
 };

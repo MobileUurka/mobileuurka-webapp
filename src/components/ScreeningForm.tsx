@@ -6,6 +6,7 @@ import { hospitalService } from '../services/hospitalServices';
 import { patientService } from '../services/patientServices';
 import HospitalSelector from './HospitalSelector';
 import PatientSelector from './PatientSelector';
+import { usePerformanceTimer } from '../hooks/usePerformanceTimer';
 // import { type PatientData } from '../types/patient';
 
 // Simple loading spinner component
@@ -79,12 +80,20 @@ interface ScreeningFormProps {
   isLastStep?: boolean;
 }
 
-const ScreeningForm = ({ fields, onSubmit, initialData = {}, isLastStep = false }: ScreeningFormProps) => {
+const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep = false }: ScreeningFormProps) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<Record<string, any>>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentPage, setCurrentPage] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Performance timer — starts when the form mounts, stops on successful submit
+  const perfTimer = usePerformanceTimer(title);
+  useEffect(() => {
+    perfTimer.start();
+    return () => perfTimer.cancel(); // clean up if user navigates away
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [hospitalOptions, setHospitalOptions] = useState<string[]>([]);
   const [loadingHospitals, setLoadingHospitals] = useState(false);
   const [showHospitalSelector, setShowHospitalSelector] = useState(false);
@@ -374,6 +383,7 @@ const ScreeningForm = ({ fields, onSubmit, initialData = {}, isLastStep = false 
       setIsSubmitting(true);
       try {
         await onSubmit(formData);
+        perfTimer.stop(); // record duration on success
       } catch (error) {
         console.error('Form submission error:', error);
         // The error handling is done in the parent component
