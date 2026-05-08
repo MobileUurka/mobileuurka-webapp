@@ -21,7 +21,6 @@ import { useFeedbackContext } from '../contexts/FeedbackContext';
 
 // Components
 import Chat from "../components/Chat";
-import ChatStreamDemo from "../components/ChatStreamDemo";
 import Overview from "../patient/Overview";
 import Profile from "../patient/Profile";
 import Medication from "../patient/Medication";
@@ -566,10 +565,7 @@ const Patient: React.FC = () => {
                 </button>
               </div>
             )}
-            {import.meta.env.VITE_CHATBOT_STREAM_ENABLED === 'true'
-              ? <ChatStreamDemo patient={patient} user={currentUser} />
-              : <Chat patient={patient} user={currentUser} />
-            }
+            <Chat patient={patient} user={currentUser} />
           </div>
         )}
 

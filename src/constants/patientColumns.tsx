@@ -20,16 +20,20 @@ export interface Patient {
 export const formatDiagnosis = (raw: string | null | undefined): string => {
   if (!raw || raw.trim() === "" || raw === "{}") return "No diagnosis records";
 
-  // Helper to parse Postgres array syntax: {"item1", "item2"}
-  const parsePostgresArray = (str: string): string[] => {
-    // If it's not a Postgres array format, return it as a single-item array
-    if (!str.startsWith("{") || !str.endsWith("}")) return [str];
+  const isNegativeResult = (s: string) =>
+    /^no\b/i.test(s) ||
+    /^not\b/i.test(s) ||
+    /^none\b/i.test(s) ||
+    /no specific conditions/i.test(s) ||
+    /no condition/i.test(s) ||
+    /not of any/i.test(s);
 
+  const parsePostgresArray = (str: string): string[] => {
+    if (!str.startsWith("{") || !str.endsWith("}")) return [str];
     return str
-      .replace(/^{|}$/g, "") // Remove surrounding curly braces
-      // Split by comma, but ignore commas inside double quotes
+      .replace(/^{|}$/g, "")
       .split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/)
-      .map((item) => item.replace(/^"(.*)"$/, "$1").trim()); // Remove quotes and whitespace
+      .map((item) => item.replace(/^"(.*)"$/, "$1").trim());
   };
 
   try {
@@ -47,16 +51,13 @@ export const formatDiagnosis = (raw: string | null | undefined): string => {
       );
 
     if (cleaned.length === 0) return "No diagnosis data found";
+    if (isNegativeResult(cleaned[0])) return "No specific conditions detected";
 
-    // Check for "No specific conditions detected" or similar clean results
-    if (/^no\s+specific\s+conditions\s+detected/i.test(cleaned[0])) {
-      return "No conditions detected";
-    }
+    const positive = cleaned.filter((c) => !isNegativeResult(c));
+    if (positive.length === 0) return "No specific conditions detected";
 
-    // Join multiple conditions with an ampersand
-    const diagnosisList = cleaned.join(" & ");
-    return `Suspected to have ${diagnosisList}`;
-    
+    return `Suspected to have ${positive.join(" & ")}`;
+
   } catch (error) {
     console.error("Diagnosis parsing error:", error);
     return "Error parsing diagnosis";

@@ -22,6 +22,15 @@ const Predisposition: React.FC<PredispositionProps> = ({ patient, setActiveTab }
         .map((item) => item.replace(/^"(.*)"$/, "$1").trim());
     };
 
+    // Patterns that indicate no condition was found — never prefix with "Suspected to have"
+    const isNegativeResult = (s: string) =>
+      /^no\b/i.test(s) ||
+      /^not\b/i.test(s) ||
+      /^none\b/i.test(s) ||
+      /no specific conditions/i.test(s) ||
+      /no condition/i.test(s) ||
+      /not of any/i.test(s);
+
     const parsed = parsePostgresArray(raw);
     const cleaned = parsed
       .filter((x) => x && x !== "NULL")
@@ -34,9 +43,15 @@ const Predisposition: React.FC<PredispositionProps> = ({ patient, setActiveTab }
       );
 
     if (cleaned.length === 0) return "No diagnosis data found";
-    if (/^no specific conditions detected/i.test(cleaned[0])) return cleaned[0];
 
-    return `Suspected to have ${cleaned.join(" & ")}`;
+    // If the first (or only) entry is a negative result, return it as-is
+    if (isNegativeResult(cleaned[0])) return "No specific conditions detected";
+
+    // Filter out any negative entries mixed in with real diagnoses
+    const positive = cleaned.filter((c) => !isNegativeResult(c));
+    if (positive.length === 0) return "No specific conditions detected";
+
+    return `Suspected to have ${positive.join(" & ")}`;
   };
 
   // 2. Risk Assessment Logic

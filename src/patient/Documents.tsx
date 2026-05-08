@@ -77,15 +77,37 @@ const Documents: React.FC<DocumentsProps> = ({
 
   function formatDiagnosis(raw: string) {
     if (!raw) return "No diagnosis records";
+
+    const isNegativeResult = (s: string) =>
+      /^no\b/i.test(s) ||
+      /^not\b/i.test(s) ||
+      /^none\b/i.test(s) ||
+      /no specific conditions/i.test(s) ||
+      /no condition/i.test(s) ||
+      /not of any/i.test(s);
+
     const parsePostgresArray = (str: string) =>
       str.replace(/^{|}$/g, "").split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/)
         .map((item) => item.replace(/^"(.*)"$/, "$1").trim());
+
     const parsed = parsePostgresArray(raw);
-    const cleaned = parsed.filter((x) => x && x !== "NULL")
-      .map((entry) => entry.replace(/Highly\s+/i, "").replace(/Suspected to have\s+/i, "").replace(/\.$/, "").trim());
+    const cleaned = parsed
+      .filter((x) => x && x !== "NULL")
+      .map((entry) =>
+        entry
+          .replace(/Highly\s+/i, "")
+          .replace(/Suspected to have\s+/i, "")
+          .replace(/\.$/, "")
+          .trim()
+      );
+
     if (cleaned.length === 0) return "No diagnosis data found";
-    if (/^no specific conditions detected/i.test(cleaned[0])) return cleaned[0];
-    return `Suspected to have ${cleaned.join(" & ")}`;
+    if (isNegativeResult(cleaned[0])) return "No specific conditions detected";
+
+    const positive = cleaned.filter((c) => !isNegativeResult(c));
+    if (positive.length === 0) return "No specific conditions detected";
+
+    return `Suspected to have ${positive.join(" & ")}`;
   }
 
   const generateInfectionMessage = (item: any) => {

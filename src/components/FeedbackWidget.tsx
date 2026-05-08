@@ -121,7 +121,7 @@ const FeedbackWidget: React.FC<FeedbackWidgetProps> = ({ patientId, patientName 
                 aria-label="Open feedback"
                 title="Send feedback"
                 className={`
-                    fixed bottom-6 right-6 z-50
+                    fixed bottom-20 right-8 z-50
                     w-12 h-12 rounded-full shadow-lg
                     flex items-center justify-center
                     transition-all duration-200
