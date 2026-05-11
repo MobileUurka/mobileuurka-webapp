@@ -68,22 +68,39 @@ export const PATIENT_COLUMNS: ColumnConfig<Patient>[] = [
   {
     label: "Name",
     key: "name",
-    width:"240px",
-    render: (patient) => (
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-[#e5decb] flex items-center justify-center text-xs text-gray-700 shrink-0">
-          {patient.firstName?.charAt(0)}{patient.lastName?.charAt(0)}
+    width: "240px",
+    render: (patient) => {
+      // 1. Determine the display name
+      const displayName = patient.name || `${patient.firstName ?? ''} ${patient.lastName ?? ''}`.trim();
+
+      // 2. Determine the initials
+      let initials = "";
+      if (patient.firstName && patient.lastName) {
+        initials = `${patient.firstName.charAt(0)}${patient.lastName.charAt(0)}`;
+      } else if (patient.name) {
+        // Split fullName and take first letter of first two words
+        const names = patient.name.split(" ");
+        initials = names.length > 1
+          ? `${names[0][0]}${names[1][0]}`
+          : names[0][0];
+      }
+
+      return (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-[#e5decb] flex items-center justify-center text-xs text-gray-700 shrink-0 uppercase">
+            {initials || "?"}
+          </div>
+          <span className="font-medium truncate">
+            {displayName || "Unknown Patient"}
+          </span>
         </div>
-        <span className="font-medium truncate">
-          {patient.firstName} {patient.lastName}
-        </span>
-      </div>
-    )
+      );
+    }
   },
   {
     label: "National ID",
     key: "nationalId",
-    width:"120px",
+    width: "120px",
     render: (patient) => {
       const id = String(patient.nationalId || "");
       return id ? `*****${id.slice(-4)}` : "—";
@@ -92,7 +109,7 @@ export const PATIENT_COLUMNS: ColumnConfig<Patient>[] = [
   {
     label: "Hospital",
     key: "hospital",
-    width:"220px",
+    width: "220px",
     render: (patient) => <span className="truncate">{patient.hospital || "—"}</span>
   },
   {
@@ -101,11 +118,11 @@ export const PATIENT_COLUMNS: ColumnConfig<Patient>[] = [
     width: "120px",
     render: (item: any) => {
       const riskValue = item.riskLevel;
-  
+
       if (!riskValue) return <span className="text-gray-400">—</span>;
-  
+
       const risk = riskValue.toLowerCase() as 'high' | 'mid' | 'low';
-  
+
       const colors = {
         high: {
           text: "rgba(220, 38, 38, 0.9)", // red-600
@@ -124,9 +141,9 @@ export const PATIENT_COLUMNS: ColumnConfig<Patient>[] = [
           bg: "rgba(107, 114, 128, 0.08)",
         },
       };
-  
+
       const config = colors[risk] || colors.default;
-  
+
       return (
         <div
           className="flex items-center gap-2 px-3 py-1 rounded-full w-fit text-xs font-medium"
@@ -152,27 +169,27 @@ export const PATIENT_COLUMNS: ColumnConfig<Patient>[] = [
     width: "120px",
     render: (item: any) => {
       const nextVisit = item.nextVisit;
-      
+
       if (!nextVisit) return <span className="text-gray-400">—</span>;
-      
+
       // Parse the date and format it nicely
       try {
         const date = new Date(nextVisit);
         const today = new Date();
         const diffTime = date.getTime() - today.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
+
         // Format the date
         const formattedDate = date.toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
           year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
         });
-        
+
         // Determine color based on urgency
         let textColor = "text-gray-700";
         let bgColor = "bg-gray-50";
-        
+
         if (diffDays < 0) {
           // Overdue
           textColor = "text-red-700";
@@ -186,7 +203,7 @@ export const PATIENT_COLUMNS: ColumnConfig<Patient>[] = [
           textColor = "text-blue-700";
           bgColor = "bg-blue-50";
         }
-        
+
         return (
           <div className={`px-2 py-1 rounded text-xs font-medium ${textColor} ${bgColor} w-fit`}>
             {formattedDate}
@@ -203,17 +220,17 @@ export const PATIENT_COLUMNS: ColumnConfig<Patient>[] = [
     width: "350px",
     render: (item: any) => {
       // Access the patient object inside the nested response
-      const rawDiagnosis = item.diagnosis; 
-      
+      const rawDiagnosis = item.diagnosis;
+
       const formatted = formatDiagnosis(rawDiagnosis);
-  
+
       const isEmpty =
         !rawDiagnosis ||
         formatted === "No diagnosis" ||
         formatted === "No diagnosis records" ||
         formatted === "No diagnosis data found" ||
         formatted === "Suspected to have ";
-  
+
       return (
         <span className="flex items-center text-xs">
           {!isEmpty && (
