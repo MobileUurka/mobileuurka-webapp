@@ -65,12 +65,12 @@ const Medication: React.FC<MedicationProps> = ({ patient, setActiveTab }) => {
           className="h-[50px] px-[25px] rounded-[11px] bg-[#008540] text-white flex items-center justify-center gap-2.5 text-[0.9em] cursor-pointer hover:bg-[#007036] transition-colors"
         >
           <IoMdAdd className="text-xl" />
-          Add Medicine
+          Add <span className="hidden md:flex">Medicine</span>
         </button>
       </div>
 
       {/* Main Grid Layout */}
-      <div className="w-full min-h-[78vh] grid gap-[1%]" style={{ gridTemplateColumns: "68.5% 31.5%" }}>
+      <div className="w-full min-h-[78vh] grid gap-[1%] md:grid-cols-[68.5%_31.5%}" >
 
         {/* Medications List */}
         <div className="mt-[50px]">

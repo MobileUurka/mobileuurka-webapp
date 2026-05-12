@@ -108,6 +108,103 @@ const CompactSparkline: React.FC<{ history: HistoryPoint[] }> = ({ history }) =>
   );
 };
 
+interface ReasoningSection { title: string; body: string }
+
+
+function parseClinicalReasoning(raw: string): ReasoningSection[] {
+  if (!raw) return [];
+
+  const HEADERS = [
+    'Overview', 'Maternal Assessment', 'Fetal Assessment',
+    'Risk Factor Synthesis', 'Differential Considerations',
+    'Management Rationale', 'Monitoring & Escalation Plan',
+    'Kenya-Specific Adaptations',
+  ];
+
+  // Find all header positions in the string
+  const found: { title: string; start: number; contentStart: number }[] = [];
+  for (const h of HEADERS) {
+    let searchFrom = 0;
+    while (true) {
+      const idx = raw.indexOf(`${h}:`, searchFrom);
+      if (idx === -1) break;
+      found.push({ title: h, start: idx, contentStart: idx + h.length + 1 });
+      searchFrom = idx + 1;
+    }
+  }
+
+  if (found.length === 0) {
+    // No headers found — split on semicolons as sentences
+    const sentences = raw.split(/;\s+/).map(s => s.trim()).filter(Boolean);
+    return [{ title: '', body: sentences.join('\n') }];
+  }
+
+  // Sort by position
+  found.sort((a, b) => a.start - b.start);
+
+  // Extract each section's body = text from contentStart to next header's start
+  const sections: ReasoningSection[] = found.map((h, i) => {
+    const end = i + 1 < found.length ? found[i + 1].start : raw.length;
+    const body = raw.slice(h.contentStart, end).trim().replace(/;?\s*$/, '').trim();
+    return { title: h.title, body };
+  });
+
+  return sections.filter(s => s.body.length > 0);
+}
+
+// Split a section body into individual bullet points.
+// Splits on ALL semicolons — the AI uses them as statement separators within sections.
+// Also splits on ". " before a capital letter for full-stop separated sentences.
+function splitIntoSentences(body: string): string[] {
+  return body
+    .split(/;\s*|\.\s+(?=[A-Z])/)
+    .map(s => s.trim().replace(/[;.]$/, '').trim())
+    .filter(s => s.length > 8)
+    .map(s => s.charAt(0).toUpperCase() + s.slice(1));
+}
+
+// Render parsed clinical reasoning sections
+const ClinicalReasoningBlock: React.FC<{ text: string }> = ({ text }) => {
+  const sections = parseClinicalReasoning(text);
+  if (sections.length === 0) return null;
+
+  const BulletList = ({ sentences }: { sentences: string[] }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      {sentences.map((s, i) => (
+        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <span style={{ color: '#9ca3af', flexShrink: 0, marginTop: 6, fontSize: 5 }}>●</span>
+          <span style={{ fontSize: 12, color: '#374151', lineHeight: 1.7 }}>{s}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Single section with no title
+  if (sections.length === 1 && !sections[0].title) {
+    return <BulletList sentences={splitIntoSentences(sections[0].body)} />;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {sections.map((s, i) => {
+        const sentences = splitIntoSentences(s.body);
+        return (
+          <div key={i}>
+            {/* Title in sentence case, dark, readable */}
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#111827', marginBottom: 7 }}>
+              {s.title}
+            </div>
+            {sentences.length > 0
+              ? <BulletList sentences={sentences} />
+              : <span style={{ fontSize: 12, color: '#374151', lineHeight: 1.7 }}>{s.body}</span>
+            }
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 // ─── Full timeline entry ──────────────────────────────────────────────────────
 const TimelineEntry: React.FC<{
   point: HistoryPoint & { score: number };
@@ -273,7 +370,8 @@ const TimelineEntry: React.FC<{
                   Clinical Reasoning
                 </div>
                 <p style={{ margin: 0, fontSize: 12, color: '#374151', lineHeight: 1.6 }}>
-                  {point.clinicalReasoning}
+                  <ClinicalReasoningBlock text={point.clinicalReasoning}/>
+                  {/* {point.clinicalReasoning} */}
                 </p>
               </div>
             )}

@@ -289,7 +289,7 @@ const Documents: React.FC<DocumentsProps> = ({
           className="h-[50px] px-[25px] rounded-[11px] bg-[#008540] text-white flex items-center justify-center gap-2.5 text-[0.9em] cursor-pointer hover:bg-[#007036] transition-colors"
         >
           <IoMdAdd className="text-xl" />
-          Add Document
+          Add <span className="hidden md:flex">Document</span>
         </button>
       </div>
 
