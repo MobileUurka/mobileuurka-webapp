@@ -6,6 +6,10 @@ export interface FormField {
   options?: string[];
   placeholder?: string;
   readonly?: boolean;
+  dependsOn?: {
+    field: string;
+    value: any | any[];
+  };
 }
 
 export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[] }> = {
@@ -127,11 +131,11 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'lastPeriodDate', label: 'Last Menstrual Period', type: 'date' },
       { name: 'estimatedDueDate', label: 'Estimated Due Date', type: 'date' },
 
-      { name: 'miscarriageNum', label: 'Number of Miscarriages', type: 'number' },
-      { name: 'csectionNum', label: 'Number of C-Sections', type: 'number' },
+      { name: 'miscarriageNum', label: 'Number of Miscarriages', type: 'number', dependsOn: { field: 'miscarriage', value: 'yes' } },
+      { name: 'csectionNum', label: 'Number of C-Sections', type: 'number', dependsOn: { field: 'csection', value: 'yes' } },
 
       { name: 'stillbirth', label: 'Previous Stillbirth', type: 'select', options: ['yes', 'no'] },
-      { name: 'stillbirthNum', label: 'Number of Stillbirths', type: 'number' },
+      { name: 'stillbirthNum', label: 'Number of Stillbirths', type: 'number', dependsOn: { field: 'stillbirth', value: 'yes' } },
 
       { name: 'pph', label: 'Postpartum Hemorrhage History', type: 'select', options: ['yes', 'no'] },
 
@@ -146,7 +150,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'prevGynaSurgery', label: 'Previous Gynecological Surgery', type: 'text' },
 
       { name: 'prolongedLabour', label: 'History of Prolonged Labour', type: 'select', options: ['yes', 'no'] },
-      { name: 'prolongedLabourHours', label: 'Prolonged Labour Duration (hours)', type: 'number' },
+      { name: 'prolongedLabourHours', label: 'Prolonged Labour Duration (hours)', type: 'number', dependsOn: { field: 'prolongedLabour', value: 'yes' } },
 
       { name: 'contraceptives', label: 'Previous Contraceptive Use', type: 'text' },
 
@@ -220,7 +224,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'fbs1', label: 'FBS 1 Hour (mg/dL)', type: 'number' },
       { name: 'fbs2', label: 'FBS 2 Hour (mg/dL)', type: 'number' },
       { name: 'hba1c', label: 'HbA1c', type: 'select', required: true, options: ['normal', 'prediabetic', 'diabetic'] },
-      { name: 'hba1c_value', label: 'HbA1c Value (%)', type: 'number' },
+      { name: 'hba1c_value', label: 'HbA1c Value (%)', type: 'number', dependsOn: { field: 'hba1c', value: ['prediabetic', 'diabetic'] } },
       { name: 'randombloodsugar', label: 'Random Blood Sugar (mg/dL)', type: 'number', required: true },
 
       // Hematology
@@ -293,7 +297,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'diet', label: 'Diet Quality', type: 'select', required: true, options: ['poor', 'fair', 'good', 'excellent'] },
       { name: 'exercise', label: 'Exercise (minutes/week)', type: 'number', required: true },
       { name: 'caffeine', label: 'Caffeine Consumption', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'caffeineQuantity', label: 'Caffeine Quantity', type: 'text', placeholder: 'e.g., 2 cups/day' },
+      { name: 'caffeineQuantity', label: 'Caffeine Quantity', type: 'text', placeholder: 'e.g., 2 cups/day', dependsOn: { field: 'caffeine', value: 'yes' } },
       { name: 'sugarDrink', label: 'Sugar Drinks', type: 'select', required: true, options: ['yes', 'no'] }
     ]
   },

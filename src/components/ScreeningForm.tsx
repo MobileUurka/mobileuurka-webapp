@@ -70,6 +70,10 @@ interface FormField {
   options?: string[];
   placeholder?: string;
   readonly?: boolean;
+  dependsOn?: {
+    field: string;
+    value: any | any[];
+  };
 }
 
 interface ScreeningFormProps {
@@ -338,10 +342,20 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
     }
   };
 
+  const isFieldVisible = (field: FormField) => {
+    if (!field.dependsOn) return true;
+    const dependentFieldValue = formData[field.dependsOn.field];
+    if (Array.isArray(field.dependsOn.value)) {
+      return field.dependsOn.value.includes(dependentFieldValue);
+    }
+    return dependentFieldValue === field.dependsOn.value;
+  };
+
   const validateCurrentPage = () => {
     const newErrors: Record<string, string> = {};
 
     currentFields.forEach(field => {
+      if (!isFieldVisible(field)) return;
       if (field.required && (!formData[field.name] || formData[field.name] === '')) {
         newErrors[field.name] = `${field.label} is required`;
       }
@@ -355,6 +369,7 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
     const newErrors: Record<string, string> = {};
 
     fields.forEach(field => {
+      if (!isFieldVisible(field)) return;
       if (field.required && (!formData[field.name] || formData[field.name] === '')) {
         newErrors[field.name] = `${field.label} is required`;
       }
@@ -382,7 +397,18 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
     if (validateAllFields()) {
       setIsSubmitting(true);
       try {
-        await onSubmit(formData);
+        const cleanedFormData = { ...formData };
+        fields.forEach(field => {
+          if (!isFieldVisible(field)) {
+            if (field.type === 'number') {
+              cleanedFormData[field.name] = 0;
+            } else {
+              cleanedFormData[field.name] = '';
+            }
+          }
+        });
+
+        await onSubmit(cleanedFormData);
         perfTimer.stop(); // record duration on success
       } catch (error) {
         console.error('Form submission error:', error);
@@ -394,6 +420,8 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
   };
 
   const renderField = (field: FormField) => {
+    if (!isFieldVisible(field)) return null;
+
     const hasError = errors[field.name];
     const isReadonly = field.readonly || field.name === 'editor';
 
