@@ -33,16 +33,32 @@ const FetalGraph: React.FC<FetalGraphProps> = ({
             ? Number(entry[selectedOption])
             : null,
       }))
-      .sort((a, b) => b.rawWeek - a.rawWeek)
-      .slice(0, 5)
-      .reverse();
+      .sort((a, b) => a.rawWeek - b.rawWeek);
 
-    while (formatted.length < 5) {
-      formatted.push({ date: "--", rawWeek: 0, value: null });
+    // Take last 5 real entries
+    const lastFive = formatted.slice(-5);
+
+    // Baseline always first
+    const baseline = {
+      date: "0",
+      rawWeek: 0,
+      value: 0,
+    };
+
+    let result = [baseline, ...lastFive];
+
+    // Ensure minimum of 6 slots
+    while (result.length < 6) {
+      result.push({
+        date: "--",
+        rawWeek: 0,
+        value: null,
+      });
     }
 
-    return [{ date: "0", rawWeek: 0, value: 0 }, ...formatted];
+    return result;
   }, [patient, selectedOption]);
+
 
   return (
     <div className="w-full h-[90%] mx-auto relative z-10">
