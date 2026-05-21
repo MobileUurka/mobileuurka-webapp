@@ -228,9 +228,9 @@ const TimelineEntry: React.FC<{
   return (
     <div style={{ display: 'flex', gap: 0, position: 'relative' }}>
       {/* Vertical connector line */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 32, flexShrink: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 24, flexShrink: 0 }}>
         <div style={{
-          width: 12, height: 12, borderRadius: '50%', flexShrink: 0, marginTop: 14,
+          width: 10, height: 10, borderRadius: '50%', flexShrink: 0, marginTop: 14,
           background: colors.line, border: `2px solid ${colors.border}`,
           boxShadow: isLatest ? `0 0 0 3px ${colors.bg}` : 'none',
           zIndex: 1,
@@ -242,98 +242,97 @@ const TimelineEntry: React.FC<{
 
       {/* Card */}
       <div style={{
-        flex: 1, marginBottom: 12, marginLeft: 8,
+        flex: 1, marginBottom: 10, marginLeft: 6,
         border: `1px solid ${isLatest ? colors.border : '#e5e7eb'}`,
         borderRadius: 10,
         background: isLatest ? colors.bg : '#fff',
         overflow: 'hidden',
+        minWidth: 0,
       }}>
         {/* Card header */}
         <div
           style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '10px 14px',
+            display: 'flex', flexDirection: 'column', gap: 8,
+            padding: '10px 12px',
             cursor: hasDetail ? 'pointer' : 'default',
             borderBottom: expanded ? '1px solid #f3f4f6' : 'none',
           }}
           onClick={() => hasDetail && setExpanded(e => !e)}
         >
-          {/* Date + gestation */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>
-                {fmt(point.createdAt)}
-              </span>
-              {point.gestationWeeksInt != null && (
-                <span style={{
-                  fontSize: 11, padding: '1px 7px', borderRadius: 20,
-                  background: '#f3f4f6', color: '#6b7280', fontWeight: 500,
-                }}>
-                  Week {point.gestationWeeksInt}
-                </span>
-              )}
-              {isLatest && (
-                <span style={{
-                  fontSize: 10, padding: '1px 7px', borderRadius: 20,
-                  background: '#008540', color: '#fff', fontWeight: 600,
-                }}>
-                  Latest
-                </span>
-              )}
-              {isJump && (
-                <span style={{
-                  fontSize: 10, padding: '1px 7px', borderRadius: 20,
-                  background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', fontWeight: 600,
-                }}>
-                  ⚠ Significant change
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Risk badge */}
-          <span style={{
-            fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-            background: colors.bg, color: colors.text, border: `1px solid ${colors.border}`,
-            flexShrink: 0,
-          }}>
-            {level || 'UNKNOWN'}
-          </span>
-
-          {/* Score bar */}
-          <div style={{ width: 80, flexShrink: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-              <span style={{ fontSize: 10, color: '#9ca3af' }}>Score</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: colors.text }}>
-                {(point.score * 100).toFixed(0)}%
-              </span>
-            </div>
-            <div style={{ height: 4, borderRadius: 2, background: '#e5e7eb', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${point.score * 100}%`, background: colors.line, borderRadius: 2, transition: 'width 0.3s' }} />
-            </div>
-          </div>
-
-          {/* Delta */}
-          {TrendIcon && delta !== null && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, minWidth: 52 }}>
-              <TrendIcon size={13} color={trendColor} />
-              <span style={{ fontSize: 11, fontWeight: 600, color: trendColor }}>
-                {delta > 0 ? '+' : ''}{(delta * 100).toFixed(0)}%
-              </span>
-            </div>
-          )}
-
-          {/* Expand toggle */}
-          {hasDetail && (
-            <span style={{ color: '#9ca3af', flexShrink: 0 }}>
-              {expanded ? <LuChevronUp size={14} /> : <LuChevronDown size={14} />}
+          {/* Row 1: date + badges + expand toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#111827', flexShrink: 0 }}>
+              {fmt(point.createdAt)}
             </span>
-          )}
+            {point.gestationWeeksInt != null && (
+              <span style={{
+                fontSize: 10, padding: '1px 6px', borderRadius: 20,
+                background: '#f3f4f6', color: '#6b7280', fontWeight: 500, flexShrink: 0,
+              }}>
+                Wk {point.gestationWeeksInt}
+              </span>
+            )}
+            {isLatest && (
+              <span style={{
+                fontSize: 10, padding: '1px 6px', borderRadius: 20,
+                background: '#008540', color: '#fff', fontWeight: 600, flexShrink: 0,
+              }}>
+                Latest
+              </span>
+            )}
+            {isJump && (
+              <span style={{
+                fontSize: 10, padding: '1px 6px', borderRadius: 20,
+                background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca',
+                fontWeight: 600, flexShrink: 0,
+              }}>
+                ⚠ Change
+              </span>
+            )}
+            <span style={{ marginLeft: 'auto', color: '#9ca3af', flexShrink: 0 }}>
+              {hasDetail && (expanded ? <LuChevronUp size={13} /> : <LuChevronDown size={13} />)}
+            </span>
+          </div>
+
+          {/* Row 2: risk badge + score bar + delta — all on one line, wraps gracefully */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {/* Risk badge */}
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+              background: colors.bg, color: colors.text, border: `1px solid ${colors.border}`,
+              flexShrink: 0,
+            }}>
+              {level || 'UNKNOWN'}
+            </span>
+
+            {/* Score bar */}
+            <div style={{ flex: 1, minWidth: 60, maxWidth: 120 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                <span style={{ fontSize: 9, color: '#9ca3af' }}>Score</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: colors.text }}>
+                  {(point.score * 100).toFixed(0)}%
+                </span>
+              </div>
+              <div style={{ height: 4, borderRadius: 2, background: '#e5e7eb', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${point.score * 100}%`, background: colors.line, borderRadius: 2, transition: 'width 0.3s' }} />
+              </div>
+            </div>
+
+            {/* Delta */}
+            {TrendIcon && delta !== null && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                <TrendIcon size={12} color={trendColor} />
+                <span style={{ fontSize: 10, fontWeight: 600, color: trendColor }}>
+                  {delta > 0 ? '+' : ''}{(delta * 100).toFixed(0)}%
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Expanded detail */}
         {expanded && (
-          <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {factors.length > 0 && (
               <div>
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 5 }}>
@@ -432,8 +431,8 @@ const RiskScoreTimeline: React.FC<RiskScoreTimelineProps> = ({ history, compact 
   return (
     <div style={{ width: '100%' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-        <LuActivity size={15} color="#008540" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        <LuActivity size={14} color="#008540" />
         <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6b7280' }}>
           Risk History
         </span>
@@ -446,7 +445,7 @@ const RiskScoreTimeline: React.FC<RiskScoreTimelineProps> = ({ history, compact 
           onClick={() => setSignificantOnly(v => !v)}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '4px 11px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+            padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600,
             cursor: 'pointer', transition: 'all 0.15s', border: 'none',
             background: significantOnly ? '#fef2f2' : '#f3f4f6',
             color: significantOnly ? '#dc2626' : '#6b7280',
@@ -458,7 +457,7 @@ const RiskScoreTimeline: React.FC<RiskScoreTimelineProps> = ({ history, compact 
             background: significantOnly ? '#dc2626' : '#d1d5db',
             display: 'inline-block', flexShrink: 0,
           }} />
-          Significant changes
+          Significant
           {significantOnly && points.length > 1 && (
             <span style={{
               marginLeft: 2, fontSize: 10, fontWeight: 700,
@@ -470,10 +469,11 @@ const RiskScoreTimeline: React.FC<RiskScoreTimelineProps> = ({ history, compact 
           )}
         </button>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
-          <TrendIcon size={13} color={trendColor} />
-          <span style={{ fontSize: 12, fontWeight: 700, color: trendColor }}>
-            {delta > 0 ? '+' : ''}{(delta * 100).toFixed(0)}% since last report
+        {/* Trend — pushed to its own line on very small screens via flex wrap */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+          <TrendIcon size={12} color={trendColor} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: trendColor, whiteSpace: 'nowrap' }}>
+            {delta > 0 ? '+' : ''}{(delta * 100).toFixed(0)}% last
           </span>
         </div>
       </div>

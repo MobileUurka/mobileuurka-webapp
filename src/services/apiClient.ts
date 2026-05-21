@@ -44,7 +44,7 @@ async function request(endpoint: string, options: any = {}) {
     // 3. Make Initial Request
     let response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
     
-    console.log('Response status:', response.status, 'for endpoint:', endpoint);
+    // console.log('Response status:', response.status, 'for endpoint:', endpoint);
     
     // We need to parse the JSON, but only if there is a body
     let data;

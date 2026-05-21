@@ -532,7 +532,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
           }}
         >
           {/* Header */}
-          <div className="flex items-start justify-between mb-5">
+          <div className="flex flex-col lg:flex-row items-start justify-between mb-5">
             <div className="flex items-center gap-2">
               <img src="/images/logo.png" alt="Mobileuurka" className="w-12 h-12" />
               <div>
@@ -540,7 +540,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
                 <p className="text-[13px]" style={{ color: '#4b5563' }}>Healthcare Services</p>
               </div>
             </div>
-            <div className="text-right">
+            <div className="mt-2 lg:text-right lg:mt-0">
               <h2 className="text-sm font-bold" style={{ color: '#111827' }}>AI Analysis</h2>
               <p className="text-[13px]" style={{ color: '#4b5563' }}>Date: {generatedDate}</p>
             </div>
@@ -550,7 +550,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
           <div className="mb-5">
             <h3 className="text-sm font-bold mb-3" style={{ color: '#111827' }}>Patient Information</h3>
 
-            <div className="grid grid-cols-3 gap-x-6 gap-y-2.5">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5">
               <div>
                 <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>FULL NAME</p>
                 <p className="text-[13px] font-medium" style={{ color: '#111827' }}>{patient?.name || '—'}</p>

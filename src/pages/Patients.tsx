@@ -17,7 +17,6 @@ const Patients = ({ setActiveItem }: { setActiveItem?: (val: string) => void }) 
   // calls invalidatePatients() which resets status back to 'idle'.
   // Existing rows stay visible during background re-fetches — no flicker.
   useEffect(() => {
-    console.log(patients)
     if (status === 'idle') {
       dispatch(fetchPatients());
     }

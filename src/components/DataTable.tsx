@@ -53,7 +53,7 @@ function DataTable<T extends { id?: string | number }>({
       {/* Responsive wrapper with horizontal scroll */}
       <div className="w-full overflow-x-auto">
         <div className="min-w-full mx-auto max-h-[80vh]" style={{ minWidth: '600px' }}>
-          <div className="w-full bg-[#EFEFEF9C] p-3 sm:p-5 rounded-[10px] my-5 text-[#666666] sticky top-0 z-10 min-w-max"
+          <div className="w-full bg-[#F5F5F5] p-3 sm:p-5 rounded-[10px] my-5 text-[#666666] sticky top-0 z-10 min-w-max"
           style={{ 
               display: 'grid', 
               gridTemplateColumns: gridLayout,

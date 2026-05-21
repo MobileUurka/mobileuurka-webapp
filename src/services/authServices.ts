@@ -331,15 +331,17 @@ export const authService = {
     return result;
   },
 
-  // Token management with encryption
-  setTokens(accessToken: string, refreshToken: string) {
+  // Token management — access token in sessionStorage, refresh token in HttpOnly cookie (set by server)
+  setTokens(accessToken: string, _refreshToken: string) {
+    // _refreshToken is intentionally ignored for web — the server sets it as an HttpOnly cookie.
+    // We keep the parameter so mobile callers don't need to change their call signature.
     if (!encryption.hasKey()) {
       console.error('Cannot encrypt: encryption key not set');
       return;
     }
 
     sessionStorage.setItem('at', encryption.encrypt(accessToken));
-    localStorage.setItem('rt', encryption.encrypt(refreshToken));
+    // Refresh token is NOT stored in localStorage — it lives in the HttpOnly cookie.
   },
 
   getAccessToken(): string | null {
@@ -355,22 +357,14 @@ export const authService = {
     return decrypted || null;
   },
 
+  // Kept for backward compatibility — web no longer stores the refresh token in JS-accessible storage.
   getRefreshToken(): string | null {
-    const encrypted = localStorage.getItem('rt');
-    if (!encrypted) return null;
-
-    if (!encryption.hasKey()) {
-      console.error('Cannot decrypt: encryption key not set');
-      return null;
-    }
-
-    const decrypted = encryption.decrypt(encrypted);
-    return decrypted || null;
+    return null;
   },
 
   clearTokens() {
     sessionStorage.removeItem('at');
-    localStorage.removeItem('rt');
+    // No localStorage refresh token to clear — the server clears the cookie via Set-Cookie on logout.
   },
 
   // User management
@@ -485,19 +479,17 @@ export const authService = {
     return !!this.getAccessToken();
   },
   async logout(): Promise<{ success: boolean; message: string }> {
-    // 1. Get the decrypted tokens and the plain sessionId
     const accessToken = this.getAccessToken();
-    const refreshToken = this.getRefreshToken();
     const sessionId = this.getSessionId();
 
     const response = await fetch(`${API_URL}/auth/logout`, {
       method: 'POST',
+      credentials: 'include', // sends the HttpOnly refresh token cookie so the server can delete it
       headers: {
         'Content-Type': 'application/json',
-        // Use the decrypted accessToken for the Bearer header
         'Authorization': `Bearer ${accessToken}`
       },
-      body: JSON.stringify({ refreshToken, sessionId }),
+      body: JSON.stringify({ sessionId }),
     });
 
     const data = await response.json();
@@ -506,7 +498,7 @@ export const authService = {
       throw data;
     }
 
-    // 2. Clear everything on success
+    // Clear access token and all non-cookie session data
     this.clearTokens();
     localStorage.removeItem('user');
     localStorage.removeItem('userType');
@@ -514,7 +506,6 @@ export const authService = {
     localStorage.removeItem('organization');
     localStorage.removeItem('organizations');
 
-    // 3. Wipe the encryption key from memory
     encryption.clearKey();
     return data;
   },
@@ -522,20 +513,15 @@ export const authService = {
 
 
   async refreshToken(): Promise<string | null> {
-    const refreshToken = this.getRefreshToken();
-    if (!refreshToken) {
-      console.log('No refresh token available');
-      return null;
-    }
-
     try {
       console.log('Attempting to refresh token...');
       const response = await fetch(`${API_URL}/auth/refresh`, {
         method: 'POST',
+        credentials: 'include', // sends the HttpOnly refresh token cookie
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ refreshToken }),
+        // No body needed — the refresh token travels as an HttpOnly cookie
       });
 
       const data = await response.json();
@@ -547,13 +533,9 @@ export const authService = {
           return null;
         }
 
-        // Store both new access token and refresh token
+        // Store new access token; the server already rotated the cookie
         sessionStorage.setItem('at', encryption.encrypt(data.data.accessToken));
-        if (data.data.refreshToken) {
-          localStorage.setItem('rt', encryption.encrypt(data.data.refreshToken));
-        }
 
-        // Update session ID if provided
         if (data.data.sessionId) {
           this.setSessionId(data.data.sessionId);
         }
@@ -562,7 +544,6 @@ export const authService = {
         return data.data.accessToken;
       }
 
-      // If refresh failed, clear tokens and redirect to login
       if (response.status === 401) {
         console.warn('Refresh token expired, logging out user');
         this.logout();
@@ -611,21 +592,30 @@ export const authService = {
 
   async initializeEncryption(): Promise<boolean> {
     try {
-      const hasSession = !!localStorage.getItem('rt') || !!sessionStorage.getItem('at');
+      const hasAccessToken = !!sessionStorage.getItem('at');
 
-      // No data? Return false so App redirects to Auth
-      if (!hasSession) return false;
+      // Fetch the obfuscation key first — we need it to decrypt the access token
+      // or to store a new one after a silent refresh.
+      const keyResponse = await fetch(`${API_URL}/auth/encryption-key`);
+      const keyResult = await keyResponse.json();
 
-      // Fetch the key to decrypt the existing data
-      const response = await fetch(`${API_URL}/auth/encryption-key`);
-      const result = await response.json();
+      if (!keyResult.success || !keyResult.data?.key) {
+        return false;
+      }
 
-      if (result.success && result.data.key) {
-        encryption.setKey(result.data.key);
+      encryption.setKey(keyResult.data.key);
+
+      if (hasAccessToken) {
+        // Normal case: access token is in sessionStorage, we're good.
         return true;
       }
 
-      return false;
+      // No access token (e.g. hard page refresh cleared sessionStorage).
+      // Attempt a silent refresh — the HttpOnly cookie will be sent automatically.
+      // If there's no valid cookie the server returns 401 and we fall through to false.
+      console.log('No access token in sessionStorage, attempting silent refresh via cookie...');
+      const newToken = await this.refreshToken();
+      return !!newToken;
     } catch (error) {
       console.error('Initialization Error:', error);
       return false;

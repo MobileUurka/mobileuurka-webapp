@@ -43,7 +43,7 @@ const Pagination: React.FC<PaginationProps> = ({
   const btnBase = "px-4 py-2 rounded-md text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed";
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 px-4 w-full  pt-4">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 px-4 w-full  pt-4 pb-10">
       
       {/* 1. Page Info & Per Page Selector */}
       <div className="flex items-center gap-4">

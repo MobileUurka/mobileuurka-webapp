@@ -17,12 +17,11 @@ import { MdOutlineFeedback } from "react-icons/md";
 type SidebarProps = {
     activeItem: string;
     setActiveItem: React.Dispatch<React.SetStateAction<string>>;
-    setInternalTab: React.Dispatch<React.SetStateAction<string | null>>;
     sideBarActive: boolean;
     setSideBarActive: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
-const Sidebar = ({ activeItem, setActiveItem, setInternalTab, setSideBarActive, sideBarActive }: SidebarProps) => {
+const Sidebar = ({ activeItem, setActiveItem, setSideBarActive, sideBarActive }: SidebarProps) => {
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 900);
     const [user, setUser] = useState<any>(null);
@@ -98,7 +97,7 @@ const activityItems = [
 const handleClick = (name: string) => {
     if (name == "Dashboard") {
         setActiveItem(name);
-        setInternalTab(null);
+        // setInternalTab(null);
         setSidebarOpen(false); // close mobile sidebar
         navigate(`/`);
     }
@@ -107,7 +106,7 @@ const handleClick = (name: string) => {
     }
     else {
         setActiveItem(name);
-        setInternalTab(null);
+        // setInternalTab(null);
         setSidebarOpen(false); // close mobile sidebar
         navigate(`/${name}`);
     }

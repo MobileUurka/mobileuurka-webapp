@@ -87,7 +87,6 @@ const Profile: React.FC<ProfileProps> = ({ patient }) => {
     { label: "PCOS", value: latestHistory?.pcos },
   ];
 
-  console.log(patient)
   const contactDetails = [
     { label: "Phone Number", value: patient?.phone },
     { label: "Email", value: patient?.email },

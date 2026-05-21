@@ -6,6 +6,7 @@ import { IoDocumentTextOutline, IoWarningOutline } from "react-icons/io5";
 
 // Types
 import { type PatientData, type TabType } from '../types/patient';
+import DataTable from "../components/DataTable";
 
 interface MedicationProps {
   patient: PatientData;
@@ -20,7 +21,6 @@ const Medication: React.FC<MedicationProps> = ({ patient, setActiveTab }) => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  // Filter for Medication Allergies (Case Insensitive)
   const medicationAllergies = (patient.allergies ?? [])
     .filter((item: any) => {
       const type = item.allergyType || item.allergy_type || "";
@@ -34,7 +34,7 @@ const Medication: React.FC<MedicationProps> = ({ patient, setActiveTab }) => {
       state: {
         patientId: patient?.id,
         patientName: `${patient.firstName} ${patient.lastName}`,
-      }
+      },
     });
   };
 
@@ -45,6 +45,46 @@ const Medication: React.FC<MedicationProps> = ({ patient, setActiveTab }) => {
       day: "2-digit", month: "short", year: "numeric",
     });
   };
+
+  const filteredMeds = (patient.medications ?? []).filter((med: any) =>
+    (med.medicine || med.name || "").toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const medColumns = [
+    {
+      label: "Name",
+      key: "name",
+      width: "220px",
+      render: (med: any) => (
+        <div className="flex flex-row items-center gap-[15px]">
+          <div className="w-10 h-10 rounded-full bg-[#ffae1b] flex justify-center items-center text-white text-[1.1em] flex-shrink-0">
+            <IoDocumentTextOutline />
+          </div>
+          <div className="font-medium text-black truncate">
+            {med.medicine || med.name}
+          </div>
+        </div>
+      ),
+    },
+    {
+      label: "Dosage",
+      key: "dosage",
+      width: "160px",
+      render: (med: any) => (
+        <div className="text-black/70">{med.dosage || "—"}</div>
+      ),
+    },
+    {
+      label: "Duration",
+      key: "duration",
+      width: "220px",
+      render: (med: any) => (
+        <div className="text-[#333]">
+          {formatDate(med.startDate)} – {formatDate(med.stopDate || med.endDate)}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="w-full">
@@ -69,72 +109,41 @@ const Medication: React.FC<MedicationProps> = ({ patient, setActiveTab }) => {
         </button>
       </div>
 
-      {/* Main Grid Layout */}
-      <div className="w-full min-h-[78vh] grid gap-[1%] md:grid-cols-[68.5%_31.5%}" >
-
-        {/* Medications List */}
-        <div className="mt-[50px]">
-          <div className="grid grid-cols-[30%_30%_30%] m-2.5 mb-[15px] text-[0.9em] text-[#333]">
-            <div className="font-[500] text-black">Name</div>
-            <div className="font-[500] text-black">Dosage</div>
-            <div className="font-[500] text-black">Duration</div>
-          </div>
-
-          <div className="flex flex-col">
-            {(patient.medications ?? [])
-              .filter((med: any) =>
-                (med.medicine || med.name || "").toLowerCase().includes(searchTerm.toLowerCase())
-              )
-              .map((med: any, index: number) => (
-                <div
-                  key={med.id || index}
-                  className="grid grid-cols-[30%_30%_30%] items-center py-5 px-2.5 text-[0.9em] text-[#333] border-b border-[#dfdede80] cursor-pointer transition-all hover:pl-5"
-                >
-                  <div className="flex flex-row items-center gap-[15px]">
-                    <div className="w-10 h-10 rounded-full bg-[#ffae1b] flex justify-center items-center text-white text-[1.1em]">
-                      <IoDocumentTextOutline />
-                    </div>
-                    <div className="font-medium text-black">{med.medicine || med.name}</div>
-                  </div>
-                  <div className="text-black/70">{med.dosage}</div>
-                  <div className="text-[#333]">
-                    {formatDate(med.startDate)} - {formatDate(med.stopDate || med.endDate)}
-                  </div>
-                </div>
-              ))}
-
-            {(!patient.medications || patient.medications.length === 0) && (
-              <div className="py-20 text-center text-gray-400 italic">No active medications prescribed.</div>
-            )}
-          </div>
-        </div>
-
-        {/* Warning Sidebar */}
-        <div className="relative">
-          {medicationAllergies && medicationAllergies.trim() !== "" && (
-            <div className="w-full p-5 bg-[#fdf5e6e6] rounded-[10px] flex flex-col gap-5 border border-[#dc9b320d] mt-[30px] ml-[-15px]">
-              <div className="flex flex-col gap-3">
-                <div className="w-[50px] h-[50px] rounded-full bg-[#f5b74a1a] flex justify-center items-center text-[#dc9b32] text-[1.4em] flex-shrink-0">
-                  <IoWarningOutline />
-                </div>
-                <div className="flex-1">
-                  <div className="font-[900] text-[0.9em] text-black mb-1">Medication Alert</div>
-                  <p className="text-[#22110a] text-[0.8em] leading-normal m-0">
-                    The patient has a known adverse reaction to <span className="font-bold underline">{medicationAllergies}</span>.
-                    Please review the allergy history and consider alternative medications.
-                  </p>
-                  <button
-                    onClick={() => setActiveTab("profile")}
-                    className="mt-[15px] w-[150px] h-[50px] bg-[#2f1104] text-white rounded-md flex justify-center items-center text-[0.8em] cursor-pointer hover:bg-black transition-all"
-                  >
-                    View Allergies
-                  </button>
-                </div>
-              </div>
+      {/* Allergy alert — shown above the table when relevant */}
+      {medicationAllergies && medicationAllergies.trim() !== "" && (
+        <div className="w-full p-5 bg-[#fdf5e6e6] rounded-[10px] flex flex-col gap-3 border border-[#dc9b320d] mb-5">
+          <div className="flex items-start gap-4">
+            <div className="w-[46px] h-[46px] rounded-full bg-[#f5b74a1a] flex justify-center items-center text-[#dc9b32] text-[1.4em] flex-shrink-0">
+              <IoWarningOutline />
             </div>
-          )}
+            <div className="flex-1">
+              <div className="font-[900] text-[0.9em] text-black mb-1">Medication Alert</div>
+              <p className="text-[#22110a] text-[0.8em] leading-normal m-0">
+                The patient has a known adverse reaction to{" "}
+                <span className="font-bold underline">{medicationAllergies}</span>.
+                Please review the allergy history and consider alternative medications.
+              </p>
+              <button
+                onClick={() => setActiveTab("profile")}
+                className="mt-[15px] w-[150px] h-[45px] bg-[#2f1104] text-white rounded-md flex justify-center items-center text-[0.8em] cursor-pointer hover:bg-black transition-all"
+              >
+                View Allergies
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      <DataTable
+        columns={medColumns}
+        data={filteredMeds}
+        emptyMessage={
+          searchTerm
+            ? `No medications found matching "${searchTerm}"`
+            : "No active medications prescribed."
+        }
+        initialItemsPerPage={5}
+      />
     </div>
   );
 };

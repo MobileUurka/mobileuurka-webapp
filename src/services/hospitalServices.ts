@@ -58,7 +58,7 @@ export const hospitalService = {
         try {
             const response = await api.get('/organizations/hospitals/available');
             
-            console.log('Available Hospitals API Response:', response); // Debug log
+            // console.log('Available Hospitals API Response:', response); // Debug log
             
             // Handle different possible response structures
             if (response.hospitals) {

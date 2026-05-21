@@ -16,12 +16,11 @@ function Layout() {
   };
 
   const [activeItem, setActiveItem] = useState(getActiveFromPath(location.pathname));
-  const [internalTab, setInternalTab] = useState<string | null>(null);
+  // const [internalTab, setInternalTab] = useState<string | null>(null);
   const [sideBarActive, setSideBarActive] = useState(true)
 
   useEffect(() => {
     setActiveItem(getActiveFromPath(location.pathname));
-    console.log(internalTab)
   }, [location.pathname]);
 
 
@@ -44,7 +43,7 @@ function Layout() {
       <Sidebar
         activeItem={activeItem}
         setActiveItem={setActiveItem}
-        setInternalTab={setInternalTab}
+        // setInternalTab={setInternalTab}
         sideBarActive={sideBarActive}
         setSideBarActive={setSideBarActive}
       />

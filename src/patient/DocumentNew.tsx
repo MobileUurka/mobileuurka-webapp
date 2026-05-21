@@ -65,11 +65,11 @@ const formatDate = (iso: string, format: 'long' | 'short' = 'long'): string => {
   if (!iso) return "—";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "—";
-  
+
   if (format === 'short') {
     return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
   }
-  
+
   return d.toLocaleString("en-US", {
     year: "numeric",
     month: "long",
@@ -142,7 +142,7 @@ const DocumentNew: React.FC<DocumentProps> = ({
           const res = await userService.getUserById(uid);
           const u = res?.data?.user;
           if (u) map[uid] = `${u.firstName} ${u.lastName}`;
-        } catch {}
+        } catch { }
       }
       setResolvedNames(map);
     })();
@@ -210,13 +210,13 @@ const DocumentNew: React.FC<DocumentProps> = ({
 
       const imgWidth = 210;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
+
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgData = canvas.toDataURL('image/png');
-      
+
       pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
       pdf.save(filename);
-      
+
       console.log('PDF saved successfully:', filename);
     } catch (error) {
       console.error('PDF generation failed:', error);
@@ -255,7 +255,7 @@ const DocumentNew: React.FC<DocumentProps> = ({
       <div
         ref={printRef}
         className="mt-5 w-full max-w-[210mm] p-8 print:p-0 rounded-lg"
-        style={{ 
+        style={{
           fontSize: '11px',
           backgroundColor: '#ffffff',
           border: '1px solid #e5e7eb',
@@ -263,7 +263,7 @@ const DocumentNew: React.FC<DocumentProps> = ({
         }}
       >
         {/* Header */}
-        <div className="flex items-start justify-between mb-5">
+        <div className="flex flex-col lg:flex-row items-start justify-between mb-5">
           <div className="flex items-center gap-2">
             <img src="/images/logo.png" alt="Mobileuurka" className="w-12 h-12" />
             <div>
@@ -271,7 +271,7 @@ const DocumentNew: React.FC<DocumentProps> = ({
               <p className="text-xs" style={{ color: '#4b5563' }}>Healthcare Services</p>
             </div>
           </div>
-          <div className="text-right">
+          <div className="mt-4 lg:text-right lg:mt-0">
             <h2 className="text-sm font-bold" style={{ color: '#111827' }}>{title}</h2>
             <p className="text-xs" style={{ color: '#4b5563' }}>Date: {formatDate(document?.date || new Date().toISOString())}</p>
           </div>
@@ -280,7 +280,7 @@ const DocumentNew: React.FC<DocumentProps> = ({
         {/* Patient Information */}
         <div className="mb-5">
           <h3 className="text-sm font-bold mb-3" style={{ color: '#111827' }}>Patient Information</h3>
-          <div className="grid grid-cols-3 gap-x-6 gap-y-2.5">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5">
             <div>
               <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>FULL NAME</p>
               <p className="text-xs font-medium" style={{ color: '#111827' }}>{patient?.name || '—'}</p>
@@ -299,43 +299,142 @@ const DocumentNew: React.FC<DocumentProps> = ({
         {/* Document Data */}
         <div className="mb-5">
           <h3 className="text-sm font-bold mb-3" style={{ color: '#111827' }}>Document Data</h3>
-          <div className="rounded overflow-hidden" style={{ border: '1px solid #e5e7eb' }}>
+          <div
+            className="rounded overflow-hidden"
+            style={{ border: '1px solid #e5e7eb' }}
+          >
             <table className="w-full text-xs">
               <thead>
-                <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                  <th className="text-left py-2 px-3 text-[10px] font-semibold uppercase tracking-wide w-[22%]" style={{ color: '#4b5563' }}>Field</th>
-                  <th className="text-left py-2 px-3 text-[10px] font-semibold uppercase tracking-wide w-[28%]" style={{ color: '#4b5563' }}>Value</th>
-                  <th className="text-left py-2 px-3 text-[10px] font-semibold uppercase tracking-wide w-[22%]" style={{ color: '#4b5563' }}>Field</th>
-                  <th className="text-left py-2 px-3 text-[10px] font-semibold uppercase tracking-wide w-[28%]" style={{ color: '#4b5563' }}>Value</th>
+                <tr
+                  style={{
+                    backgroundColor: '#f9fafb',
+                    borderBottom: '1px solid #e5e7eb',
+                  }}
+                >
+                  <th
+                    className="text-left py-2 px-3 text-[10px] font-semibold uppercase tracking-wide w-[22%]"
+                    style={{ color: '#4b5563' }}
+                  >
+                    Field
+                  </th>
+
+                  <th
+                    className="text-left py-2 px-3 text-[10px] font-semibold uppercase tracking-wide w-[28%]"
+                    style={{ color: '#4b5563' }}
+                  >
+                    Value
+                  </th>
+
+                  {/* Hide on mobile */}
+                  <th
+                    className="hidden md:table-cell text-left py-2 px-3 text-[10px] font-semibold uppercase tracking-wide w-[22%]"
+                    style={{ color: '#4b5563' }}
+                  >
+                    Field
+                  </th>
+
+                  <th
+                    className="hidden md:table-cell text-left py-2 px-3 text-[10px] font-semibold uppercase tracking-wide w-[28%]"
+                    style={{ color: '#4b5563' }}
+                  >
+                    Value
+                  </th>
                 </tr>
               </thead>
+
               <tbody>
                 {pairs.map(([item1, item2], index) => (
-                  <tr 
-                    key={index} 
-                    style={{ 
-                      backgroundColor: index % 2 === 0 ? '#ffffff' : '#f9fafb',
-                      borderBottom: index === pairs.length - 1 ? 'none' : '1px solid #f3f4f6'
-                    }}
-                  >
-                    <td className="py-2 px-3 font-medium" style={{ color: '#374151' }}>{item1.label}</td>
-                    <td className="py-2 px-3" style={{ color: '#111827' }}>
-                      {isBool(item1.raw) ? <BoolBadge val={item1.raw} /> : item1.display}
-                    </td>
-                    {item2 ? (
-                      <>
-                        <td className="py-2 px-3 font-medium" style={{ color: '#374151', borderLeft: '1px solid #e5e7eb' }}>{item2.label}</td>
-                        <td className="py-2 px-3" style={{ color: '#111827' }}>
-                          {isBool(item2.raw) ? <BoolBadge val={item2.raw} /> : item2.display}
+                  <React.Fragment key={index}>
+                    {/* First item */}
+                    <tr
+                      style={{
+                        backgroundColor:
+                          index % 2 === 0 ? '#ffffff' : '#f9fafb',
+                        borderBottom:
+                          index === pairs.length - 1
+                            ? 'none'
+                            : '1px solid #f3f4f6',
+                      }}
+                    >
+                      <td
+                        className="py-2 px-3 font-medium"
+                        style={{ color: '#374151' }}
+                      >
+                        {item1.label}
+                      </td>
+
+                      <td
+                        className="py-2 px-3"
+                        style={{ color: '#111827' }}
+                      >
+                        {isBool(item1.raw)
+                          ? <BoolBadge val={item1.raw} />
+                          : item1.display}
+                      </td>
+
+                      {/* Desktop only */}
+                      {item2 ? (
+                        <>
+                          <td
+                            className="hidden md:table-cell py-2 px-3 font-medium"
+                            style={{
+                              color: '#374151',
+                              borderLeft: '1px solid #e5e7eb',
+                            }}
+                          >
+                            {item2.label}
+                          </td>
+
+                          <td className="hidden md:table-cell py-2 px-3" style={{ color: '#111827' }}>
+                            {isBool(item2.raw)
+                              ? <BoolBadge val={item2.raw} />
+                              : item2.label === 'Updated At'
+                                ? formatDate(item2.display)
+                                : item2.display}
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td
+                            className="hidden md:table-cell py-2 px-3"
+                            style={{ borderLeft: '1px solid #e5e7eb' }}
+                          ></td>
+
+                          <td className="hidden md:table-cell py-2 px-3"></td>
+                        </>
+                      )}
+                    </tr>
+
+                    {/* Mobile second item */}
+                    {item2 && (
+                      <tr
+                        className="md:hidden"
+                        style={{
+                          backgroundColor:
+                            index % 2 === 0 ? '#ffffff' : '#f9fafb',
+                          borderBottom:
+                            index === pairs.length - 1
+                              ? 'none'
+                              : '1px solid #f3f4f6',
+                        }}
+                      >
+                        <td
+                          className="py-2 px-3 font-medium"
+                          style={{ color: '#374151' }}
+                        >
+                          {item2.label}
                         </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="py-2 px-3" style={{ borderLeft: '1px solid #e5e7eb' }}></td>
-                        <td className="py-2 px-3"></td>
-                      </>
+
+                        <td className="py-2 px-3" style={{ color: '#111827' }}>
+                          {isBool(item2.raw)
+                            ? <BoolBadge val={item2.raw} />
+                            : item2.label === 'Updated At'
+                              ? formatDate(item2.display)
+                              : item2.display}
+                        </td>
+                      </tr>
                     )}
-                  </tr>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
