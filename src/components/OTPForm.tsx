@@ -238,7 +238,7 @@ const OTPForm = ({ email, verificationType = 'signup', organizationSlug, onVerif
       </div>
 
       <div className="input-group">
-        <div className="otp-container">
+        <div className="w-full justify-center flex flex-row gap-[0.5rem] mx-auto lg:otp-container">
           {otp.map((digit, index) => (
             <input
               key={index}
@@ -248,7 +248,7 @@ const OTPForm = ({ email, verificationType = 'signup', organizationSlug, onVerif
               value={digit}
               onChange={(e) => handleChange(e.target, index)}
               onKeyDown={(e) => handleKeyDown(e, index)}
-              className="otp-input"
+              className="w-12 h-12 text-center text-[16px] lg:otp-input"
               autoComplete="off"
             />
           ))}

@@ -97,6 +97,7 @@ function SignUpForm({ onSwitch }: SignUpFormProps) {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        console.log(formData)
 
         if (!validateStep2()) return;
 
@@ -111,6 +112,7 @@ function SignUpForm({ onSwitch }: SignUpFormProps) {
                 navigate('/verify', {
                     state: {
                         email: formData.email,
+                        phone: formData.phone,
                         type: 'signup'
                     }
                 });
