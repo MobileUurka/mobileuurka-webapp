@@ -46,7 +46,11 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         pattern: /^0\d{9}$/,
         patternMessage: 'Phone number must be exactly 10 digits and start with 0'
       },
-      { name: 'nationalId', label: 'National ID', type: 'text', required: false },
+      {
+        name: 'nationalId', label: 'National ID', type: 'text', required: false, minLength: 8,
+        maxLength: 8, patternMessage: 'National ID must be exactly 8 digits'
+
+      },
       { name: 'email', label: 'Email Address', type: 'email' },
       { name: 'address', label: 'Address', type: 'text' },
       { name: 'insurance', label: 'Insurance Provider', type: 'text' },
@@ -101,7 +105,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       //   type: 'text',
       //   required: true,
       //   dependsOn: { field: 'visitReason', value: 'Other' }
-        
+
       // },
       { name: 'visitExplanation', label: 'Visit Explanation', type: 'textarea', required: true, placeholder: 'Detailed explanation of visit' },
       { name: 'editor', label: 'Doctor/Editor', type: 'text', required: true, readonly: true },
@@ -257,7 +261,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'editor', label: 'Recorded By', type: 'text', required: true, readonly: true },
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
       { name: 'date', label: 'Test Date', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
-      { name: 'gestationweek', label: 'Gestation Week', type: 'number',min: 0, max: 43 },
+      { name: 'gestationweek', label: 'Gestation Week', type: 'number', min: 0, max: 43 },
 
       // Blood Chemistry
       { name: 'alp', label: 'ALP (U/L)', type: 'number', required: true },
