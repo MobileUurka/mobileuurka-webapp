@@ -257,7 +257,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'editor', label: 'Recorded By', type: 'text', required: true, readonly: true },
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
       { name: 'date', label: 'Test Date', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
-      { name: 'gestationweek', label: 'Gestation Week', type: 'number' },
+      { name: 'gestationweek', label: 'Gestation Week', type: 'number',min: 0, max: 43 },
 
       // Blood Chemistry
       { name: 'alp', label: 'ALP (U/L)', type: 'number', required: true },

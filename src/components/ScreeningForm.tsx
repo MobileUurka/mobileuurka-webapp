@@ -663,8 +663,7 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
 
   const validateBusinessRules = () => {
     const newErrors: Record<string, string> = {}; 
-    newErrors.visitNumber = "..."
-    newErrors.gestationWeek = "..."
+
 
     const visitNumber = Number(formData.visitNumber);
     const gestationWeek = Number(formData.gestationWeek);
