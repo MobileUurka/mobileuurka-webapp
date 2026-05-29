@@ -70,11 +70,25 @@ interface FormField {
   options?: string[];
   placeholder?: string;
   readonly?: boolean;
+
+  // NEW
+  minLength?: number;
+  maxLength?: number;
+  pattern?: RegExp;
+  patternMessage?: string;
+  max?: string | number;
+  min?: string | number;
+
   dependsOn?: {
     field: string;
     value: any | any[];
   };
 }
+
+type LastVisitData = {
+  visitNumber: number;
+  gestationWeek: number;
+};
 
 interface ScreeningFormProps {
   title: string;
@@ -96,7 +110,7 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
   useEffect(() => {
     perfTimer.start();
     return () => perfTimer.cancel(); // clean up if user navigates away
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [hospitalOptions, setHospitalOptions] = useState<string[]>([]);
   const [loadingHospitals, setLoadingHospitals] = useState(false);
@@ -119,7 +133,7 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
     if (state) {
       console.log("Patient ID:", state.patientId);
       console.log("Patient Name:", state.patientName);
-      
+
       handlePatientSelection(state.patientId, state.patientName)
       // You can also initialize local state here if needed
       // setLocalPatient(state.patientData);
@@ -154,7 +168,6 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
   // Get current user data for editor fields
   useEffect(() => {
     const currentUser = authService.getUser();
-    console.log(currentUser)
     if (currentUser) {
       // Pre-populate editor fields with current user's name
       const editorFields = fields.filter(field => field.name === 'editor');
@@ -191,6 +204,8 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
   const fieldsPerPage = 10;
   const totalPages = Math.ceil(fields.length / fieldsPerPage);
   const currentFields = fields.slice(currentPage * fieldsPerPage, (currentPage + 1) * fieldsPerPage);
+  const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const [lastVisitData, setLastVisitData] = useState<LastVisitData | null>(null);
 
   // Handle patient selection and auto-fill gestation week
   const handlePatientSelection = async (patientId: string, patientName: string) => {
@@ -199,6 +214,8 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
 
     // Auto-fill gestation week based on last visit
     if (patientId) {
+      setIsAutoFilling(true);
+
       try {
         // Get complete patient profile to access visit history
         const response = await patientService.getPatientCompleteProfile(patientId);
@@ -209,19 +226,36 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
           );
           const lastVisit = visits[0];
 
+          setLastVisitData({
+            visitNumber: lastVisit.visitNumber,
+            gestationWeek: lastVisit.gestationWeek
+          });
+
           if (lastVisit.gestationWeek && lastVisit.date) {
             const currentGestationWeek = calculateGestationWeek(lastVisit.date, lastVisit.gestationWeek);
             if (currentGestationWeek > 0) {
               // Auto-fill gestation week fields
 
+              setIsAutoFilling(false)
+
               setFormData(prev => ({
                 ...prev,
                 gestationWeek: currentGestationWeek,
+                visitNumber: lastVisit.visitNumber,
                 gestationweek: currentGestationWeek // Handle both naming conventions
               }));
             }
           }
         }
+        else{
+            setIsAutoFilling(false)
+            setFormData(prev => ({
+                ...prev,
+                gestationWeek: 0,
+                visitNumber: 0,
+                gestationweek: 0// Handle both naming conventions
+              }));
+          }
       } catch (error) {
         console.error('Failed to fetch patient visit history:', error);
       }
@@ -351,36 +385,108 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
     return dependentFieldValue === field.dependsOn.value;
   };
 
-  const validateCurrentPage = () => {
+  const validateFields = (fieldsToValidate: FormField[]) => {
     const newErrors: Record<string, string> = {};
 
-    currentFields.forEach(field => {
+    fieldsToValidate.forEach(field => {
       if (!isFieldVisible(field)) return;
-      if (field.required && (!formData[field.name] || formData[field.name] === '')) {
+
+      const value = formData[field.name];
+
+      // REQUIRED VALIDATION
+      if (
+        field.required &&
+        (value === undefined || value === null || value === '')
+      ) {
         newErrors[field.name] = `${field.label} is required`;
+        return;
+      }
+
+      // Skip further validation if empty
+      if (
+        value === undefined ||
+        value === null ||
+        value === ''
+      ) {
+        return;
+      }
+
+      const stringValue = String(value);
+
+      // -----------------------------
+      // STRING LENGTH VALIDATION
+      // -----------------------------
+      if (
+        field.minLength &&
+        stringValue.length < field.minLength
+      ) {
+        newErrors[field.name] =
+          `${field.label} must be at least ${field.minLength} characters`;
+      }
+
+      if (
+        field.maxLength &&
+        stringValue.length > field.maxLength
+      ) {
+        newErrors[field.name] =
+          `${field.label} must not exceed ${field.maxLength} characters`;
+      }
+
+      // -----------------------------
+      // PATTERN VALIDATION (REGEX)
+      // -----------------------------
+      if (
+        field.pattern &&
+        !field.pattern.test(stringValue)
+      ) {
+        newErrors[field.name] =
+          field.patternMessage || `Invalid ${field.label}`;
+      }
+
+      // -----------------------------
+      // NUMBER VALIDATION (MIN / MAX)
+      // -----------------------------
+      if (field.type === 'number') {
+        const numericValue = Number(value);
+
+        if (isNaN(numericValue)) {
+          newErrors[field.name] = `${field.label} must be a number`;
+          return;
+        }
+
+        if (
+          field.min !== undefined &&
+          numericValue < Number(field.min)
+        ) {
+          newErrors[field.name] =
+            `${field.label} must be at least ${field.min}`;
+        }
+
+        if (
+          field.max !== undefined &&
+          numericValue > Number(field.max)
+        ) {
+          newErrors[field.name] =
+            `${field.label} must not exceed ${field.max}`;
+        }
       }
     });
 
     setErrors(newErrors);
+
     return Object.keys(newErrors).length === 0;
+  };
+
+  const validateCurrentPage = () => {
+    return validateFields(currentFields);
   };
 
   const validateAllFields = () => {
-    const newErrors: Record<string, string> = {};
-
-    fields.forEach(field => {
-      if (!isFieldVisible(field)) return;
-      if (field.required && (!formData[field.name] || formData[field.name] === '')) {
-        newErrors[field.name] = `${field.label} is required`;
-      }
-    });
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return validateFields(fields);
   };
 
   const handleNext = () => {
-    if (validateCurrentPage()) {
+    if (validateCurrentPage() && validateBusinessRules()) {
       if (currentPage < totalPages - 1) {
         setCurrentPage(prev => prev + 1);
       }
@@ -394,7 +500,7 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
   };
 
   const handleSubmit = async () => {
-    if (validateAllFields()) {
+    if (validateAllFields() && validateBusinessRules()) {
       setIsSubmitting(true);
       try {
         const cleanedFormData = { ...formData };
@@ -438,9 +544,11 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
               (Auto-calculated)
             </span>
           )}
-          {(field.name === 'gestationWeek' || field.name === 'gestationweek') && formData[field.name] && (
+
+          {(field.name === 'gestationWeek' || field.name === 'gestationweek' || field.name == 'visitNumber') && (
             <span className="text-xs text-green-600 ml-2 font-normal">
-              (Auto-filled from last visit)
+              {isAutoFilling ? "(Auto-filling from last visit...)" :
+                formData[field.name] != 0 ? "(Auto-filled from last visit)" : "(No previous Visits)"}
             </span>
           )}
           {field.name === 'estimatedDueDate' && formData.lastPeriodDate && formData[field.name] && (
@@ -506,16 +614,41 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
             type={field.type}
             value={formData[field.name] ?? ''}
             onChange={(e) => {
-              if (field.type === 'number') {
-                const numValue = e.target.value === '' ? '' : Number(e.target.value);
-                handleInputChange(field.name, numValue);
-              } else {
-                handleInputChange(field.name, e.target.value);
+              let value: any = e.target.value;
+
+              // PHONE VALIDATION
+              if (
+                field.name === 'phone' ||
+                field.name === 'emergencyContactPhone'
+              ) {
+                value = value.replace(/\D/g, '').slice(0, 10);
               }
+
+              // NATIONAL ID VALIDATION
+              if (field.name === 'nationalId') {
+                value = value.replace(/\D/g, '').slice(0, 8);
+              }
+
+              if (field.type === 'number') {
+                value = value === '' ? '' : Number(value);
+              }
+
+              handleInputChange(field.name, value);
             }}
-            placeholder={field.placeholder || (field.name === 'bmi' ? 'Will calculate automatically' : field.name === 'map' ? 'Will calculate automatically' : '')}
+            placeholder={
+              field.placeholder ||
+              (
+                field.name === 'bmi'
+                  ? 'Will calculate automatically'
+                  : field.name === 'map'
+                    ? 'Will calculate automatically'
+                    : ''
+              )
+            }
             readOnly={isReadonly}
-            min={field.type === 'number' ? 0 : undefined}
+            min={field.min}
+            max={field.max}
+            maxLength={field.maxLength}
             className={`px-3 py-3 border rounded-lg focus:outline-none focus:ring-0 focus:ring-[#008540] ${hasError ? 'border-red-500' : 'border-gray-300'
               } ${isReadonly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
           />
@@ -526,6 +659,33 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
         )}
       </div>
     );
+  };
+
+  const validateBusinessRules = () => {
+    const newErrors: Record<string, string> = {}; 
+    newErrors.visitNumber = "..."
+    newErrors.gestationWeek = "..."
+
+    const visitNumber = Number(formData.visitNumber);
+    const gestationWeek = Number(formData.gestationWeek);
+
+    if (lastVisitData?.visitNumber != null) {
+      if (visitNumber <= lastVisitData.visitNumber) {
+        newErrors.visitNumber =
+          `Visit number must be greater than last visit (${lastVisitData.visitNumber})`;
+      }
+    }
+
+    if (lastVisitData?.gestationWeek != null) {
+      if (gestationWeek <= lastVisitData.gestationWeek) {
+        newErrors.gestationWeek =
+          `Gestation week must be greater than last recorded (${lastVisitData.gestationWeek})`;
+      }
+    }
+
+    setErrors(prev => ({ ...prev, ...newErrors }));
+
+    return Object.keys(newErrors).length === 0;
   };
 
   return (
