@@ -19,11 +19,8 @@ interface SymptomReportProps {
   report: any;
   patient?: PatientData;
   onBack?: () => void;
-  /** Full history array from symptom_reasoning_report_history (newest-first) */
   reportHistory?: any[];
-  /** Called when clinician escalates a CRITICAL alert */
   onEscalate?: (message: string) => Promise<void>;
-  /** Called when a comment is saved — receives the quoted text + note */
   onSaveComment?: (payload: CommentPayload) => Promise<void>;
 }
 
@@ -34,15 +31,36 @@ const RISK_COLORS: Record<string, string> = {
   LOW: '#16a34a',
 };
 
-const parseList = (raw: any): string[] => {
+type ParseListField = 'keyRiskFactors' | 'primaryConcerns' | 'default';
+
+const parseList = (raw: any, field: ParseListField = 'default'): string[] => {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.filter(Boolean).map(String);
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
-  } catch { }
-  return String(raw)
-    .replace(/^\[|\]$/g, '')
+  } catch { /* not valid JSON — fall through */ }
+
+  const str = String(raw).replace(/^\[|\]$/g, '').trim();
+
+  // keyRiskFactors: items separated by "., " (period + comma + space)
+  if (field === 'keyRiskFactors') {
+    return str
+      .split(/\.,\s+/)
+      .map(s => s.replace(/^["']|["']$/g, '').replace(/\.$/, '').trim())
+      .filter(Boolean);
+  }
+
+  // primaryConcerns: same "., " boundary pattern
+  if (field === 'primaryConcerns') {
+    return str
+      .split(/\.,\s+/)
+      .map(s => s.replace(/^["']|["']$/g, '').replace(/\.$/, '').trim())
+      .filter(Boolean);
+  }
+
+  // default: standard CSV split
+  return str
     .split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)
     .map(s => s.replace(/^["']|["']$/g, '').trim())
     .filter(Boolean);
@@ -52,17 +70,13 @@ const formatDate = (iso?: string, format: 'long' | 'short' = 'long') => {
   if (!iso) return '—';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
-
   if (format === 'short') {
     return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
   }
-
   return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 };
 
 // ─── Clinical reasoning parser ────────────────────────────────────────────────
-// The AI returns one long string with "Title: content; NextTitle: content" pattern.
-// Split it into labelled sections for readable display.
 interface ReasoningSection { title: string; body: string }
 
 function parseClinicalReasoning(raw: string): ReasoningSection[] {
@@ -75,7 +89,6 @@ function parseClinicalReasoning(raw: string): ReasoningSection[] {
     'Kenya-Specific Adaptations',
   ];
 
-  // Find all header positions in the string
   const found: { title: string; start: number; contentStart: number }[] = [];
   for (const h of HEADERS) {
     let searchFrom = 0;
@@ -88,15 +101,12 @@ function parseClinicalReasoning(raw: string): ReasoningSection[] {
   }
 
   if (found.length === 0) {
-    // No headers found — split on semicolons as sentences
     const sentences = raw.split(/;\s+/).map(s => s.trim()).filter(Boolean);
     return [{ title: '', body: sentences.join('\n') }];
   }
 
-  // Sort by position
   found.sort((a, b) => a.start - b.start);
 
-  // Extract each section's body = text from contentStart to next header's start
   const sections: ReasoningSection[] = found.map((h, i) => {
     const end = i + 1 < found.length ? found[i + 1].start : raw.length;
     const body = raw.slice(h.contentStart, end).trim().replace(/;?\s*$/, '').trim();
@@ -106,9 +116,6 @@ function parseClinicalReasoning(raw: string): ReasoningSection[] {
   return sections.filter(s => s.body.length > 0);
 }
 
-// Split a section body into individual bullet points.
-// Splits on ALL semicolons — the AI uses them as statement separators within sections.
-// Also splits on ". " before a capital letter for full-stop separated sentences.
 function splitIntoSentences(body: string): string[] {
   return body
     .split(/;\s*|\.\s+(?=[A-Z])/)
@@ -117,7 +124,6 @@ function splitIntoSentences(body: string): string[] {
     .map(s => s.charAt(0).toUpperCase() + s.slice(1));
 }
 
-// Render parsed clinical reasoning sections
 const ClinicalReasoningBlock: React.FC<{ text: string }> = ({ text }) => {
   const sections = parseClinicalReasoning(text);
   if (sections.length === 0) return null;
@@ -133,7 +139,6 @@ const ClinicalReasoningBlock: React.FC<{ text: string }> = ({ text }) => {
     </div>
   );
 
-  // Single section with no title
   if (sections.length === 1 && !sections[0].title) {
     return <BulletList sentences={splitIntoSentences(sections[0].body)} />;
   }
@@ -144,7 +149,6 @@ const ClinicalReasoningBlock: React.FC<{ text: string }> = ({ text }) => {
         const sentences = splitIntoSentences(s.body);
         return (
           <div key={i}>
-            {/* Title in sentence case, dark, readable */}
             <div style={{ fontSize: 12, fontWeight: 700, color: '#111827', marginBottom: 7 }}>
               {s.title}
             </div>
@@ -159,22 +163,29 @@ const ClinicalReasoningBlock: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBack, reportHistory = [], onEscalate, onSaveComment }) => {
+// ─── Main component ───────────────────────────────────────────────────────────
+
+const SymptomReportNew: React.FC<SymptomReportProps> = ({
+  report, patient, onBack, reportHistory = [], onEscalate, onSaveComment
+}) => {
   const printRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [activePanel, setActivePanel] = useState<'report' | 'diff' | 'timeline' | 'monitoring' | 'recommendations'>('report');
-  // null = panel closed; string = the highlighted text being commented on
   const [activeComment, setActiveComment] = useState<string | null>(null);
-  // locally stored notes — seeded from DB on mount
   const [savedNotes, setSavedNotes] = useState<CommentPayload[]>([]);
-  // DB comment IDs keyed by index so we can delete them
   const [commentIds, setCommentIds] = useState<(string | undefined)[]>([]);
   const [notesDrawerOpen, setNotesDrawerOpen] = useState(false);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const toggle = useCallback((key: string) => setChecked(p => ({ ...p, [key]: !p[key] })), []);
+
+  // Stores the exact DOM Range at the moment the user clicks "Add comment"
+  // so we can use surroundContents() for precise single-occurrence highlighting.
+  const pendingRangeRef = useRef<Range | null>(null);
+
   const menu = useSelectionMenu(printRef, menuRef);
 
-  // The document ID is the report's history record ID (stable across reloads)
+  console.log(report);
+
   const documentId: string = report?.id ?? report?.historyId ?? '';
 
   // ── Load existing comments from DB on mount ──────────────────────────────
@@ -190,16 +201,24 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
         })));
         setCommentIds(rows.map(r => r.id));
       })
-      .catch(() => { /* silently ignore — offline or no comments yet */ });
+      .catch(() => { /* silently ignore */ });
   }, [patient?.id, documentId]);
 
-  // ── Highlight saved quoted texts in the report DOM ───────────────────────
-  // Runs after the report renders and whenever savedNotes changes.
+  // Track which comment indices were highlighted via surroundContents (not text-search)
+  const rangeHighlightedIndices = useRef<Set<number>>(new Set());
+
   useEffect(() => {
     if (!printRef.current || savedNotes.length === 0) return;
 
-    // Remove any previous marks first
+    // Only process notes that weren't already highlighted via surroundContents
+    const phrases = savedNotes
+      .map((n, i) => ({ text: n.quotedText, index: i }))
+      .filter(p => p.text && !rangeHighlightedIndices.current.has(p.index));
+
+    // Remove only marks for text-search indices (leave surroundContents marks alone)
     printRef.current.querySelectorAll('mark[data-comment-highlight]').forEach(m => {
+      const idx = Number(m.getAttribute('data-comment-index'));
+      if (rangeHighlightedIndices.current.has(idx)) return;
       const parent = m.parentNode;
       if (parent) {
         parent.replaceChild(document.createTextNode(m.textContent ?? ''), m);
@@ -207,8 +226,6 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
       }
     });
 
-    // Walk text nodes and wrap matches
-    const phrases = [...new Set(savedNotes.map(n => n.quotedText).filter(Boolean))];
     if (phrases.length === 0) return;
 
     const walker = document.createTreeWalker(
@@ -216,7 +233,6 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
       NodeFilter.SHOW_TEXT,
       {
         acceptNode: (node) => {
-          // Skip nodes already inside a mark
           if ((node.parentElement as HTMLElement)?.closest('mark[data-comment-highlight]')) {
             return NodeFilter.FILTER_REJECT;
           }
@@ -229,17 +245,23 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
     let node: Node | null;
     while ((node = walker.nextNode())) textNodes.push(node as Text);
 
+    const matched = new Set<number>();
+
     for (const textNode of textNodes) {
       const text = textNode.textContent ?? '';
-      for (const phrase of phrases) {
+      for (const { text: phrase, index } of phrases) {
+        if (matched.has(index)) continue;
         const idx = text.indexOf(phrase);
         if (idx === -1) continue;
+
+        matched.add(index);
 
         const before = text.slice(0, idx);
         const after = text.slice(idx + phrase.length);
 
         const mark = document.createElement('mark');
         mark.setAttribute('data-comment-highlight', 'true');
+        mark.setAttribute('data-comment-index', String(index));
         mark.style.cssText = 'background:#fef08a;border-radius:2px;padding:0 1px;';
         mark.textContent = phrase;
 
@@ -249,7 +271,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
         if (after) frag.appendChild(document.createTextNode(after));
 
         textNode.parentNode?.replaceChild(frag, textNode);
-        break; // one phrase per text node pass — re-walk handles the rest
+        break;
       }
     }
   }, [savedNotes, activePanel]);
@@ -262,8 +284,8 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
   const riskScore = parseFloat(report?.riskScore ?? report?.risk_score ?? 0);
   const riskColor = RISK_COLORS[riskLevel] || RISK_COLORS.MODERATE;
 
-  const keyRiskFactors = parseList(medical?.key_risk_factors ?? report?.keyRiskFactors);
-  const primaryConcerns = parseList(medical?.primary_concerns ?? report?.primaryConcerns);
+  const keyRiskFactors = parseList(medical?.key_risk_factors ?? report?.keyRiskFactors, 'keyRiskFactors');
+  const primaryConcerns = parseList(medical?.primary_concerns ?? report?.primaryConcerns, 'primaryConcerns');
   const recommendations = parseList(report?.recommendations ?? medical?.recommendations);
   const monitoring = parseList(medical?.monitoring_requirements ?? report?.monitoringRequirements);
   const immediateActions = parseList(medical?.immediate_actions ?? report?.immediateActions);
@@ -277,34 +299,21 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
   const gestationTotal = report?.gestationWeeksTotal ?? 40;
   const generatedDate = formatDate(report?.createdAt ?? report?.updatedAt, 'long');
 
-
-
   const handleDownloadPDF = async () => {
     if (!printRef.current) return;
-
     try {
-      // Generate filename: "AI Analysis - PatientName - Date"
       const patientName = patient?.name?.replace(/\s+/g, ' ').trim() || 'Patient';
       const dateStr = formatDate(report?.createdAt ?? report?.updatedAt, 'short').replace(/\//g, '-');
       const filename = `AI Analysis - ${patientName} - ${dateStr}.pdf`;
 
-      // Capture the element as canvas
       const canvas = await html2canvas(printRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
+        scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff',
       });
 
-      // Calculate PDF dimensions (A4 size)
-      const imgWidth = 210; // A4 width in mm
+      const imgWidth = 210;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      // Create PDF
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgData = canvas.toDataURL('image/png');
-
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, imgWidth, imgHeight);
       pdf.save(filename);
     } catch (error) {
       console.error('PDF generation failed:', error);
@@ -312,13 +321,20 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
     }
   };
 
+  // Capture the exact DOM Range at the moment the user opens the comment panel
   const handleComment = (text: string) => {
-    setActiveComment(text); // captures the highlighted word, opens the panel
+    pendingRangeRef.current = menu.rangeRef.current
+      ? menu.rangeRef.current.cloneRange()
+      : null;
+    setActiveComment(text);
   };
+
+
 
   return (
     <>
       <SelectionMenu ref={menuRef} menu={menu} onComment={handleComment} />
+
       {/* Screen-only controls */}
       <div className="print:hidden mb-3 flex items-center gap-2">
         {onBack && (
@@ -338,16 +354,11 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
           Download PDF
         </button>
 
-        {/* View Notes button — only shown when there are saved notes */}
         {savedNotes.length > 0 && (
           <button
             onClick={() => setNotesDrawerOpen(true)}
             className="px-3 py-1.5 rounded text-[13px] font-medium transition-colors flex items-center gap-1.5"
-            style={{
-              background: "#f0fdf4",
-              color: "#008540",
-              border: "1px solid #bbf7d0",
-            }}
+            style={{ background: "#f0fdf4", color: "#008540", border: "1px solid #bbf7d0" }}
           >
             <LuMessageSquare size={14} />
             Notes
@@ -362,18 +373,14 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
         )}
       </div>
 
-      {/* Panel tabs — screen only */}
+      {/* Panel tabs */}
       <div className="print:hidden flex gap-2 mb-4 flex-wrap">
-        {(
-          [
-            { key: 'report' as const, label: 'Report', icon: null as React.ReactNode, disabled: false },
-            { key: 'monitoring' as const, label: 'Monitoring', icon: <LuListChecks size={12} /> as React.ReactNode, disabled: monitoring.length === 0 },
-            { key: 'recommendations' as const, label: 'Recommendations', icon: <LuCircleCheck size={12} /> as React.ReactNode, disabled: recommendations.length === 0 },
-            // Changes tab hidden for now — will be re-enabled later
-            // { key: 'diff' as const,           label: 'Changes',         icon: <LuGitCompare size={12} /> as React.ReactNode,              disabled: !previousReport },
-            { key: 'timeline' as const, label: 'Timeline', icon: <LuActivity size={12} /> as React.ReactNode, disabled: reportHistory.length < 2 },
-          ]
-        ).map(tab => (
+        {([
+          { key: 'report' as const, label: 'Report', icon: null as React.ReactNode, disabled: false },
+          { key: 'monitoring' as const, label: 'Monitoring', icon: <LuListChecks size={12} />, disabled: monitoring.length === 0 },
+          { key: 'recommendations' as const, label: 'Recommendations', icon: <LuCircleCheck size={12} />, disabled: recommendations.length === 0 },
+          { key: 'timeline' as const, label: 'Timeline', icon: <LuActivity size={12} />, disabled: reportHistory.length < 2 },
+        ]).map(tab => (
           <button
             key={tab.key}
             onClick={() => !tab.disabled && setActivePanel(tab.key)}
@@ -402,7 +409,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
         ))}
       </div>
 
-      {/* Monitoring panel — screen only */}
+      {/* Monitoring panel */}
       {activePanel === 'monitoring' && (
         <div className="print:hidden mb-4 rounded-lg border border-gray-200 bg-white overflow-hidden">
           <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f4f6', background: '#fefce8', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -426,15 +433,11 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
                     display: 'flex', alignItems: 'flex-start', gap: 10,
                     padding: '7px 4px', cursor: 'pointer',
                     borderBottom: i < monitoring.length - 1 ? '1px solid #f3f4f6' : 'none',
-                    opacity: done ? 0.5 : 1,
-                    transition: 'opacity 0.15s',
+                    opacity: done ? 0.5 : 1, transition: 'opacity 0.15s',
                   }}
                 >
                   <span style={{ color: done ? '#16a34a' : '#d1d5db', flexShrink: 0, marginTop: 1 }}>
-                    {done
-                      ? <LuCircleCheck size={16} />
-                      : <LuCircle size={16} />
-                    }
+                    {done ? <LuCircleCheck size={16} /> : <LuCircle size={16} />}
                   </span>
                   <span style={{ fontSize: 13, color: '#374151', lineHeight: 1.5, textDecoration: done ? 'line-through' : 'none' }}>
                     {item}
@@ -446,7 +449,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
         </div>
       )}
 
-      {/* Recommendations panel — screen only */}
+      {/* Recommendations panel */}
       {activePanel === 'recommendations' && (
         <div className="print:hidden mb-4 rounded-lg border border-gray-200 bg-white overflow-hidden">
           <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f4f6', background: '#f0fdf4', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -470,15 +473,11 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
                     display: 'flex', alignItems: 'flex-start', gap: 10,
                     padding: '7px 4px', cursor: 'pointer',
                     borderBottom: i < recommendations.length - 1 ? '1px solid #f3f4f6' : 'none',
-                    opacity: done ? 0.5 : 1,
-                    transition: 'opacity 0.15s',
+                    opacity: done ? 0.5 : 1, transition: 'opacity 0.15s',
                   }}
                 >
                   <span style={{ color: done ? '#16a34a' : '#d1d5db', flexShrink: 0, marginTop: 1 }}>
-                    {done
-                      ? <LuCircleCheck size={16} />
-                      : <LuCircle size={16} />
-                    }
+                    {done ? <LuCircleCheck size={16} /> : <LuCircle size={16} />}
                   </span>
                   <span style={{ fontSize: 13, color: '#374151', lineHeight: 1.5, textDecoration: done ? 'line-through' : 'none' }}>
                     {item}
@@ -490,22 +489,21 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
         </div>
       )}
 
-      {/* Diff panel — screen only */}
+      {/* Diff panel */}
       {activePanel === 'diff' && previousReport && (
         <div className="print:hidden mb-4 p-4 rounded-lg border border-gray-200 bg-white">
           <ReasoningDiff current={report} previous={previousReport} />
         </div>
       )}
 
-      {/* Timeline panel — screen only */}
+      {/* Timeline panel */}
       {activePanel === 'timeline' && reportHistory.length >= 2 && (
         <div className="print:hidden mb-4 p-4 rounded-lg border border-gray-200 bg-white">
           <RiskScoreTimeline history={reportHistory} />
         </div>
       )}
 
-      {/* Action checklist — screen only, shown in report panel. Only immediate actions here;
-          monitoring and recommendations have their own dedicated tabs. */}
+      {/* Action checklist */}
       {activePanel === 'report' && immediateActions.length > 0 && (
         <div className="w-full max-w-[210mm] print:hidden mb-4 p-4 rounded-lg border border-gray-200 bg-white">
           <ActionChecklist
@@ -519,17 +517,12 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
         </div>
       )}
 
-      {/* Printable Report — only shown on the Report tab */}
+      {/* Printable Report */}
       {activePanel === 'report' && (
         <div
           ref={printRef}
           className="mt-5 w-full max-w-[210mm] p-8 print:p-0 rounded-lg"
-          style={{
-            fontSize: '13px',
-            backgroundColor: '#ffffff',
-            border: '1px solid #e5e7eb',
-            color: '#000000'
-          }}
+          style={{ fontSize: '13px', backgroundColor: '#ffffff', border: '1px solid #e5e7eb', color: '#000000' }}
         >
           {/* Header */}
           <div className="flex flex-col lg:flex-row items-start justify-between mb-5">
@@ -549,7 +542,6 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
           {/* Patient Information */}
           <div className="mb-5">
             <h3 className="text-sm font-bold mb-3" style={{ color: '#111827' }}>Patient Information</h3>
-
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5">
               <div>
                 <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>FULL NAME</p>
@@ -559,7 +551,6 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
                 <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>GESTATION</p>
                 <p className="text-[13px] font-medium" style={{ color: '#111827' }}>{gestationWeeks} weeks (of {gestationTotal})</p>
               </div>
-
               <div>
                 <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>NATIONAL ID</p>
                 <p className="text-[13px] font-medium" style={{ color: '#111827' }}>{patient?.nationalId || '—'}</p>
@@ -585,7 +576,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>RISK LEVEL</p>
-                <p className="font-bold " style={{ color: riskColor }}>{riskLevel}</p>
+                <p className="font-bold" style={{ color: riskColor }}>{riskLevel}</p>
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: '#6b7280' }}>RISK SCORE</p>
@@ -606,9 +597,14 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
           {primaryConcerns.length > 0 && (
             <div className="mb-4">
               <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Primary Concerns</h3>
-              <p className="text-[13px] leading-relaxed" style={{ color: '#374151' }}>
-                {primaryConcerns.join(', ')}
-              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {primaryConcerns.map((concern, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <span style={{ color: '#9ca3af', flexShrink: 0, marginTop: 6, fontSize: 5 }}>●</span>
+                    <span style={{ fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{concern}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -644,8 +640,6 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
             </div>
           )}
 
-          {/* Immediate Actions — shown in ActionChecklist above the report, not repeated here */}
-
           {/* Follow Up Timing */}
           {followUpTiming && (
             <div className="mb-4">
@@ -664,23 +658,41 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
             <p className="text-[10px] text-center" style={{ color: '#9ca3af' }}>
               Generated on {formatDate(report?.createdAt ?? report?.updatedAt, 'short')} at{' '}
               {new Date(report?.createdAt ?? report?.updatedAt).toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false,
+                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
               }).replace(/:/g, '')}
             </p>
           </div>
         </div>
       )}
 
-      {/* Comments panel — slides in when a selection is commented on */}
+      {/* Comments panel */}
       {activeComment !== null && (
         <CommentsPanel
           quotedText={activeComment}
-          onClose={() => setActiveComment(null)}
+          onClose={() => {
+            pendingRangeRef.current = null;
+            setActiveComment(null);
+          }}
           onSave={async (payload) => {
-            // 1. Save to DB
+            // 1. Highlight the EXACT selection using the stored Range
+            //    surroundContents() wraps only the selected nodes — no text search,
+            //    no repeated matches anywhere else in the document.
+            if (pendingRangeRef.current) {
+              try {
+                const mark = document.createElement('mark');
+                mark.setAttribute('data-comment-highlight', 'true');
+                mark.setAttribute('data-comment-index', String(savedNotes.length));
+                mark.style.cssText = 'background:#fef08a;border-radius:2px;padding:0 1px;';
+                pendingRangeRef.current.surroundContents(mark);
+                rangeHighlightedIndices.current.add(savedNotes.length); // ← add this line
+              } catch {
+                // surroundContents throws if the selection crosses element boundaries.
+                // In that case we skip the highlight silently — the comment is still saved.
+              }
+              pendingRangeRef.current = null;
+            }
+
+            // 2. Save to DB
             let newId: string | undefined;
             if (patient?.id && documentId) {
               try {
@@ -694,23 +706,36 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
                 console.error('Failed to persist comment:', err);
               }
             }
-            // 2. Add to local state
+
+            // 3. Update local state
             setSavedNotes(prev => [...prev, payload]);
             setCommentIds(prev => [...prev, newId]);
-            // 3. Notify parent if needed
             await onSaveComment?.(payload);
             setActiveComment(null);
           }}
         />
       )}
 
-      {/* Notes drawer — lists all saved notes */}
+      {/* Notes drawer */}
       {notesDrawerOpen && (
         <NotesDrawer
           notes={savedNotes}
           onClose={() => setNotesDrawerOpen(false)}
           onDelete={async (i) => {
-            // Delete from DB if we have an ID
+
+            rangeHighlightedIndices.current.delete(i); // ← add this line
+            const mark = printRef.current?.querySelector(`mark[data-comment-index="${i}"]`);
+            // ... rest unchanged
+            // Remove the highlight mark from the DOM by index
+            if (mark) {
+              const parent = mark.parentNode;
+              if (parent) {
+                parent.replaceChild(document.createTextNode(mark.textContent ?? ''), mark);
+                parent.normalize();
+              }
+            }
+
+            // Delete from DB
             const id = commentIds[i];
             if (id && patient?.id) {
               try {
@@ -728,25 +753,14 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({ report, patient, onBac
       {/* Print Styles */}
       <style>{`
         @media print {
-          body * {
-            visibility: hidden;
-          }
-          #root, #root * {
-            visibility: hidden;
-          }
+          body * { visibility: hidden; }
+          #root, #root * { visibility: hidden; }
           ${printRef.current ? `
-            .print\\:block {
-              display: block !important;
-            }
-            .print\\:hidden {
-              display: none !important;
-            }
+            .print\\:block { display: block !important; }
+            .print\\:hidden { display: none !important; }
           ` : ''}
         }
-        @page {
-          size: A4;
-          margin: 20mm;
-        }
+        @page { size: A4; margin: 20mm; }
       `}</style>
     </>
   );

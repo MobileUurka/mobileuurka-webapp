@@ -22,7 +22,7 @@ export type SelectionState = {
 export default function useSelectionMenu(
     containerRef: React.RefObject<HTMLElement | null>,
     menuRef: React.RefObject<HTMLElement | null>
-): SelectionState {
+): SelectionState & { rangeRef: React.RefObject<Range | null> } {
     const [menu, setMenu] = useState<SelectionState>({
         visible: false,
         text: "",
@@ -109,5 +109,5 @@ export default function useSelectionMenu(
         };
     }, [containerRef, menuRef]);
 
-    return menu;
+    return { ...menu, rangeRef };  // ← expose it
 }

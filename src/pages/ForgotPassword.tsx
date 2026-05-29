@@ -125,7 +125,7 @@ const ForgotPassword = () => {
             </p>
           </div>
 
-          <div className="space-y-3 flex flex-row items-center justify-center gap-4">
+          <div className="space-y-3 flex flex-col lg:flex-row items-center justify-center gap-4">
             <button
               onClick={() => setSuccess(false)}
               className="w-full p-4 rounded-[8px] border border-gray-300 cursor-pointer bg-white text-gray-700 hover:bg-gray-50"

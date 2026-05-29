@@ -25,9 +25,9 @@ type Severity = 'critical' | 'high' | 'moderate' | 'low';
 
 const SEVERITY_STYLES: Record<Severity, { bg: string; color: string; border: string; dot: string }> = {
   critical: { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', dot: '#dc2626' },
-  high:     { bg: '#fff7ed', color: '#ea580c', border: '#fed7aa', dot: '#ea580c' },
+  high: { bg: '#fff7ed', color: '#ea580c', border: '#fed7aa', dot: '#ea580c' },
   moderate: { bg: '#fefce8', color: '#ca8a04', border: '#fde68a', dot: '#ca8a04' },
-  low:      { bg: '#f3f4f6', color: '#374151', border: '#e5e7eb', dot: '#6b7280' },
+  low: { bg: '#f3f4f6', color: '#374151', border: '#e5e7eb', dot: '#6b7280' },
 };
 
 const CRITICAL_KEYWORDS = [
@@ -68,17 +68,34 @@ const RiskFactorBreakdown: React.FC<RiskFactorBreakdownProps> = ({ keyRiskFactor
 
   if (compact) {
     return (
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
         {factors.map((f, i) => {
           const s = SEVERITY_STYLES[f.severity];
           return (
             <span key={i} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 10, fontWeight: 500, padding: '2px 8px', borderRadius: 20,
-              background: s.bg, color: s.color, border: `1px solid ${s.border}`,
+              display: 'inline-flex',
+              alignItems: 'flex-start', // 👈 Changed from 'center' to snap to the top
+              gap: 6,                   // Slight increase for cleaner badge spacing
+              fontSize: 10,
+              fontWeight: 500,
+              padding: '8px 12px',
+              borderRadius: 20,
+              background: s.bg,
+              color: s.color,
+              border: `1px solid ${s.border}`,
+              lineHeight: '14px'        // Explicit line-height ensures predictable alignment
             }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.dot, flexShrink: 0 }} />
-              {f.text}
+              <span style={{
+                width: 5,
+                height: 5,
+                borderRadius: '50%',
+                background: s.dot,
+                flexShrink: 0,
+                marginTop: '4.5px'      // 👈 Offsets the dot to align perfectly with the first line of text
+              }} />
+              <span style={{ textAlign: 'left' }}>
+                {f.text}
+              </span>
             </span>
           );
         })}

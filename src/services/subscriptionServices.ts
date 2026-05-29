@@ -1,0 +1,170 @@
+/**
+ * =========================
+ * HELPERS
+ * =========================
+ */
+async function publicRequest(endpoint: string, options: any = {}) {
+  const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5500/api/v1";
+
+  const response = await fetch(`${BASE_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || "Request failed");
+  return data;
+}
+
+async function authenticatedRequest(endpoint: string, options: any = {}) {
+  const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5500/api/v1";
+  const token = localStorage.getItem("token"); 
+
+  const response = await fetch(`${BASE_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...apiHeaders(),
+      ...options.headers,
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || "Request failed");
+  return data;
+}
+
+function apiHeaders() {
+  const headers: Record<string, string> = {};
+  const key = import.meta.env.VITE_INTERNAL_API_KEY;
+  if (key) headers["x-api-key"] = key;
+  return headers;
+}
+
+/**
+ * =========================
+ * TYPES
+ * =========================
+ */
+export interface Subscription {
+  id: string;
+  organizationId: string | null;
+  planName: 'basic' | 'professional' | 'enterprise';
+  status: 'active' | 'past_due' | 'canceled' | 'expired';
+  amount: string;
+  currency: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  lastRemindedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  email:string
+}
+
+export interface SubscriptionResponse {
+  success: boolean;
+  message: string;
+  data?: Subscription;
+}
+
+/**
+ * =========================
+ * SUBSCRIPTION SERVICE
+ * =========================
+ */
+export const subscriptionService = {
+  /**
+   * FETCH SUBSCRIPTION STATUS
+   */
+  async getSubscription(id?: string): Promise<SubscriptionResponse> {
+    try {
+      const endpoint = id ? `/subscriptions/${id}` : "/subscriptions";
+      const response = await authenticatedRequest(endpoint, { method: "GET" });
+      return {
+        success: true,
+        message: response.message || "Subscription data pulled successfully",
+        data: response.data,
+      };
+    } catch (error: unknown) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  },
+
+  /**
+   * INSTANTIATE AN ORPHAN/PRE-PAY SUBSCRIPTION
+   */
+  async createSubscription(payload: {
+    planName: string;
+    amount: number;
+    currency?: string;
+    email:string;
+    organizationId?: string;
+    durationDays?: number;
+  }): Promise<SubscriptionResponse> {
+    try {
+      const response = await publicRequest("/subscription", {
+        method: "POST",
+        headers: apiHeaders(),
+        body: JSON.stringify(payload),
+      });
+      return {
+        success: true,
+        message: "Subscription created",
+        data: response.data,
+      };
+    } catch (error: unknown) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  },
+
+  /**
+   * MODIFY SUBSCRIPTION (e.g., Attach Organization ID after M-Pesa Callback)
+   */
+  async updateSubscription(id: string, updates: Partial<Subscription>): Promise<SubscriptionResponse> {
+    try {
+      const response = await publicRequest(`/subscriptions/${id}`, {
+        method: "PUT",
+        headers: apiHeaders(),
+        body: JSON.stringify(updates),
+      });
+      return {
+        success: true,
+        message: "Subscription status synced",
+        data: response.data,
+      };
+    } catch (error: unknown) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  },
+
+  /**
+   * DELETE SUBSCRIPTION
+   */
+  async deleteSubscription(id: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await authenticatedRequest(`/subscriptions/${id}`, { method: "DELETE" });
+      return {
+        success: true,
+        message: response.message || "Subscription row destroyed",
+      };
+    } catch (error: unknown) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+};

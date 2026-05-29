@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { FiSearch, FiPlus, FiRefreshCw } from 'react-icons/fi';
 import { authService } from '../services/authServices';
+import { IoLogOutOutline } from 'react-icons/io5';
 
 interface SearchProps {
   placeholder?: string;
@@ -58,6 +59,19 @@ const SearchContainer: React.FC<SearchProps> = ({
         setInitial(initials);
       }
     }, [user]);
+
+
+    const handleLogout = () => {
+        // Clear local state immediately and navigate — don't wait for the API
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.href = '/';
+    
+        // Fire the server-side cleanup in the background (invalidates refresh token + session)
+        authService.logout().catch((error) => {
+            console.warn('Background logout cleanup failed (tokens may expire naturally):', error);
+        });
+    };
   
 
   return (
@@ -99,6 +113,7 @@ const SearchContainer: React.FC<SearchProps> = ({
       <div className='hidden lg:flex w-10 aspect-square rounded-full bg-[#008540] text-sm text-white items-center justify-center'>
         {initial}
       </div>
+      <IoLogOutOutline onClick={handleLogout} size={26} className='text-[#aca287] cursor-pointer'/>
     </div>
   );
 };

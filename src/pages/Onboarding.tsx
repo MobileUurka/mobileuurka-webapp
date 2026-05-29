@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { paymentService, type PaymentPlan } from '../services/paymentServices';
 import { authService } from '../services/authServices';
+import { subscriptionService } from '../services/subscriptionServices';
 
 type OnboardingStep = 'payment' | 'finish';
 
@@ -242,13 +243,30 @@ function Onboarding() {
         setError(null);
 
         try {
+
+            const subInitResponse = await subscriptionService.createSubscription({
+                planName: paymentData.id,
+                amount: paymentData.price,
+                currency: paymentData.currency || 'KES',
+                durationDays: 30,
+                email:email
+            });
+
+            if (!subInitResponse.success) {
+                throw new Error(subInitResponse.message || "Failed to initialize subscription tier mapping.");
+            }
+
+                        console.log(paymentData,pendingUserData,subInitResponse)
+
+
+
             const response = await authService.completeOrganizationCreation({
                 email: email,
                 paymentData: paymentData,
                 hospitalData: { hospitals: [] } // No hospitals - just create the organization
             });
-
             if (response.success) {
+
                 navigate('/dashboard', {
                     state: {
                         message: 'Welcome to your dashboard! Your organization has been created successfully.'
@@ -450,7 +468,6 @@ function Onboarding() {
 
                 {/* Details card */}
                 {pendingUserData && paymentData && (
-                    console.log(paymentData),
                     <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100 mb-5">
                         <div className="flex items-center gap-3 px-4 py-3">
                             <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
@@ -507,7 +524,7 @@ function Onboarding() {
     ), [pendingUserData, paymentData, selectedPlan, error, loading, handleFinishSetup]);
     // Finish Setup Panel Component
 
-    
+
 
 
     const isMobile = window.innerWidth <= 900;
@@ -613,7 +630,7 @@ function Onboarding() {
             {/* Overlay that slides from left to right */}
             <div className={`absolute top-0 w-[50%] h-full bg-gray-200 transition-all duration-500 ease-in-out z-9999 ${currentStep !== 'finish' ? 'left-[50%]' : 'left-0'
                 }`}>
-                     <img src="/images/auth-image.jpg" alt="" className="w-full h-full object-cover"/>
+                <img src="/images/auth-image.jpg" alt="" className="w-full h-full object-cover" />
             </div>
         </div>
     );

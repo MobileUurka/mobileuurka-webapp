@@ -25,6 +25,7 @@ import LoadingSpinner from './components/LoadingSpinner';
 import { useAppDispatch } from './store/hooks';
 import { resetStore } from './store';
 import { socketService } from './services/socketService';
+import { fetchNotifications } from './store/notificationsSlice';
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -38,6 +39,8 @@ function App() {
     setIsInitialized(true);
   }, []);
 
+  
+
   useEffect(() => {
     checkAuth();
 
@@ -49,6 +52,12 @@ function App() {
     window.addEventListener('auth-logout', handleUnauthorized);
     return () => window.removeEventListener('auth-logout', handleUnauthorized);
   }, [checkAuth, dispatch]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      dispatch(fetchNotifications());
+    }
+  }, [isAuthenticated, dispatch]);
 
   if (!isInitialized) {
     return (
