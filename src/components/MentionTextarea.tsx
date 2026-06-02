@@ -89,7 +89,7 @@ export default function MentionTextarea({
     const positionDropdown = useCallback(() => {
         const ta = textareaRef.current;
         if (!ta) return;
-        const rect = ta.getBoundingClientRect();
+        // const rect = ta.getBoundingClientRect();
         // setDropdownPos({
         //     top: rect.bottom + window.scrollY + 4,
         //     left: rect.left + window.scrollX,
