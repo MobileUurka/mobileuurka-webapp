@@ -21,7 +21,12 @@ async function publicRequest(endpoint: string, options: any = {}) {
 
 async function authenticatedRequest(endpoint: string, options: any = {}) {
   const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5500/api/v1";
-  const token = localStorage.getItem("token"); 
+  const { authService } = await import('./authServices');
+
+  // Proactively refresh if the token is close to expiry (mirrors apiClient behaviour)
+  await authService.validateAndRefreshToken();
+
+  const token = authService.getAccessToken();
 
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     ...options,

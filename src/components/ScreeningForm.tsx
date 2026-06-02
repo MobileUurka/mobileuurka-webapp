@@ -662,20 +662,24 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
   };
 
   const validateBusinessRules = () => {
-    const newErrors: Record<string, string> = {}; 
+    const newErrors: Record<string, string> = {};
 
+    // Visit-progression rules only apply to the Visits form, which is the only
+    // form that has both visitNumber and gestationWeek together. Other forms
+    // (Allergy, Triage, Lab, etc.) that share gestationWeek should not be
+    // blocked by these sequential constraints.
+    const hasVisitNumberField = fields.some(f => f.name === 'visitNumber');
 
-    const visitNumber = Number(formData.visitNumber);
-    const gestationWeek = Number(formData.gestationWeek);
-
-    if (lastVisitData?.visitNumber != null) {
+    if (hasVisitNumberField && lastVisitData?.visitNumber != null) {
+      const visitNumber = Number(formData.visitNumber);
       if (visitNumber <= lastVisitData.visitNumber) {
         newErrors.visitNumber =
           `Visit number must be greater than last visit (${lastVisitData.visitNumber})`;
       }
     }
 
-    if (lastVisitData?.gestationWeek != null) {
+    if (hasVisitNumberField && lastVisitData?.gestationWeek != null) {
+      const gestationWeek = Number(formData.gestationWeek);
       if (gestationWeek <= lastVisitData.gestationWeek) {
         newErrors.gestationWeek =
           `Gestation week must be greater than last recorded (${lastVisitData.gestationWeek})`;
