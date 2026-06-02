@@ -21,6 +21,7 @@ import Verify from './pages/Verify';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Onboarding from './pages/Onboarding';
+import ChangePassword from './pages/ChangePassword';
 import LoadingSpinner from './components/LoadingSpinner';
 import { useAppDispatch } from './store/hooks';
 import { resetStore } from './store';
@@ -30,12 +31,21 @@ import { fetchNotifications } from './store/notificationsSlice';
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [backendDown, setBackendDown] = useState(false);
   const dispatch = useAppDispatch();
 
   const checkAuth = useCallback(async () => {
+    setBackendDown(false);
     const hasKeys = await authService.initializeEncryption();
     const hasToken = authService.isAuthenticated();
-    setIsAuthenticated(hasKeys && hasToken);
+
+    if (!hasKeys && hasToken) {
+      // Had a token but couldn't reach backend — don't wipe the session, show an error
+      setBackendDown(true);
+      setIsAuthenticated(false);
+    } else {
+      setIsAuthenticated(hasKeys && hasToken);
+    }
     setIsInitialized(true);
   }, []);
 
@@ -67,6 +77,21 @@ function App() {
     );
   }
 
+  if (backendDown) {
+    return (
+      <div className="loading-screen m-auto h-screen flex items-center justify-center flex-col gap-4">
+        <p className="text-red-500 font-semibold text-lg">Unable to reach the server</p>
+        <p className="text-gray-500 text-sm">Make sure the backend is running on port 5500, then refresh the page.</p>
+        <button
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          onClick={() => window.location.reload()}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
     <ToastProvider>
       <FeedbackProvider>
@@ -80,6 +105,7 @@ function App() {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/verify" element={<Verify />} />
               <Route path="/onboarding" element={<Onboarding />} />
+              <Route path="/change-password" element={<ChangePassword onPasswordChanged={checkAuth} />} />
               <Route path="*" element={<Navigate to="/auth" replace />} />
             </>
           ) : 

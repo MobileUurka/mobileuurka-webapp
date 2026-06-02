@@ -85,7 +85,7 @@ const Staff = () => {
       const response = await userService.addUserToOrganization(organizationId, staffData);
 
       if (response.success) {
-        showSuccess(`Staff member added! Verification email sent to ${staffData.email}`);
+        showSuccess(`Staff member ${staffData.firstName} ${staffData.lastName} added. They'll be prompted to change their password on first login.`);
         // Invalidate so the next background fetch picks up the new user
         // (socket will also push the update in real-time via SocketProvider)
         dispatch(invalidateStaff());

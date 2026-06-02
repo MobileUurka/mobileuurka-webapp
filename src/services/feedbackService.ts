@@ -1,11 +1,18 @@
 import { api } from './apiClient';
 
+export interface AssignedStaffMember {
+    id: string;
+    name: string;
+    email: string;
+}
+
 export interface FeedbackPayload {
     page: string;
     pageUrl: string;
     patientId?: string;
     patientName?: string;
     message: string;
+    assignedTo?: AssignedStaffMember[];
 }
 
 export interface FeedbackEntry {
@@ -21,6 +28,8 @@ export interface FeedbackEntry {
     message: string;
     status: 'pending' | 'reviewed' | 'resolved';
     adminNotes: string | null;
+    adminReply: string | null;
+    assignedTo: AssignedStaffMember[];
     createdAt: string;
     updatedAt: string;
 }
@@ -43,8 +52,14 @@ export const feedbackService = {
         return api.get(`/feedback${query ? `?${query}` : ''}`);
     },
 
-    async updateStatus(id: string, status: string, adminNotes?: string): Promise<{ success: boolean }> {
-        return api.patch(`/feedback/${id}`, { status, adminNotes });
+    async updateStatus(
+        id: string,
+        status: string,
+        adminNotes?: string,
+        assignedTo?: AssignedStaffMember[],
+        adminReply?: string,
+    ): Promise<{ success: boolean }> {
+        return api.patch(`/feedback/${id}`, { status, adminNotes, assignedTo, adminReply });
     },
 
     async deleteEntry(id: string): Promise<{ success: boolean }> {

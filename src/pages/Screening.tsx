@@ -145,6 +145,22 @@ const Screening = () => {
   const handleFormSubmit = async (data: Record<string, any>) => {
     let structuredData: Record<string, any> = {};
 
+    /**
+     * Parse obstetric notation "X+Y" into a plain number (X+Y total).
+     * Accepts a string like "2+1" → 3, a plain number, or falls back to 0.
+     * The display stays as entered; only the value sent to the backend is numeric.
+     */
+    const parseObstetric = (val: any): number => {
+      if (val === undefined || val === null || val === '') return 0;
+      const str = String(val).trim();
+      if (str.includes('+')) {
+        const parts = str.split('+').map(Number);
+        if (parts.every(n => !isNaN(n))) return parts.reduce((a, b) => a + b, 0);
+      }
+      const n = Number(str);
+      return isNaN(n) ? 0 : n;
+    };
+
 
     // Structure data based on the form type (tabId)
     switch (tabId) {
@@ -166,7 +182,8 @@ const Screening = () => {
             phone: data.emergencyContactPhone,
             relationship: data.emergencyContactRelationship
           },
-          insurance: data.insurance,
+          // If user selected "Other" use their typed value, otherwise use the selection
+          insurance: data.insurance === 'Other' ? (data.insurance_other || 'Other') : (data.insurance || ''),
           occupation: data.occupation,
           bloodgroup: data.bloodgroup,
           rh: data.rh,
@@ -281,8 +298,8 @@ const Screening = () => {
           anemia: data.anemia,
           diabetesMelitus: data.diabetesMelitus,
           chronicHypertension: data.chronicHypertension,
-          gravida: data.gravida,
-          parity: data.parity,
+          gravida: parseObstetric(data.gravida),
+          parity: parseObstetric(data.parity),
           miscarriage: data.miscarriage,
           csection: data.csection,
           preeclampsiaHistory: data.preeclampsiaHistory,
@@ -459,8 +476,8 @@ const Screening = () => {
             gestationalDiabetesHistory: latestHistory?.gestationalDiabetesHistory || "No",
 
             // Obstetric Stats
-            parity: latestHistory?.parity || 0,
-            gravida: latestHistory?.gravida || 0,
+            parity: parseObstetric(latestHistory?.parity) || 0,
+            gravida: parseObstetric(latestHistory?.gravida) || 0,
             interval: latestHistory?.interval,
             miscarriage: latestHistory?.miscarriage || "No",
             miscarriageNum: latestHistory?.miscarriageNum || 0,

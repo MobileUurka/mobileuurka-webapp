@@ -53,7 +53,36 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       },
       { name: 'email', label: 'Email Address', type: 'email' },
       { name: 'address', label: 'Address', type: 'text' },
-      { name: 'insurance', label: 'Insurance Provider', type: 'text' },
+      {
+        name: 'insurance',
+        label: 'Insurance Provider',
+        type: 'select',
+        options: [
+          'APA Insurance',
+          'Britam',
+          'CIC Insurance',
+          'Jubilee Insurance',
+          'Old Mutual',
+          'GA Insurance',
+          'Madison Insurance',
+          'Heritage Insurance',
+          'Kenya Orient Insurance',
+          'Directline Assurance',
+          'Occidental Insurance',
+          'AAR Insurance',
+          'Sanlam',
+          'Liberty Life',
+          'ICEA LION',
+          'Other'
+        ]
+      },
+      {
+        name: 'insurance_other',
+        label: 'Specify Insurance Provider',
+        type: 'text',
+        placeholder: 'Enter insurance provider name',
+        dependsOn: { field: 'insurance', value: 'Other' }
+      },
       { name: 'occupation', label: 'Occupation', type: 'text' },
 
       // Emergency Contact (nested JSON flattened)
@@ -158,8 +187,8 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'anemia', label: 'Anemia', type: 'select', required: true, options: ['yes', 'no'] },
       { name: 'diabetesMelitus', label: 'Diabetes Mellitus', type: 'select', required: true, options: ['yes', 'no'] },
       { name: 'chronicHypertension', label: 'Chronic Hypertension', type: 'select', options: ['yes', 'no'] },
-      { name: 'gravida', label: 'Gravida', type: 'number', required: true },
-      { name: 'parity', label: 'Parity', type: 'number', required: true },
+      { name: 'gravida', label: 'Gravida', type: 'text', required: true, placeholder: 'e.g. 2+0', pattern: /^\d+\+\d+$/, patternMessage: 'Format must be X+Y (e.g. 2+0)' },
+      { name: 'parity', label: 'Parity', type: 'text', required: true, placeholder: 'e.g. 1+0', pattern: /^\d+\+\d+$/, patternMessage: 'Format must be X+Y (e.g. 1+0)' },
       { name: 'miscarriage', label: 'Previous Miscarriage', type: 'select', required: true, options: ['yes', 'no'] },
       { name: 'csection', label: 'Previous C-Section', type: 'select', required: true, options: ['yes', 'no'] },
       { name: 'preeclampsiaHistory', label: 'Previous Preeclampsia', type: 'select', required: true, options: ['yes', 'no'] },

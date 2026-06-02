@@ -372,7 +372,7 @@ const AddStaffModal = ({ isOpen, onClose, onSubmit }: AddStaffModalProps) => {
               </div>
               {errors.password && <span className="text-red-500 text-xs mt-1">{errors.password}</span>}
               <p className="text-xs text-gray-500 mt-1">
-                A verification email will be sent to the user's email address.
+                A temporary password. The staff member will be prompted to change it on first login.
               </p>
             </div>
           </div>

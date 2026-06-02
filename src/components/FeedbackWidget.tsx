@@ -1,10 +1,12 @@
-import React, { useState, useRef, useEffect, type KeyboardEvent, type ChangeEvent } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { IoIosSend } from 'react-icons/io';
 import { IoClose } from 'react-icons/io5';
 import { MdFeedback } from 'react-icons/md';
+import { FiUserCheck } from 'react-icons/fi';
 import { feedbackService } from '../services/feedbackService';
 import { authService } from '../services/authServices';
+import MentionTextarea, { type AssignedMember } from './MentionTextarea';
 
 // ─── Page label map ───────────────────────────────────────────────────────────
 // Maps the first path segment to a human-readable page name shown in the widget
@@ -40,23 +42,21 @@ type SubmitState = 'idle' | 'sending' | 'success' | 'error';
 const FeedbackWidget: React.FC<FeedbackWidgetProps> = ({ patientId, patientName }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [message, setMessage] = useState('');
+    const [assignedTo, setAssignedTo] = useState<AssignedMember[]>([]);
     const [submitState, setSubmitState] = useState<SubmitState>('idle');
     const [errorMsg, setErrorMsg] = useState('');
 
     const location = useLocation();
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const panelRef = useRef<HTMLDivElement>(null);
 
     const page = getPageLabel(location.pathname);
     const pageUrl = location.pathname;
 
-    // Auto-focus textarea when panel opens
+    // Reset state when panel closes
     useEffect(() => {
-        if (isOpen) {
-            setTimeout(() => textareaRef.current?.focus(), 80);
-        } else {
-            // Reset state when closed
+        if (!isOpen) {
             setMessage('');
+            setAssignedTo([]);
             setSubmitState('idle');
             setErrorMsg('');
         }
@@ -71,19 +71,6 @@ const FeedbackWidget: React.FC<FeedbackWidgetProps> = ({ patientId, patientName 
         return () => window.removeEventListener('keydown', onKey);
     }, []);
 
-    const adjustHeight = (e: ChangeEvent<HTMLTextAreaElement>) => {
-        setMessage(e.target.value);
-        const el = e.target;
-        el.style.height = 'auto';
-        el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
-    };
-
-    const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSubmit();
-        }
-    };
 
     const handleSubmit = async () => {
         if (!message.trim() || submitState === 'sending') return;
@@ -98,9 +85,11 @@ const FeedbackWidget: React.FC<FeedbackWidgetProps> = ({ patientId, patientName 
                 patientId,
                 patientName,
                 message: message.trim(),
+                assignedTo: assignedTo.length > 0 ? assignedTo : undefined,
             });
             setSubmitState('success');
             setMessage('');
+            setAssignedTo([]);
             // Auto-close after 2.5 s
             setTimeout(() => setIsOpen(false), 2500);
         } catch (err: any) {
@@ -197,21 +186,36 @@ const FeedbackWidget: React.FC<FeedbackWidgetProps> = ({ patientId, patientName 
                             </div>
                         ) : (
                             <>
-                                <textarea
-                                    ref={textareaRef}
+                                <MentionTextarea
                                     value={message}
-                                    onChange={adjustHeight}
-                                    onKeyDown={handleKeyDown}
-                                    placeholder={`What did you notice on the ${page} page?`}
+                                    onChange={setMessage}
+                                    assignedTo={assignedTo}
+                                    onAssignedChange={setAssignedTo}
+                                    placeholder={`What did you notice on the ${page} page? Type @ to assign someone.`}
                                     rows={4}
-                                    disabled={submitState === 'sending'}
-                                    className="
-                                        w-full mt-2 bg-white rounded-xl border border-gray-200
-                                        px-4 py-3 text-sm text-gray-800 placeholder-gray-400
-                                        resize-none outline-none focus:ring-2 focus:ring-[#008540]/20 focus:border-[#008540]
-                                        transition-all disabled:opacity-60
-                                    "
                                 />
+
+                                {/* Assigned chips */}
+                                {assignedTo.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                        {assignedTo.map(m => (
+                                            <span
+                                                key={m.id}
+                                                className="inline-flex items-center gap-1 text-[11px] bg-[#984815]/10 text-[#984815] rounded-full px-2.5 py-0.5 font-medium"
+                                            >
+                                                <FiUserCheck size={10} />
+                                                {m.name.split(' ')[0]}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setAssignedTo(prev => prev.filter(x => x.id !== m.id))}
+                                                    className="ml-0.5 hover:text-red-500 transition"
+                                                >
+                                                    ×
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
 
                                 {submitState === 'error' && (
                                     <p className="text-xs text-red-500 mt-2">{errorMsg}</p>

@@ -165,20 +165,35 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
     loadHospitals();
   }, [fields]);
 
-  // Get current user data for editor fields
+  // Get current user data for editor fields.
+  // After a hard page refresh, initializeEncryption() runs asynchronously in App.tsx
+  // before the encryption key is available. We retry until we get a user object.
   useEffect(() => {
-    const currentUser = authService.getUser();
-    if (currentUser) {
-      // Pre-populate editor fields with current user's name
-      const editorFields = fields.filter(field => field.name === 'editor');
-      if (editorFields.length > 0) {
-        setFormData(prev => ({
-          ...prev,
-          user_id: currentUser.id,
-          editor: currentUser.name || currentUser.firstName + ' ' + currentUser.lastName || currentUser.email
-        }));
+    let attempts = 0;
+    const maxAttempts = 20; // 2 seconds total
+
+    const tryPopulateEditor = () => {
+      const currentUser = authService.getUser();
+      if (currentUser) {
+        const editorFields = fields.filter(field => field.name === 'editor');
+        if (editorFields.length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            user_id: currentUser.id,
+            editor: currentUser.firstName && currentUser.lastName
+              ? `${currentUser.firstName} ${currentUser.lastName}`
+              : currentUser.name || currentUser.email || ''
+          }));
+        }
+        return; // done
       }
-    }
+      attempts++;
+      if (attempts < maxAttempts) {
+        setTimeout(tryPopulateEditor, 100);
+      }
+    };
+
+    tryPopulateEditor();
   }, [fields]);
 
   useEffect(() => {

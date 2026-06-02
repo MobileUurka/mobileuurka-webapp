@@ -1,30 +1,25 @@
 /**
- * Feedback page — admin view of all submitted feedback from the public schema.
+ * Feedback page — two modes:
  *
- * Access restriction mirrors the Sidebar:
- *   - Email in VITE_ALLOWED_EMAILS env var, OR
- *   - Email ends with @mobileuurka.com
+ * ADMIN MODE (VITE_ALLOWED_EMAILS or @mobileuurka.com):
+ *   - Sees ALL feedback, can update status, add internal notes, reply, assign staff, delete.
  *
- * Unauthorised users are redirected to "/" immediately.
- *
- * Features:
- *   - All feedback with status filter tabs (all / pending / reviewed / resolved)
- *   - Inline status update (pending → reviewed → resolved)
- *   - Delete entry
- *   - Performance metrics panel — shows timings recorded by usePerformanceTimer
- *     across the session (create patient, submit lab, etc.)
+ * USER MODE (everyone else):
+ *   - Sees only their own submissions.
+ *   - Read-only: shows status badge + admin reply if one exists.
+ *   - No internal notes, no delete, no task assignment.
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authServices';
 import { feedbackService, type FeedbackEntry } from '../services/feedbackService';
 import { getAllMetrics, clearMetrics, type PerfMetric } from '../hooks/usePerformanceTimer';
 import {
     FiTrash2, FiRefreshCw, FiClock, FiBarChart2,
-    FiCheckCircle, FiAlertCircle, FiLoader, FiX
+    FiCheckCircle, FiAlertCircle, FiLoader, FiX, FiUserCheck, FiMessageSquare
 } from 'react-icons/fi';
 import { MdOutlineFeedback } from 'react-icons/md';
+import MentionTextarea, { type AssignedMember } from '../components/MentionTextarea';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -191,20 +186,41 @@ function FeedbackDetail({
 }: {
     entry: FeedbackEntry;
     onClose: () => void;
-    onStatusChange: (id: string, status: string) => void;
+    onStatusChange: (id: string, status: string, updatedEntry: Partial<FeedbackEntry>) => void;
     onDelete: (id: string) => void;
 }) {
     const [notes, setNotes] = useState(entry.adminNotes ?? '');
+    const [reply, setReply] = useState(entry.adminReply ?? '');
+    const [assignedTo, setAssignedTo] = useState<AssignedMember[]>(
+        Array.isArray(entry.assignedTo) ? entry.assignedTo : []
+    );
     const [saving, setSaving] = useState(false);
 
+    // Reset local state when a different entry is opened
+    useEffect(() => {
+        setNotes(entry.adminNotes ?? '');
+        setReply(entry.adminReply ?? '');
+        setAssignedTo(Array.isArray(entry.assignedTo) ? entry.assignedTo : []);
+    }, [entry.id]);
+
     const nextStatus = entry.status === 'pending' ? 'reviewed' : entry.status === 'reviewed' ? 'resolved' : null;
+
+    const handleSaveNotes = async () => {
+        setSaving(true);
+        try {
+            await feedbackService.updateStatus(entry.id, entry.status, notes || undefined, assignedTo, reply || undefined);
+            onStatusChange(entry.id, entry.status, { adminNotes: notes, adminReply: reply, assignedTo });
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const handleAdvance = async () => {
         if (!nextStatus) return;
         setSaving(true);
         try {
-            await feedbackService.updateStatus(entry.id, nextStatus, notes || undefined);
-            onStatusChange(entry.id, nextStatus);
+            await feedbackService.updateStatus(entry.id, nextStatus, notes || undefined, assignedTo, reply || undefined);
+            onStatusChange(entry.id, nextStatus, { adminNotes: notes, adminReply: reply, assignedTo });
         } finally {
             setSaving(false);
         }
@@ -254,28 +270,84 @@ function FeedbackDetail({
                     <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{entry.message}</p>
                 </div>
 
-                {/* Admin notes */}
+                {/* Reply to submitter */}
                 <div>
-                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Admin notes</p>
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+                        Reply to submitter
+                    </p>
                     <textarea
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#984815] resize-none"
                         rows={3}
-                        placeholder="Add internal notes..."
+                        placeholder={`Write a reply to ${entry.userName ?? entry.userEmail}...`}
+                        value={reply}
+                        onChange={e => setReply(e.target.value)}
+                    />
+                    {entry.adminReply && (
+                        <p className="text-[10px] text-gray-400 mt-1">
+                            Last saved: "{entry.adminReply.slice(0, 60)}{entry.adminReply.length > 60 ? '…' : ''}"
+                        </p>
+                    )}
+                </div>
+
+                {/* Admin notes with @mention */}
+                <div>
+                    <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                            Internal notes &amp; task assignment
+                        </p>
+                        <span className="text-[10px] text-gray-400">type @ to assign staff</span>
+                    </div>
+                    <MentionTextarea
                         value={notes}
-                        onChange={e => setNotes(e.target.value)}
+                        onChange={setNotes}
+                        assignedTo={assignedTo}
+                        onAssignedChange={setAssignedTo}
+                        placeholder="Internal notes only... type @ to assign a task to someone"
+                        rows={3}
                     />
                 </div>
 
-                {/* Actions */}
-                {nextStatus && (
-                    <button
-                        onClick={handleAdvance}
-                        disabled={saving}
-                        className="w-full flex items-center justify-center gap-2 bg-[#984815] text-white rounded-lg py-2.5 text-sm font-medium hover:bg-[#7a3a10] transition disabled:opacity-60"
-                    >
-                        {saving ? 'Saving...' : `Mark as ${nextStatus}`}
-                    </button>
+                {/* Currently assigned */}
+                {assignedTo.length > 0 && (
+                    <div className="bg-[#984815]/5 border border-[#984815]/15 rounded-lg px-4 py-3">
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-[#984815] mb-2">
+                            <FiUserCheck size={12} />
+                            Assigned to
+                        </div>
+                        <div className="space-y-1.5">
+                            {assignedTo.map(m => (
+                                <div key={m.id} className="flex items-center gap-2 text-xs text-gray-700">
+                                    <div className="w-5 h-5 rounded-full bg-[#984815] text-white text-[9px] flex items-center justify-center font-bold shrink-0">
+                                        {m.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="font-medium">{m.name}</span>
+                                    <span className="text-gray-400">{m.email}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 )}
+
+                {/* Action buttons */}
+                <div className="flex gap-2 pt-1">
+                    <button
+                        onClick={handleSaveNotes}
+                        disabled={saving}
+                        className="flex-1 flex items-center justify-center gap-2 border border-gray-200 text-gray-600 rounded-lg py-2.5 text-sm font-medium hover:bg-gray-50 transition disabled:opacity-60"
+                    >
+                        {saving ? 'Saving...' : 'Save'}
+                    </button>
+
+                    {nextStatus && (
+                        <button
+                            onClick={handleAdvance}
+                            disabled={saving}
+                            className="flex-1 flex items-center justify-center gap-2 bg-[#984815] text-white rounded-lg py-2.5 text-sm font-medium hover:bg-[#7a3a10] transition disabled:opacity-60"
+                        >
+                            {saving ? 'Saving...' : `Mark as ${nextStatus}`}
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -285,9 +357,291 @@ function FeedbackDetail({
 
 type StatusFilter = 'all' | 'pending' | 'reviewed' | 'resolved';
 
-export default function Feedback() {
-    const navigate = useNavigate();
-    const [allowed, setAllowed] = useState<boolean | null>(null); // null = checking
+/** Returns true if the user is an admin (explicitly listed in VITE_ALLOWED_EMAILS or @mobileuurka.com). */
+function isAdminUser(email: string): boolean {
+    const allowedEmails = (import.meta.env.VITE_ALLOWED_EMAILS ?? '')
+        .split(',')
+        .map((e: string) => e.trim().toLowerCase())
+        .filter(Boolean);
+    const e = email.toLowerCase();
+    // Only grant admin access to explicitly listed emails.
+    // @mobileuurka.com domain alone is not sufficient — the account must also
+    // exist as a mobileuurka_users record on the backend to call the admin API.
+    // Add specific mobileuurka.com addresses to VITE_ALLOWED_EMAILS to grant access.
+    return allowedEmails.includes(e);
+}
+
+// ─── User (non-admin) view ───────────────────────────────────────────────────
+
+function UserFeedbackDetail({
+    entry,
+    onClose,
+    onStatusChange,
+}: {
+    entry: FeedbackEntry;
+    onClose: () => void;
+    onStatusChange?: (id: string, newStatus: string) => void;
+}) {
+    const currentUserId = authService.getUser()?.id ?? '';
+    const isAssignedToMe = Array.isArray(entry.assignedTo) &&
+        entry.assignedTo.some(a => a.id === currentUserId) &&
+        entry.userId !== currentUserId;
+
+    const [saving, setSaving] = useState(false);
+
+    const nextStatus = entry.status === 'pending'
+        ? 'reviewed'
+        : entry.status === 'reviewed'
+        ? 'resolved'
+        : null;
+
+    const handleAdvance = async () => {
+        if (!nextStatus) return;
+        setSaving(true);
+        try {
+            await feedbackService.updateStatus(entry.id, nextStatus);
+            onStatusChange?.(entry.id, nextStatus);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="flex flex-col h-full">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+                <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition text-sm flex items-center gap-1">
+                    ← Back
+                </button>
+                <StatusBadge status={entry.status} />
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+                {/* "Assigned to you" banner */}
+                {isAssignedToMe && (
+                    <div className="flex items-center gap-2 bg-[#984815]/8 border border-[#984815]/20 rounded-lg px-4 py-2.5">
+                        <FiUserCheck size={13} className="text-[#984815] shrink-0" />
+                        <p className="text-xs text-[#984815] font-medium">
+                            This feedback was assigned to you by {entry.userName ?? entry.userEmail}
+                        </p>
+                    </div>
+                )}
+
+                {/* Meta */}
+                <div className="text-xs text-gray-400 flex items-center gap-2 flex-wrap">
+                    <span>{entry.page}</span>
+                    {entry.pageUrl && <><span>·</span><span className="truncate max-w-[200px]">{entry.pageUrl}</span></>}
+                    {isAssignedToMe && (
+                        <><span>·</span><span className="font-medium text-gray-500">from {entry.userName ?? entry.userEmail}</span></>
+                    )}
+                    <span className="ml-auto">{timeAgo(entry.createdAt)}</span>
+                </div>
+
+                {/* Original message */}
+                <div>
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+                        {isAssignedToMe ? 'Feedback message' : 'Your message'}
+                    </p>
+                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-[#f5f5f5] rounded-lg px-4 py-3">{entry.message}</p>
+                </div>
+
+                {/* Admin reply */}
+                {entry.adminReply ? (
+                    <div>
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-[#984815] uppercase tracking-wide mb-2">
+                            <FiMessageSquare size={12} />
+                            Reply from support
+                        </div>
+                        <div className="bg-[#984815]/5 border border-[#984815]/15 rounded-lg px-4 py-3 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                            {entry.adminReply}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="text-xs text-gray-400 bg-gray-50 rounded-lg px-4 py-3 text-center">
+                        {entry.status === 'resolved'
+                            ? 'This issue has been resolved.'
+                            : "No reply yet — we'll get back to you soon."}
+                    </div>
+                )}
+
+                {/* Internal notes visible to assigned staff */}
+                {isAssignedToMe && entry.adminNotes && (
+                    <div>
+                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Internal notes</p>
+                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-amber-50 border border-amber-100 rounded-lg px-4 py-3">
+                            {entry.adminNotes}
+                        </p>
+                    </div>
+                )}
+
+                {/* Status action — only for assigned users on non-resolved items */}
+                {isAssignedToMe && nextStatus && (
+                    <button
+                        onClick={handleAdvance}
+                        disabled={saving}
+                        className="w-full flex items-center justify-center gap-2 bg-[#984815] text-white rounded-lg py-2.5 text-sm font-medium hover:bg-[#7a3a10] transition disabled:opacity-60"
+                    >
+                        {saving ? 'Saving…' : `Mark as ${nextStatus}`}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function UserFeedbackView() {
+    const [entries, setEntries] = useState<FeedbackEntry[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [selected, setSelected] = useState<FeedbackEntry | null>(null);
+    const [error, setError] = useState('');
+    const [activeTab, setActiveTab] = useState<'mine' | 'assigned'>('mine');
+
+    const currentUserId = authService.getUser()?.id ?? '';
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        setError('');
+        try {
+            const res = await feedbackService.getMine();
+            if (res.success) setEntries(res.data.feedback);
+        } catch {
+            setError('Failed to load your feedback. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    const handleStatusChange = (id: string, newStatus: string) => {
+        setEntries(prev => prev.map(e =>
+            e.id === id ? { ...e, status: newStatus as FeedbackEntry['status'] } : e
+        ));
+        setSelected(prev =>
+            prev?.id === id ? { ...prev, status: newStatus as FeedbackEntry['status'] } : prev
+        );
+    };
+
+    // Split into submitted-by-me vs assigned-to-me (could overlap, show in both)
+    const mySubmissions = entries.filter(e => e.userId === currentUserId);
+    const assignedToMe  = entries.filter(e =>
+        Array.isArray(e.assignedTo) && e.assignedTo.some(a => a.id === currentUserId)
+    );
+    const visibleEntries = activeTab === 'mine' ? mySubmissions : assignedToMe;
+
+    return (
+        <div className="w-full h-full flex flex-col pt-4 px-4 sm:pt-6 sm:px-6 bg-white overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-1 shrink-0">
+                <div className="text-lg sm:text-[1.3em] font-medium flex items-center gap-3">
+                    <MdOutlineFeedback className="text-[#984815]" />
+                    My Feedback
+                </div>
+                <button
+                    onClick={load}
+                    disabled={loading}
+                    className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 transition disabled:opacity-50"
+                >
+                    <FiRefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+                    Refresh
+                </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 mb-4 border-b border-gray-100 shrink-0">
+                {([
+                    { key: 'mine',     label: `Submitted (${mySubmissions.length})` },
+                    { key: 'assigned', label: `Assigned to me (${assignedToMe.length})` },
+                ] as const).map(t => (
+                    <button
+                        key={t.key}
+                        onClick={() => { setActiveTab(t.key); setSelected(null); }}
+                        className={`px-3 py-2 text-xs font-medium rounded-t-lg transition border-b-2 -mb-px ${
+                            activeTab === t.key
+                                ? 'border-[#984815] text-[#984815]'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                        {t.label}
+                        {t.key === 'assigned' && assignedToMe.length > 0 && (
+                            <span className="ml-1.5 bg-[#984815] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                                {assignedToMe.length}
+                            </span>
+                        )}
+                    </button>
+                ))}
+            </div>
+
+            {error && (
+                <div className="mb-4 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg px-4 py-3 shrink-0">
+                    {error}
+                </div>
+            )}
+
+            <div className="flex-1 overflow-hidden flex gap-4 min-h-0">
+                {/* List */}
+                <div className={`flex flex-col overflow-y-auto transition-all ${selected ? 'hidden sm:flex sm:w-[380px] shrink-0' : 'w-full'}`}>
+                    {loading && (
+                        <div className="flex-1 flex items-center justify-center text-gray-400 text-sm py-16">
+                            Loading...
+                        </div>
+                    )}
+                    {!loading && visibleEntries.length === 0 && (
+                        <div className="flex-1 flex flex-col items-center justify-center text-gray-400 py-16 gap-3">
+                            <MdOutlineFeedback size={40} className="opacity-30" />
+                            <p className="text-sm">
+                                {activeTab === 'mine'
+                                    ? "You haven't submitted any feedback yet."
+                                    : "No feedback has been assigned to you yet."}
+                            </p>
+                        </div>
+                    )}
+                    {!loading && visibleEntries.map(entry => (
+                        <div
+                            key={entry.id}
+                            onClick={() => setSelected(entry)}
+                            className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-50 hover:bg-gray-50 transition ${selected?.id === entry.id ? 'bg-[#984815]/5' : ''}`}
+                        >
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <StatusBadge status={entry.status} />
+                                    {/* "assigned to me" tab: show who submitted it */}
+                                    {activeTab === 'assigned' && (
+                                        <span className="inline-flex items-center gap-0.5 text-[10px] text-[#984815] font-medium">
+                                            <FiUserCheck size={9} /> from {entry.userName ?? entry.userEmail}
+                                        </span>
+                                    )}
+                                    {entry.adminReply && (
+                                        <span className="inline-flex items-center gap-0.5 text-[10px] text-[#984815] font-medium">
+                                            <FiMessageSquare size={9} /> Reply received
+                                        </span>
+                                    )}
+                                    <span className="text-[10px] text-gray-400 ml-auto">{timeAgo(entry.createdAt)}</span>
+                                </div>
+                                <p className="text-sm text-gray-700 truncate mt-1">{entry.message}</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">{entry.page}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Detail pane */}
+                {selected && (
+                    <div className="flex-1 border border-gray-100 rounded-xl overflow-hidden flex flex-col min-h-0">
+                        <UserFeedbackDetail
+                            entry={selected}
+                            onClose={() => setSelected(null)}
+                            onStatusChange={handleStatusChange}
+                        />
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ─── Admin view ──────────────────────────────────────────────────────────────
+
+function AdminFeedbackView() {
     const [entries, setEntries] = useState<FeedbackEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<StatusFilter>('all');
@@ -295,24 +649,6 @@ export default function Feedback() {
     const [showPerf, setShowPerf] = useState(false);
     const [error, setError] = useState('');
 
-    // ── Access check (same logic as Sidebar) ──────────────────────────────────
-    useEffect(() => {
-        const user = authService.getUser();
-        if (!user?.email) { navigate('/'); return; }
-
-        const allowedEmails = (import.meta.env.VITE_ALLOWED_EMAILS ?? '')
-            .split(',')
-            .map((e: string) => e.trim().toLowerCase())
-            .filter(Boolean);
-
-        const email = user.email.toLowerCase();
-        const ok = allowedEmails.includes(email) || email.endsWith('@mobileuurka.com');
-
-        if (!ok) { navigate('/'); return; }
-        setAllowed(true);
-    }, [navigate]);
-
-    // ── Fetch all feedback ────────────────────────────────────────────────────
     const load = useCallback(async () => {
         setLoading(true);
         setError('');
@@ -326,26 +662,26 @@ export default function Feedback() {
         }
     }, []);
 
-    useEffect(() => {
-        if (allowed) load();
-    }, [allowed, load]);
+    useEffect(() => { load(); }, [load]);
 
-    // ── Handlers ──────────────────────────────────────────────────────────────
-    const handleStatusChange = (id: string, status: string) => {
-        setEntries(prev => prev.map(e => e.id === id ? { ...e, status: status as FeedbackEntry['status'] } : e));
-        setSelected(prev => prev?.id === id ? { ...prev, status: status as FeedbackEntry['status'] } : prev);
+    const handleStatusChange = (id: string, status: string, updatedEntry?: Partial<FeedbackEntry>) => {
+        setEntries(prev => prev.map(e =>
+            e.id === id ? { ...e, status: status as FeedbackEntry['status'], ...updatedEntry } : e
+        ));
+        setSelected(prev =>
+            prev?.id === id ? { ...prev, status: status as FeedbackEntry['status'], ...updatedEntry } : prev
+        );
     };
 
     const handleDelete = async (id: string) => {
         try {
             await feedbackService.deleteEntry(id);
             setEntries(prev => prev.filter(e => e.id !== id));
-        } catch { /* silent — entry stays in list */ }
+            if (selected?.id === id) setSelected(null);
+        } catch { /* silent */ }
     };
 
-    // ── Derived data ──────────────────────────────────────────────────────────
     const filtered = entries.filter(e => filter === 'all' || e.status === filter);
-
     const counts = {
         all: entries.length,
         pending: entries.filter(e => e.status === 'pending').length,
@@ -359,9 +695,6 @@ export default function Feedback() {
         { key: 'reviewed', label: `Reviewed (${counts.reviewed})` },
         { key: 'resolved', label: `Resolved (${counts.resolved})` },
     ];
-
-    // ── Render ────────────────────────────────────────────────────────────────
-    if (allowed === null) return null; // still checking access
 
     return (
         <div className="w-full h-full flex flex-col pt-4 px-4 sm:pt-6 sm:px-6 bg-white overflow-hidden">
@@ -408,14 +741,12 @@ export default function Feedback() {
                 ))}
             </div>
 
-            {/* Error */}
             {error && (
                 <div className="mb-4 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg px-4 py-3 shrink-0">
                     {error}
                 </div>
             )}
 
-            {/* Body */}
             <div className="flex-1 overflow-hidden flex gap-4 min-h-0">
                 {/* List */}
                 <div className={`flex flex-col overflow-y-auto transition-all ${selected ? 'hidden sm:flex sm:w-[500px] shrink-0' : 'w-full'}`}>
@@ -436,11 +767,9 @@ export default function Feedback() {
                             onClick={() => setSelected(entry)}
                             className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-50 hover:bg-gray-50 transition group ${selected?.id === entry.id ? 'bg-[#984815]/5' : ''}`}
                         >
-                            {/* Avatar */}
                             <div className="w-8 h-8 rounded-full bg-[#984815]/10 flex items-center justify-center text-[#984815] text-xs font-semibold shrink-0 mt-0.5">
                                 {(entry.userName ?? entry.userEmail).charAt(0).toUpperCase()}
                             </div>
-
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm font-medium text-gray-800 truncate">
@@ -453,9 +782,17 @@ export default function Feedback() {
                                     <span className="text-[10px] text-gray-400">{entry.page}</span>
                                     <span className="text-[10px] text-gray-300">·</span>
                                     <span className="text-[10px] text-gray-400">{timeAgo(entry.createdAt)}</span>
+                                    {Array.isArray(entry.assignedTo) && entry.assignedTo.length > 0 && (
+                                        <>
+                                            <span className="text-[10px] text-gray-300">·</span>
+                                            <span className="inline-flex items-center gap-0.5 text-[10px] text-[#984815]">
+                                                <FiUserCheck size={9} />
+                                                {entry.assignedTo.map(a => a.name.split(' ')[0]).join(', ')}
+                                            </span>
+                                        </>
+                                    )}
                                 </div>
                             </div>
-
                             <button
                                 onClick={e => { e.stopPropagation(); handleDelete(entry.id); }}
                                 className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition shrink-0 mt-1"
@@ -479,8 +816,27 @@ export default function Feedback() {
                 )}
             </div>
 
-            {/* Performance modal */}
             {showPerf && <PerformancePanel onClose={() => setShowPerf(false)} />}
         </div>
     );
+}
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+
+export default function Feedback() {
+    const [isAdmin, setIsAdmin] = useState<boolean | null>(null); // null = checking
+
+    useEffect(() => {
+        const user = authService.getUser();
+        if (!user?.email) {
+            setIsAdmin(false);
+            return;
+        }
+        setIsAdmin(isAdminUser(user.email));
+    }, []);
+
+    // Still checking
+    if (isAdmin === null) return null;
+
+    return isAdmin ? <AdminFeedbackView /> : <UserFeedbackView />;
 }

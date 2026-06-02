@@ -25,13 +25,27 @@ const Sidebar = ({ activeItem, setActiveItem, setSideBarActive, sideBarActive }:
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 900);
     const [user, setUser] = useState<any>(null);
-    const [feedback, setFeedback] = useState(false)
     const [initial, setInitial] = useState()
-    // We use useCallback so this function doesn't change on every render
-    const checkAuth = useCallback(async () => {
-        // 1. Initialize encryption keys first      
-        const data = await authService.getUser();
-        setUser(data)
+    const checkAuth = useCallback(() => {
+        // Retry reading the user until the encryption key is restored after a page refresh.
+        // App.tsx calls initializeEncryption() asynchronously, so on first mount the key
+        // may not be available yet. We poll up to 2 seconds before giving up.
+        let attempts = 0;
+        const maxAttempts = 20;
+
+        const tryGetUser = () => {
+            const data = authService.getUser();
+            if (data) {
+                setUser(data);
+                return;
+            }
+            attempts++;
+            if (attempts < maxAttempts) {
+                setTimeout(tryGetUser, 100);
+            }
+        };
+
+        tryGetUser();
     }, []);
 
 
@@ -39,23 +53,15 @@ const Sidebar = ({ activeItem, setActiveItem, setSideBarActive, sideBarActive }:
     useEffect(() => {
         if (!user?.email) return;
 
-        // Get allowed emails from env
+        // Get allowed emails from env — kept in case needed for future gating
         const allowedEmails = import.meta.env.VITE_ALLOWED_EMAILS
             ?.split(",")
             .map((email: string) => email.trim().toLowerCase());
 
         const userEmail = user.email.toLowerCase();
-
-        const isAllowedEmail = allowedEmails.includes(userEmail);
-        const isCompanyEmail = userEmail.endsWith("@mobileuurka.com");
-
-        if (isAllowedEmail || isCompanyEmail) {
-            setFeedback(true)
-            // do something (e.g., set state, allow route)
-        } else {
-            setFeedback(false)
-            // handle restriction
-        }
+        const _isAdmin = allowedEmails?.includes(userEmail) || userEmail.endsWith("@mobileuurka.com");
+        // Admin detection available here if needed for future nav changes
+        void _isAdmin;
     }, [user]);
 
 
@@ -89,7 +95,7 @@ const ClientItems = [
 
 const activityItems = [
     // { name: "Settings", icon: <IoSettingsOutline /> },
-    ...(feedback ? [{ name: "Feedback", icon: <MdOutlineFeedback /> }] : []),
+    { name: "Feedback", icon: <MdOutlineFeedback /> },
     { name: "Notifications", icon: <FiBell />, showBadge: true },
     { name: "Logout", icon: <IoLogOutOutline /> }
 ];

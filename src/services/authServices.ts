@@ -89,15 +89,24 @@ export interface ChangePasswordData {
 export interface AuthResponse {
   success: boolean;
   message: string;
+  mustChangePassword?: boolean;
   data?: {
     user: any;
     userType: 'mobileuurka' | 'organization';
+    actualUserType?: string;
     accessToken: string;
     refreshToken: string;
     sessionId: string;
-    encryptionKey: string; // NEW
+    encryptionKey: string;
     organization?: any;
     organizations?: any[];
+    mustChangePassword?: boolean;
+    // staff first-login fields
+    email?: string;
+    organizationId?: string;
+    organizationSlug?: string;
+    firstName?: string;
+    setPasswordToken?: string;
   };
   code?: string;
   email?: string;
@@ -311,9 +320,60 @@ export const authService = {
     return result;
   },
 
+  // ── Staff first-login flow ──────────────────────────────────────────────────
+
+  /** Verify the OTP sent during first-login (mustChangePassword). */
+  async verifyStaffOTP(data: { email: string; otp: string }): Promise<AuthResponse> {
+    const response = await fetch(`${API_URL}/auth/staff/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!response.ok) throw result;
+    return result;
+  },
+
+  /** Set a new password after OTP verification and log the staff member in. */
+  async staffSetPassword(data: {
+    email: string;
+    newPassword: string;
+    setPasswordToken: string;
+  }): Promise<AuthResponse> {
+    const response = await fetch(`${API_URL}/auth/staff/set-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!response.ok) throw result;
+
+    // Store auth data so the user lands directly on the dashboard
+    if (result.data) {
+      encryption.setKey(result.data.encryptionKey);
+      this.setTokens(result.data.accessToken, result.data.refreshToken);
+      this.setUser(result.data.user);
+      this.setUserType(result.data.userType);
+      if (result.data.sessionId) this.setSessionId(result.data.sessionId);
+      if (result.data.organization) this.setOrganization(result.data.organization);
+    }
+    return result;
+  },
+
+  /** Resend the first-login OTP. */
+  async resendStaffOTP(data: { email: string }): Promise<AuthResponse> {
+    const response = await fetch(`${API_URL}/auth/staff/resend-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!response.ok) throw result;
+    return result;
+  },
+
   // Change password
-  async changePassword(data: ChangePasswordData): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/change-password`, {
+  async changePassword(data: ChangePasswordData): Promise<AuthResponse> {    const response = await fetch(`${API_URL}/auth/change-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -596,7 +656,16 @@ export const authService = {
 
       // Fetch the obfuscation key first — we need it to decrypt the access token
       // or to store a new one after a silent refresh.
-      const keyResponse = await fetch(`${API_URL}/auth/encryption-key`);
+      let keyResponse: Response;
+      try {
+        keyResponse = await fetch(`${API_URL}/auth/encryption-key`);
+      } catch (networkError) {
+        console.error('Backend unreachable during initialization:', networkError);
+        // Backend is down — preserve any existing session state rather than wiping it.
+        // The app will show API errors when components try to fetch data.
+        return false;
+      }
+
       const keyResult = await keyResponse.json();
 
       if (!keyResult.success || !keyResult.data?.key) {
