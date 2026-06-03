@@ -95,8 +95,9 @@ const Staff = () => {
     }
   };
 
-  const canAddStaff = ['doctor', 'admin'].includes(currentUser?.role?.toLowerCase());
-
+  const canAddStaff = ['doctor', 'admin'].includes(
+    currentUser?.role?.toLowerCase() ?? ''
+  );
   return (
     <div className="pt-4 px-4 sm:pt-6 sm:px-6 w-full h-full flex flex-col">
       <div className="w-full flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
