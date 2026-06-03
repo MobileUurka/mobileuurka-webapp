@@ -11,7 +11,6 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { authService } from '../services/authServices';
 import { feedbackService, type FeedbackEntry } from '../services/feedbackService';
 import { getAllMetrics, clearMetrics, type PerfMetric } from '../hooks/usePerformanceTimer';
 import {
@@ -20,6 +19,7 @@ import {
 } from 'react-icons/fi';
 import { MdOutlineFeedback } from 'react-icons/md';
 import MentionTextarea, { type AssignedMember } from '../components/MentionTextarea';
+import { useAuth } from '../contexts/AuthContext';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -382,7 +382,8 @@ function UserFeedbackDetail({
     onClose: () => void;
     onStatusChange?: (id: string, newStatus: string) => void;
 }) {
-    const currentUserId = authService.getUser()?.id ?? '';
+    const { user } = useAuth();
+    const currentUserId = user?.id ?? '';
     const isAssignedToMe = Array.isArray(entry.assignedTo) &&
         entry.assignedTo.some(a => a.id === currentUserId) &&
         entry.userId !== currentUserId;
@@ -495,7 +496,8 @@ function UserFeedbackView() {
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState<'mine' | 'assigned'>('mine');
 
-    const currentUserId = authService.getUser()?.id ?? '';
+    const { user } = useAuth();
+    const currentUserId = user?.id ?? '';
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -824,19 +826,11 @@ function AdminFeedbackView() {
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
 export default function Feedback() {
-    const [isAdmin, setIsAdmin] = useState<boolean | null>(null); // null = checking
+    const { user, isReady } = useAuth();
 
-    useEffect(() => {
-        const user = authService.getUser();
-        if (!user?.email) {
-            setIsAdmin(false);
-            return;
-        }
-        setIsAdmin(isAdminUser(user.email));
-    }, []);
+    // Wait for auth context to be ready before deciding which view to show
+    if (!isReady) return null;
 
-    // Still checking
-    if (isAdmin === null) return null;
-
-    return isAdmin ? <AdminFeedbackView /> : <UserFeedbackView />;
+    const admin = user?.email ? isAdminUser(user.email) : false;
+    return admin ? <AdminFeedbackView /> : <UserFeedbackView />;
 }

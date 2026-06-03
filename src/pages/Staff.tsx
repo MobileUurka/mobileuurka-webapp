@@ -1,12 +1,12 @@
 import { useEffect, useState, useMemo } from 'react';
 import { userService, type User } from '../services/userServices';
-import { authService } from '../services/authServices';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchStaff, invalidateStaff } from '../store/staffSlice';
 import DataTable from '../components/DataTable';
 import SearchContainer from '../components/SearchContainer';
 import AddStaffModal, { type StaffFormData } from '../components/AddStaffModal';
 import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const STAFF_COLUMNS = [
   {
@@ -53,15 +53,10 @@ const Staff = () => {
   const dispatch = useAppDispatch();
   const users = useAppSelector(s => s.staff.data);
   const status = useAppSelector(s => s.staff.status);
+  const { user: currentUser } = useAuth();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
-
-  useEffect(() => {
-    const user = authService.getUser();
-    setCurrentUser(user);
-  }, []);
 
   useEffect(() => {
     dispatch(fetchStaff());

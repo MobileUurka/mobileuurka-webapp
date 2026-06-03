@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { MdOutlineKeyboardArrowDown } from 'react-icons/md';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { authService } from '../services/authServices';
 import { hospitalService } from '../services/hospitalServices';
 import { patientService } from '../services/patientServices';
 import HospitalSelector from './HospitalSelector';
 import PatientSelector from './PatientSelector';
 import { usePerformanceTimer } from '../hooks/usePerformanceTimer';
-// import { type PatientData } from '../types/patient';
+import { useAuth } from '../contexts/AuthContext';
 
 // Simple loading spinner component
 const LoadingSpinner = ({ size = 20 }: { size?: number }) => (
@@ -62,12 +61,31 @@ const calculateGestationWeek = (lastVisitDate: string, lastGestationWeek: number
   }
 };
 
+// ── Chip state: unset (= uncertain by default) → yes → no → unset
+// Stored as: '' | 'yes' | 'no'   ('' is treated as 'unknown' on submit)
+type ChipValue = '' | 'yes' | 'no';
+
+const CHIP_CYCLE: ChipValue[] = ['', 'yes', 'no'];
+
+interface ChipOption {
+  /** The field name in formData this chip controls */
+  field: string;
+  /** Display label on the chip */
+  label: string;
+  /** If yes, show a number input beneath with this field name */
+  countField?: string;
+  /** Label for the count input */
+  countLabel?: string;
+}
+
 interface FormField {
   name: string;
   label: string;
-  type: 'text' | 'number' | 'date' | 'select' | 'textarea' | 'email';
+  type: 'text' | 'number' | 'date' | 'select' | 'textarea' | 'email' | 'chip-group';
   required?: boolean;
   options?: string[];
+  /** chip-group: list of chips in this group */
+  chips?: ChipOption[];
   placeholder?: string;
   readonly?: boolean;
 
@@ -100,6 +118,7 @@ interface ScreeningFormProps {
 
 const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep = false }: ScreeningFormProps) => {
   const navigate = useNavigate();
+  const { user, isReady } = useAuth();
   const [formData, setFormData] = useState<Record<string, any>>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentPage, setCurrentPage] = useState(0);
@@ -165,36 +184,23 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
     loadHospitals();
   }, [fields]);
 
-  // Get current user data for editor fields.
-  // After a hard page refresh, initializeEncryption() runs asynchronously in App.tsx
-  // before the encryption key is available. We retry until we get a user object.
+  // Populate editor field once the auth context is ready (encryption key is in memory)
   useEffect(() => {
-    let attempts = 0;
-    const maxAttempts = 20; // 2 seconds total
+    if (!isReady || !user) return;
+    const hasEditorField = fields.some(f => f.name === 'editor');
+    if (!hasEditorField) return;
 
-    const tryPopulateEditor = () => {
-      const currentUser = authService.getUser();
-      if (currentUser) {
-        const editorFields = fields.filter(field => field.name === 'editor');
-        if (editorFields.length > 0) {
-          setFormData(prev => ({
-            ...prev,
-            user_id: currentUser.id,
-            editor: currentUser.firstName && currentUser.lastName
-              ? `${currentUser.firstName} ${currentUser.lastName}`
-              : currentUser.name || currentUser.email || ''
-          }));
-        }
-        return; // done
-      }
-      attempts++;
-      if (attempts < maxAttempts) {
-        setTimeout(tryPopulateEditor, 100);
-      }
-    };
+    const editorName =
+      user.firstName && user.lastName
+        ? `${user.firstName} ${user.lastName}`
+        : user.name || user.email || '';
 
-    tryPopulateEditor();
-  }, [fields]);
+    setFormData(prev => ({
+      ...prev,
+      user_id: user.id,
+      editor: editorName,
+    }));
+  }, [isReady, user, fields]);
 
   useEffect(() => {
     if (formData.gestationWeek > 0) {
@@ -215,10 +221,37 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
   }, [formData.gestationWeek])
 
 
-  // Split fields into pages (2 columns, 5 rows max = 10 fields per page)
-  const fieldsPerPage = 10;
-  const totalPages = Math.ceil(fields.length / fieldsPerPage);
-  const currentFields = fields.slice(currentPage * fieldsPerPage, (currentPage + 1) * fieldsPerPage);
+  // Split fields into pages:
+  // – Each chip-group field gets its own dedicated page
+  // – Regular fields are grouped up to 10 per page
+  const pages: FormField[][] = (() => {
+    const result: FormField[][] = [];
+    let regularBuffer: FormField[] = [];
+
+    const flushBuffer = () => {
+      if (regularBuffer.length === 0) return;
+      // Slice into chunks of 10
+      for (let i = 0; i < regularBuffer.length; i += 10) {
+        result.push(regularBuffer.slice(i, i + 10));
+      }
+      regularBuffer = [];
+    };
+
+    for (const field of fields) {
+      if (field.type === 'chip-group') {
+        flushBuffer();
+        result.push([field]);
+      } else {
+        regularBuffer.push(field);
+      }
+    }
+    flushBuffer();
+
+    return result;
+  })();
+
+  const totalPages = pages.length;
+  const currentFields = pages[currentPage] ?? [];
   const [isAutoFilling, setIsAutoFilling] = useState(false);
   const [lastVisitData, setLastVisitData] = useState<LastVisitData | null>(null);
 
@@ -266,9 +299,9 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
             setIsAutoFilling(false)
             setFormData(prev => ({
                 ...prev,
-                gestationWeek: 0,
-                visitNumber: 0,
-                gestationweek: 0// Handle both naming conventions
+                gestationWeek: 1,
+                visitNumber: 1,
+                gestationweek: 1// Handle both naming conventions
               }));
           }
       } catch (error) {
@@ -404,6 +437,9 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
     const newErrors: Record<string, string> = {};
 
     fieldsToValidate.forEach(field => {
+      // chip-group fields are containers — validate their individual chips instead
+      if (field.type === 'chip-group') return;
+
       if (!isFieldVisible(field)) return;
 
       const value = formData[field.name];
@@ -520,6 +556,17 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
       try {
         const cleanedFormData = { ...formData };
         fields.forEach(field => {
+          if (field.type === 'chip-group') {
+            // Remove the synthetic group key — it's not a DB column
+            delete cleanedFormData[field.name];
+            // Any chip left unset (= Uncertain) maps to 'unknown' for the backend
+            field.chips?.forEach(chip => {
+              if (!cleanedFormData[chip.field]) {
+                cleanedFormData[chip.field] = 'unknown';
+              }
+            });
+            return;
+          }
           if (!isFieldVisible(field)) {
             if (field.type === 'number') {
               cleanedFormData[field.name] = 0;
@@ -540,8 +587,128 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
     }
   };
 
+  // ── Chip group renderer ──────────────────────────────────────────────────
+  const renderChipGroup = (field: FormField) => {
+    const chips = field.chips ?? [];
+
+    return (
+      <div key={field.name} className="col-span-1 lg:col-span-2">
+        {/* Label — stacked on mobile, inline on desktop */}
+        <div className="mb-1">
+          <p className="text-sm font-medium text-gray-700">{field.label}</p>
+          <p className="text-xs text-gray-400 my-2">(optional — Unselected defaults to Uncertain)</p>
+        </div>
+
+        {/* Compact legend */}
+        <div className="flex items-center gap-4 mb-3">
+          {([
+            ['bg-[#008540]', 'Yes'],
+            ['bg-red-400',   'No'],
+            ['bg-gray-300',  'Uncertain'],
+          ] as const).map(([dot, lbl]) => (
+            <span key={lbl} className="flex items-center gap-1.5 text-xs text-gray-500">
+              <span className={`w-2 h-2 rounded-full ${dot}`} />
+              {lbl}
+            </span>
+          ))}
+        </div>
+
+        {/* Card list — 2 columns on desktop to use the full width */}
+        <div className="rounded-xl border border-gray-200 bg-[#F6F6F6] overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-2">
+          {chips.map((chip) => {
+            const current = (formData[chip.field] ?? '') as ChipValue;
+            const isYes = current === 'yes';
+            const isNo  = current === 'no';
+
+            const handleChipClick = () => {
+              const next = CHIP_CYCLE[(CHIP_CYCLE.indexOf(current) + 1) % CHIP_CYCLE.length];
+              handleInputChange(chip.field, next);
+              if (next !== 'yes' && chip.countField) {
+                handleInputChange(chip.countField, '');
+              }
+            };
+
+            const dotColor =
+              isYes ? 'bg-[#008540]' :
+              isNo  ? 'bg-red-400'   :
+              'bg-gray-300';
+
+            const rowBg =
+              isYes ? 'bg-green-50' :
+              isNo  ? 'bg-red-50'   :
+              'bg-white';
+
+            const stateLabel =
+              isYes ? 'Yes' :
+              isNo  ? 'No'  :
+              'Uncertain';
+
+            const stateLabelColor =
+              isYes ? 'text-[#008540]' :
+              isNo  ? 'text-red-500'   :
+              'text-gray-400';
+
+            return (
+              <div key={chip.field} className={`border-b border-gray-200 ${rowBg}`}>
+                {/* Toggle row */}
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // prevent focus stealing
+                    handleChipClick();
+                  }}
+                  className={`
+                    w-full flex items-center justify-between px-4 py-3 lg:px-6 lg:py-4 text-left
+                    transition-colors duration-100 active:opacity-70 cursor-pointer
+                  `}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColor}`} />
+                    <span className="text-sm text-gray-700 truncate">{chip.label}</span>
+                  </div>
+
+                  <span className={`text-xs font-medium shrink-0 ml-3 ${stateLabelColor}`}>
+                    {stateLabel}
+                  </span>
+                </button>
+
+                {/* Count input — shown below the row when Yes and a countField exists */}
+                {isYes && chip.countField && (
+                  <div className="px-4 pb-3 lg:px-6 lg:pb-4">
+                    <label className="block text-xs text-gray-500 mb-1">
+                      {chip.countLabel ?? 'Enter count'}
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={formData[chip.countField] ?? ''}
+                      onChange={(e) => {
+                        const n = parseInt(e.target.value, 10);
+                        handleInputChange(
+                          chip.countField!,
+                          e.target.value === '' || n <= 0 ? '' : n
+                        );
+                      }}
+                      placeholder="Enter number"
+                      className="w-32 px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-[#008540]"
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderField = (field: FormField) => {
     if (!isFieldVisible(field)) return null;
+
+    // Chip-group fields span full width — rendered differently
+    if (field.type === 'chip-group') return renderChipGroup(field);
 
     const hasError = errors[field.name];
     const isReadonly = field.readonly || field.name === 'editor';
@@ -588,16 +755,16 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
               value={formData[field.name] || ''}
               onChange={(e) => handleInputChange(field.name, e.target.value)}
               disabled={isReadonly || (field.name === 'hospital' && loadingHospitals)}
-              className={`w-full px-3 py-3 pr-10 border rounded-lg appearance-none focus:outline-none focus:ring-0 focus:ring-[#008540] ${hasError ? 'border-red-500' : 'border-gray-300'
+              className={`capitalize w-full px-3 py-3 pr-10 border rounded-lg appearance-none focus:outline-none focus:ring-0 focus:ring-[#008540] ${hasError ? 'border-red-500' : 'border-gray-300'
                 } ${isReadonly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             >
-              <option value="">
+              <option value="" className='capitalize'>
                 {field.name === 'hospital' && loadingHospitals
                   ? 'Loading hospitals...'
                   : `Select ${field.label}`}
               </option>
               {fieldOptions?.map(option => (
-                <option key={option} value={option}>{option}</option>
+                <option className='capitalize' key={option} value={option}>{option}</option>
               ))}
               {field.name === 'hospital' && (
                 <>
@@ -724,15 +891,11 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
       </div> */}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Left column - first 5 fields */}
-        <div className="space-y-6">
-          {currentFields.slice(0, Math.ceil(currentFields.length / 2)).map(renderField)}
-        </div>
-
-        {/* Right column - remaining fields */}
-        <div className="space-y-6">
-          {currentFields.slice(Math.ceil(currentFields.length / 2)).map(renderField)}
-        </div>
+        {currentFields.map(field =>
+          field.type === 'chip-group'
+            ? renderChipGroup(field)
+            : renderField(field)
+        )}
       </div>
 
       <div className="flex justify-between items-center pt-6">

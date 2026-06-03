@@ -39,7 +39,7 @@ const Profile: React.FC<ProfileProps> = ({ patient }) => {
             key={index}
           >
             <div className="text-gray-500 font-medium">{item.label}</div>
-            <div className="text-gray-800 font-medium text-right text-xs max-w-[60%]">
+            <div className="capitalize text-gray-800 font-medium text-right text-xs max-w-[60%]">
               {item.value?.toString() || "-"}
             </div>
           </div>
@@ -54,7 +54,7 @@ const Profile: React.FC<ProfileProps> = ({ patient }) => {
     { label: "Date of Birth", value: patient?.dob },
     { label: "Age", value: patient?.age ? `${patient.age} years` : getAge(patient?.dob) },
     { label: "Race", value: patient?.race === "Other" ? patient?.raceOther : patient?.race },
-    { label: "Blood Type", value: `${patient?.bloodgroup || ""} ${patient?.rh || ""}`.trim() },
+    { label: "Blood Type", value: `${patient?.bloodgroup || ""} ${patient?.rh != "Unknown" ? patient.rh : "" }`.trim() },
     { label: "Hospital", value: patient?.hospital },
   ];
 

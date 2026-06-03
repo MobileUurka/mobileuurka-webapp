@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { FiSearch, FiPlus, FiRefreshCw } from 'react-icons/fi';
 import { authService } from '../services/authServices';
 import { IoLogOutOutline } from 'react-icons/io5';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SearchProps {
   placeholder?: string;
@@ -29,6 +30,13 @@ const SearchContainer: React.FC<SearchProps> = ({
   refreshing = false
 }) => {
   const [localValue, setLocalValue] = useState(searchValue);
+  const { user } = useAuth();
+
+  const initial = user?.firstName && user?.lastName
+    ? user.firstName.charAt(0).toUpperCase() + user.lastName.charAt(0).toUpperCase()
+    : user?.name
+        ? user.name.split(' ').map((n: string) => n.charAt(0).toUpperCase()).slice(0, 2).join('')
+        : user?.email?.charAt(0).toUpperCase() ?? '';
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -36,29 +44,6 @@ const SearchContainer: React.FC<SearchProps> = ({
     onSearchChange?.(val);
     onSearch(val);
   };
-
-  const [user, setUser] = useState<any>(null);
-  const [initial,setInitial] = useState()
-    // We use useCallback so this function doesn't change on every render
-    const checkAuth = useCallback(async () => {
-      // 1. Initialize encryption keys first      
-      const data = await authService.getUser();
-      setUser(data)
-  
-    }, []);
-  
-    useEffect(() => {
-      checkAuth();
-    }, [checkAuth]);
-
-    useEffect(() => {
-      if (user?.firstName && user?.lastName) {
-        const initials =
-          user.firstName.charAt(0).toUpperCase() +
-          user.lastName.charAt(0).toUpperCase();
-        setInitial(initials);
-      }
-    }, [user]);
 
 
     const handleLogout = () => {

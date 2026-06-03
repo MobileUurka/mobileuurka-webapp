@@ -17,6 +17,7 @@ import Hospital from './pages/Hospital';
 import Feedback from './pages/Feedback';
 import { ToastProvider } from './contexts/ToastContext';
 import { FeedbackProvider } from './contexts/FeedbackContext';
+import { AuthContext, type AuthUser } from './contexts/AuthContext';
 import Verify from './pages/Verify';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -32,6 +33,7 @@ function App() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [backendDown, setBackendDown] = useState(false);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const dispatch = useAppDispatch();
 
   const checkAuth = useCallback(async () => {
@@ -40,11 +42,14 @@ function App() {
     const hasToken = authService.isAuthenticated();
 
     if (!hasKeys && hasToken) {
-      // Had a token but couldn't reach backend — don't wipe the session, show an error
       setBackendDown(true);
       setIsAuthenticated(false);
+      setCurrentUser(null);
     } else {
-      setIsAuthenticated(hasKeys && hasToken);
+      const authenticated = hasKeys && hasToken;
+      setIsAuthenticated(authenticated);
+      // Read the user AFTER the encryption key is in memory
+      setCurrentUser(authenticated ? (authService.getUser() as AuthUser | null) : null);
     }
     setIsInitialized(true);
   }, []);
@@ -95,6 +100,7 @@ function App() {
   return (
     <ToastProvider>
       <FeedbackProvider>
+      <AuthContext.Provider value={{ user: currentUser, isReady: isInitialized }}>
       <BrowserRouter>
         <Routes>
           {!isAuthenticated ? (
@@ -130,6 +136,7 @@ function App() {
           )}
         </Routes>
       </BrowserRouter>
+      </AuthContext.Provider>
       </FeedbackProvider>
     </ToastProvider>
   );

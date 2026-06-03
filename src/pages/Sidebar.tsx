@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 // import { MdOutlineSpaceDashboard } from "react-icons/md";
 import { HiOutlineUserGroup } from "react-icons/hi";
 // import { IoSettingsOutline } from "react-icons/io5";
@@ -12,6 +12,7 @@ import { TbNurse } from "react-icons/tb";
 import { IoLogOutOutline } from "react-icons/io5";
 import { useAppSelector } from "../store/hooks";
 import { MdOutlineFeedback } from "react-icons/md";
+import { useAuth } from "../contexts/AuthContext";
 
 
 type SidebarProps = {
@@ -24,62 +25,17 @@ type SidebarProps = {
 const Sidebar = ({ activeItem, setActiveItem, setSideBarActive, sideBarActive }: SidebarProps) => {
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 900);
-    const [user, setUser] = useState<any>(null);
-    const [initial, setInitial] = useState()
-    const checkAuth = useCallback(() => {
-        // Retry reading the user until the encryption key is restored after a page refresh.
-        // App.tsx calls initializeEncryption() asynchronously, so on first mount the key
-        // may not be available yet. We poll up to 2 seconds before giving up.
-        let attempts = 0;
-        const maxAttempts = 20;
+    const { user } = useAuth();
 
-        const tryGetUser = () => {
-            const data = authService.getUser();
-            if (data) {
-                setUser(data);
-                return;
-            }
-            attempts++;
-            if (attempts < maxAttempts) {
-                setTimeout(tryGetUser, 100);
-            }
-        };
-
-        tryGetUser();
-    }, []);
+    const initial = user?.firstName && user?.lastName
+        ? user.firstName.charAt(0).toUpperCase() + user.lastName.charAt(0).toUpperCase()
+        : user?.name
+            ? user.name.split(' ').map((n: string) => n.charAt(0).toUpperCase()).slice(0, 2).join('')
+            : user?.email?.charAt(0).toUpperCase() ?? '';
 
 
 
-    useEffect(() => {
-        if (!user?.email) return;
-
-        // Get allowed emails from env — kept in case needed for future gating
-        const allowedEmails = import.meta.env.VITE_ALLOWED_EMAILS
-            ?.split(",")
-            .map((email: string) => email.trim().toLowerCase());
-
-        const userEmail = user.email.toLowerCase();
-        const _isAdmin = allowedEmails?.includes(userEmail) || userEmail.endsWith("@mobileuurka.com");
-        // Admin detection available here if needed for future nav changes
-        void _isAdmin;
-    }, [user]);
-
-
-
-useEffect(() => {
-    checkAuth();
-}, [checkAuth]);
-
-useEffect(() => {
-    if (user?.firstName && user?.lastName) {
-        const initials =
-            user.firstName.charAt(0).toUpperCase() +
-            user.lastName.charAt(0).toUpperCase();
-        setInitial(initials);
-    }
-}, [user]);
-
-const navigate = useNavigate();
+    const navigate = useNavigate();
 
 const unreadCount = useAppSelector(s =>
     s.notifications.data.filter(n => !n.readAt).length

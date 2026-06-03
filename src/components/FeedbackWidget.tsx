@@ -5,8 +5,8 @@ import { IoClose } from 'react-icons/io5';
 import { MdFeedback } from 'react-icons/md';
 import { FiUserCheck } from 'react-icons/fi';
 import { feedbackService } from '../services/feedbackService';
-import { authService } from '../services/authServices';
 import MentionTextarea, { type AssignedMember } from './MentionTextarea';
+import { useAuth } from '../contexts/AuthContext';
 
 // ─── Page label map ───────────────────────────────────────────────────────────
 // Maps the first path segment to a human-readable page name shown in the widget
@@ -99,7 +99,7 @@ const FeedbackWidget: React.FC<FeedbackWidgetProps> = ({ patientId, patientName 
     };
 
     // ─── User info for the header ─────────────────────────────────────────────
-    const user = authService.getUser();
+    const { user } = useAuth();
     const userName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || 'You';
 
     return (

@@ -12,12 +12,12 @@ import "../Patient.css";
 import profilePic from "/images/Default.png"; // Ensure this path is correct
 
 // Services
-import { authService } from '../services/authServices';
 import { userService } from '../services/userServices';
 import { api } from '../services/apiClient';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchPatientProfile, invalidateProfile } from '../store/patientProfileSlice';
 import { useFeedbackContext } from '../contexts/FeedbackContext';
+import { useAuth } from '../contexts/AuthContext';
 
 // Components
 import Chat from "../components/Chat";
@@ -54,7 +54,7 @@ const Patient: React.FC = () => {
   const loading = isFirstLoad;
 
   // State
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [chatActive, setChatActive] = useState<boolean>(false);
   // const [copied, setCopied] = useState<boolean>(false);
@@ -92,11 +92,6 @@ const Patient: React.FC = () => {
   const [selectedDocument, setSelectedDocument] = useState<any>([]);
   const [selectedDocumentTitle, setSelectedDocumentTitle] = useState<string>("");
   const [selectedNote, setSelectedNote] = useState<any>(null);
-
-  useEffect(() => {
-    const user = authService.getUser();
-    setCurrentUser(user);
-  }, []);
 
   // Keep the feedback widget aware of which patient we're viewing
   useEffect(() => {
@@ -249,7 +244,7 @@ const Patient: React.FC = () => {
     const history = patient.patientHistory?.[0] || {};
     const lastVisit = patient.visits?.[patient.visits.length - 1] || {};
 
-
+console.log(patient.rh)
     return [
       { label: "Age", value: calculateAge(patient.dob) },
       { label: "Gravida + Parity", value: `${history.gravida || 0}+${history.parity || 0}` },
@@ -266,7 +261,8 @@ const Patient: React.FC = () => {
             )}
           </div>
         ),
-        value: `${patient.bloodgroup || ''}${patient.rh || ''}`
+        
+        value: `${patient.bloodgroup || ''}${patient.rh !== 'Unknown' ? patient.rh :''}`
       },
       { label: "Last Visit", value: formatDate(lastVisit.date) },
       { label: "EDD", value: formatDate(history.estimatedDueDate) },
@@ -549,8 +545,8 @@ const Patient: React.FC = () => {
                       onEscalate={handleEscalate}
                     />
                   )}
-                  {activeTab === "note" && <Note note={selectedNote} user={currentUser} onBack={() => setActiveTab("notes")} />}
-                  {activeTab === "notepad" && <Notepad patient={patient} user={currentUser} />}
+                  {activeTab === "note" && <Note note={selectedNote} user={currentUser ?? { id: '' }} onBack={() => setActiveTab("notes")} />}
+                  {activeTab === "notepad" && <Notepad patient={patient} user={currentUser ?? { id: '' }} />}
                 </div>
               </div>
             </div>
@@ -573,7 +569,7 @@ const Patient: React.FC = () => {
                     </button>
                   </div>
                 )}
-                <Chat patient={patient} user={currentUser} />
+                <Chat patient={patient} user={currentUser ?? { id: '' }} />
               </div>
             )}
 

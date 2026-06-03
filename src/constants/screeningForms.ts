@@ -1,9 +1,17 @@
+interface ChipOption {
+  field: string;
+  label: string;
+  countField?: string;
+  countLabel?: string;
+}
+
 interface FormField {
   name: string;
   label: string;
-  type: 'text' | 'number' | 'date' | 'select' | 'textarea' | 'email';
+  type: 'text' | 'number' | 'date' | 'select' | 'textarea' | 'email' | 'chip-group';
   required?: boolean;
   options?: string[];
+  chips?: ChipOption[];
   placeholder?: string;
   readonly?: boolean;
 
@@ -73,6 +81,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
           'Sanlam',
           'Liberty Life',
           'ICEA LION',
+          'None',
           'Other'
         ]
       },
@@ -101,9 +110,19 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
 
 
       { name: 'bloodgroup', label: 'Blood Group', type: 'select', required: true, options: ['A', 'B', 'AB', 'O', 'Unknown'] },
-      { name: 'rh', label: 'RH Factor', type: 'select', required: true, options: ['+', '-'] },
+      { name: 'rh', label: 'RH Factor', type: 'select', required: true, options: ['+', '-', 'Unknown'] },
 
-      { name: 'race', label: 'Race / Ethnicity', type: 'text' },
+      {
+        name: 'race', label: 'Race / Ethnicity', type: 'select', options: [
+          'Black / African',
+          'Asian',
+          'White / Caucasian',
+          'Mixed / Multiracial',
+          'Middle Eastern',
+          'Indigenous / Native',
+          'Prefer not to say'
+        ]
+      },
       { name: 'hospital', label: 'Hospital', type: 'select', required: true, options: [] } // Will be populated dynamically
     ]
   },
@@ -111,6 +130,8 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
   Visits: {
     title: "Patient Visit Information",
     fields: [
+      { name: 'editor', label: 'Doctor/Editor', type: 'text', required: true, readonly: true },
+
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
       { name: 'visitNumber', label: 'Visit Number', type: 'number', required: true },
       {
@@ -136,10 +157,9 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       //   dependsOn: { field: 'visitReason', value: 'Other' }
 
       // },
-      { name: 'visitExplanation', label: 'Visit Explanation', type: 'textarea', required: true, placeholder: 'Detailed explanation of visit' },
-      { name: 'editor', label: 'Doctor/Editor', type: 'text', required: true, readonly: true },
       { name: 'gestationWeek', label: 'Gestation Week', type: 'number', required: true, min: 0, max: 43 },
       { name: 'date', label: 'Visit Date', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
+      { name: 'visitExplanation', label: 'Visit Explanation', type: 'textarea', required: true, placeholder: 'Detailed explanation of visit' },
       { name: 'nextVisit', label: 'Next Visit Date', type: 'date' }
     ]
   },
@@ -176,74 +196,149 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
   History: {
     title: "Patient Medical History",
     fields: [
+      // ── Admin / meta ────────────────────────────────────────────────────────
       { name: 'editor', label: 'Recorded By', type: 'text', required: true, readonly: true },
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
       { name: 'date', label: 'Date Recorded', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
-      { name: 'famHistoryPreeclampsia', label: 'Family History: Preeclampsia', type: 'select', required: true, options: ['yes', 'no', 'unknown'] },
-      { name: 'famHistoryCardiacDisease', label: 'Family History: Cardiac Disease', type: 'select', required: true, options: ['yes', 'no', 'unknown'] },
-      { name: 'famHistoryHypertension', label: 'Family History: Hypertension', type: 'select', required: true, options: ['yes', 'no', 'unknown'] },
-      { name: 'famHistoryDiabetes', label: 'Family History: Diabetes', type: 'select', required: true, options: ['yes', 'no', 'unknown'] },
-      { name: 'autoimmune', label: 'Autoimmune Disease', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'anemia', label: 'Anemia', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'diabetesMelitus', label: 'Diabetes Mellitus', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'chronicHypertension', label: 'Chronic Hypertension', type: 'select', options: ['yes', 'no'] },
       { name: 'gravida', label: 'Gravida', type: 'text', required: true, placeholder: 'e.g. 2+0', pattern: /^\d+\+\d+$/, patternMessage: 'Format must be X+Y (e.g. 2+0)' },
       { name: 'parity', label: 'Parity', type: 'text', required: true, placeholder: 'e.g. 1+0', pattern: /^\d+\+\d+$/, patternMessage: 'Format must be X+Y (e.g. 1+0)' },
-      { name: 'miscarriage', label: 'Previous Miscarriage', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'csection', label: 'Previous C-Section', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'preeclampsiaHistory', label: 'Previous Preeclampsia', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'gestationalDiabetesHistory', label: 'Previous Gestational Diabetes', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'famHistoryGestationalHypertension', label: 'Family History: Gestational Hypertension', type: 'select', options: ['yes', 'no', 'unknown'] },
-      { name: 'famHistoryGestationalDiabetes', label: 'Family History: Gestational Diabetes', type: 'select', options: ['yes', 'no', 'unknown'] },
-      { name: 'famHistoryAnemia', label: 'Family History: Anemia', type: 'select', options: ['yes', 'no', 'unknown'] },
-      { name: 'famObeseHistory', label: 'Family History: Obesity', type: 'select', options: ['yes', 'no', 'unknown'] },
-      { name: 'famHistoryAutoimmune', label: 'Family History: Autoimmune Disease', type: 'select', options: ['yes', 'no', 'unknown'] },
-      { name: 'famSickleCell', label: 'Family History: Sickle Cell', type: 'select', options: ['yes', 'no', 'unknown'] },
-      { name: 'famThalassemia', label: 'Family History: Thalassemia', type: 'select', options: ['yes', 'no', 'unknown'] },
-
-      { name: 'maleAge', label: 'Father Age', type: 'number' },
-      { name: 'malePreeclampsiaPrevHistory', label: 'Father Previous Preeclampsia History', type: 'select', options: ['yes', 'no', 'unknown'] },
-
-      { name: 'liver', label: 'Liver Condition', type: 'select', options: ['normal', 'abnormal'] },
-      { name: 'thyroid', label: 'Thyroid Condition', type: 'select', options: ['normal', 'abnormal'] },
-      { name: 'cardiacDisease', label: 'Cardiac Disease', type: 'select', options: ['yes', 'no'] },
-      { name: 'chronicRenalDisease', label: 'Chronic Renal Disease', type: 'select', options: ['yes', 'no'] },
-      { name: 'kidney', label: 'Kidney Condition', type: 'select', options: ['normal', 'abnormal'] },
-      { name: 'rheumatoidArthritis', label: 'Rheumatoid Arthritis', type: 'select', options: ['yes', 'no'] },
-
-      { name: 'menorrhagia', label: 'Menorrhagia', type: 'select', options: ['yes', 'no'] },
-      { name: 'pcos', label: 'PCOS', type: 'select', options: ['yes', 'no'] },
-      { name: 'uterineFibroids', label: 'Uterine Fibroids', type: 'select', options: ['yes', 'no'] },
-      { name: 'hypothyroidism', label: 'Hypothyroidism', type: 'select', options: ['yes', 'no'] },
-
       { name: 'interval', label: 'Pregnancy Interval (months)', type: 'number' },
+      { name: 'maleAge', label: "Partner's Age", type: 'number' },
+      { name: 'prevChildWeight', label: 'Previous Child Weight (grams)', type: 'number' },
+
+      // ── Family History chip group ────────────────────────────────────────────
+      {
+        name: 'familyHistoryGroup',
+        label: 'Family History — select all that apply (click to toggle Yes / Unsure / No)',
+        type: 'chip-group',
+        chips: [
+          { field: 'famHistoryPreeclampsia', label: 'Preeclampsia' },
+          { field: 'famHistoryCardiacDisease', label: 'Cardiac Disease' },
+          { field: 'famHistoryHypertension', label: 'Hypertension' },
+          { field: 'famHistoryDiabetes', label: 'Diabetes' },
+          { field: 'famHistoryGestationalHypertension', label: 'Gestational Hypertension' },
+          { field: 'famHistoryGestationalDiabetes', label: 'Gestational Diabetes' },
+          { field: 'famHistoryAnemia', label: 'Anemia' },
+          { field: 'famObeseHistory', label: 'Obesity' },
+          { field: 'famHistoryAutoimmune', label: 'Autoimmune Disease' },
+          { field: 'famSickleCell', label: 'Sickle Cell' },
+          { field: 'famThalassemia', label: 'Thalassemia' },
+          { field: 'malePreeclampsiaPrevHistory', label: "Partner's Previous Preeclampsia" },
+
+        ]
+      },
+
+      // ── Partner info ─────────────────────────────────────────────────────────
+
+
+      // ── Medical History chip group ───────────────────────────────────────────
+      {
+        name: 'medicalHistoryGroup',
+        label: 'Personal Medical History — select all that apply',
+        type: 'chip-group',
+        chips: [
+          { field: 'autoimmune', label: 'Autoimmune Disease' },
+          { field: 'anemia', label: 'Anemia' },
+          { field: 'diabetesMelitus', label: 'Diabetes Mellitus' },
+          { field: 'chronicHypertension', label: 'Chronic Hypertension' },
+          { field: 'chronicRenalDisease', label: 'Chronic Renal Disease' },
+          { field: 'cardiacDisease', label: 'Cardiac Disease' },
+          { field: 'liver', label: 'Liver Condition' },
+          { field: 'thyroid', label: 'Thyroid Condition' },
+          { field: 'kidney', label: 'Kidney Condition' },
+          { field: 'rheumatoidArthritis', label: 'Rheumatoid Arthritis' },
+          { field: 'menorrhagia', label: 'Menorrhagia' },
+          { field: 'pcos', label: 'PCOS' },
+          { field: 'uterineFibroids', label: 'Uterine Fibroids' },
+          { field: 'hypothyroidism', label: 'Hypothyroidism' },
+          { field: 'prevGynaSurgery', label: 'Previous Gynecological Surgery' },
+          { field: 'contraceptives', label: 'Previous Contraceptive Use' },
+        ]
+      },
+
+
+
+      // ── Obstetric History chip group ─────────────────────────────────────────
+      {
+        name: 'obstetricHistoryGroup',
+        label: 'Obstetric History — select all that apply',
+        type: 'chip-group',
+        chips: [
+          { field: 'pph', label: 'Postpartum Hemorrhage (PPH)' },
+          { field: 'infertility', label: 'Infertility' },
+          { field: 'ivf', label: 'IVF Pregnancy' },
+          { field: 'eclampsiaHistory', label: 'Eclampsia' },
+          { field: 'gestationalDiabetesHistory', label: 'Gestational Diabetes' },
+          { field: 'gestationalHypertensionHistory', label: 'Gestational Hypertension' },
+          { field: 'preeclampsiaHistory', label: 'Preeclampsia' },
+          { field: 'firstPreeclampsiaHistory', label: 'Preeclampsia (1st Pregnancy)' },
+          { field: 'pregnancyHistoryAnemia', label: 'Anemia in Pregnancy' },
+        ]
+      },
+
+      // ── Obstetric data ───────────────────────────────────────────────────────
+
       { name: 'lastPeriodDate', label: 'Last Menstrual Period', type: 'date', max: new Date().toISOString().split('T')[0] },
       { name: 'estimatedDueDate', label: 'Estimated Due Date', type: 'date' },
 
-      { name: 'miscarriageNum', label: 'Number of Miscarriages', type: 'number', dependsOn: { field: 'miscarriage', value: 'yes' } },
-      { name: 'csectionNum', label: 'Number of C-Sections', type: 'number', dependsOn: { field: 'csection', value: 'yes' } },
+      // ── Obstetric data with counts ───────────────────────────────────────────
+      {
+        name: 'miscarriage',
+        label: 'Miscarriage',
+        type: 'select',
+        options: ['yes', 'no', 'unknown']
+      },
+      {
+        name: 'miscarriageNum',
+        label: 'Number of Miscarriages',
+        type: 'number',
+        min: 1,
+        placeholder: 'Enter number',
+        dependsOn: { field: 'miscarriage', value: 'yes' }
+      },
+      {
+        name: 'csection',
+        label: 'C-Section',
+        type: 'select',
+        options: ['yes', 'no', 'unknown']
+      },
+      {
+        name: 'csectionNum',
+        label: 'Number of C-Sections',
+        type: 'number',
+        min: 1,
+        placeholder: 'Enter number',
+        dependsOn: { field: 'csection', value: 'yes' }
+      },
+      {
+        name: 'stillbirth',
+        label: 'Stillbirth',
+        type: 'select',
+        options: ['yes', 'no', 'unknown']
+      },
+      {
+        name: 'stillbirthNum',
+        label: 'Number of Stillbirths',
+        type: 'number',
+        min: 1,
+        placeholder: 'Enter number',
+        dependsOn: { field: 'stillbirth', value: 'yes' }
+      },
+      {
+        name: 'prolongedLabour',
+        label: 'Prolonged Labour',
+        type: 'select',
+        options: ['yes', 'no', 'unknown']
+      },
+      {
+        name: 'prolongedLabourHours',
+        label: 'Prolonged Labour (Hours)',
+        type: 'number',
+        min: 1,
+        placeholder: 'Enter hours',
+        dependsOn: { field: 'prolongedLabour', value: 'yes' }
+      },
 
-      { name: 'stillbirth', label: 'Previous Stillbirth', type: 'select', options: ['yes', 'no'] },
-      { name: 'stillbirthNum', label: 'Number of Stillbirths', type: 'number', dependsOn: { field: 'stillbirth', value: 'yes' } },
-
-      { name: 'pph', label: 'Postpartum Hemorrhage History', type: 'select', options: ['yes', 'no'] },
-
-      { name: 'infertility', label: 'History of Infertility', type: 'select', options: ['yes', 'no'] },
-      { name: 'ivf', label: 'IVF Pregnancy', type: 'select', options: ['yes', 'no'] },
-
-      { name: 'eclampsiaHistory', label: 'History of Eclampsia', type: 'select', options: ['yes', 'no'] },
-      { name: 'gestationalHypertensionHistory', label: 'History of Gestational Hypertension', type: 'select', options: ['yes', 'no'] },
-      { name: 'firstPreeclampsiaHistory', label: 'First Pregnancy Preeclampsia', type: 'select', options: ['yes', 'no', 'unknown'] },
-
-      { name: 'prevChildWeight', label: 'Previous Child Weight (grams)', type: 'number' },
-      { name: 'prevGynaSurgery', label: 'Previous Gynecological Surgery', type: 'text' },
-
-      { name: 'prolongedLabour', label: 'History of Prolonged Labour', type: 'select', options: ['yes', 'no'] },
-      { name: 'prolongedLabourHours', label: 'Prolonged Labour Duration (hours)', type: 'number', dependsOn: { field: 'prolongedLabour', value: 'yes' } },
-
-      { name: 'contraceptives', label: 'Previous Contraceptive Use', type: 'text' },
-
-      { name: 'pregnancyHistoryAnemia', label: 'Anemia During Previous Pregnancy', type: 'select', options: ['yes', 'no'] }
     ]
   },
 
@@ -255,32 +350,46 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'date', label: 'Date Recorded', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
       { name: 'gestationWeek', label: 'Gestation Week', type: 'number', required: true, min: 0, max: 43 },
 
-      // Pregnancy Complications
-      { name: 'abnormaldoppler', label: 'Abnormal Doppler', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'bleeding', label: 'Bleeding', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'eclampsia', label: 'Eclampsia', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'edema', label: 'Edema', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'malpresentation', label: 'Malpresentation', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'multifetalgestation', label: 'Multiple Fetal Gestation', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'pprom', label: 'PPROM', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'prom', label: 'PROM', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'preeclampsia', label: 'Preeclampsia', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'gestationaldiabetes', label: 'Gestational Diabetes', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'gesthypertension', label: 'Gestational Hypertension', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'placentaprevia', label: 'Placenta Previa', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'primipaternity', label: 'Primipaternity', type: 'select', required: true, options: ['yes', 'no'] },
-
-      // Fetal Information
+      // Fetal
       { name: 'sexOfFetus', label: 'Sex of Fetus', type: 'select', required: true, options: ['male', 'female', 'unknown'] },
       { name: 'spe', label: 'SPE Measurement (mm)', type: 'number', required: true },
 
-      // Medical Conditions
-      { name: 'anemia', label: 'Anemia', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'malaria', label: 'Malaria', type: 'select', options: ['yes', 'no'] },
-      { name: 'hookworm', label: 'Hookworm', type: 'select', options: ['yes', 'no'] },
-      { name: 'vitamindDeficiency', label: 'Vitamin D Deficiency', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'severAnemia', label: 'Severe Anemia', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'highHb', label: 'High Hemoglobin', type: 'select', required: true, options: ['yes', 'no'] }
+      // Pregnancy complications chip group
+      {
+        name: 'pregnancyComplicationsGroup',
+        label: 'Current Pregnancy Complications',
+        type: 'chip-group',
+        chips: [
+          { field: 'abnormaldoppler', label: 'Abnormal Doppler' },
+          { field: 'bleeding', label: 'Bleeding' },
+          { field: 'eclampsia', label: 'Eclampsia' },
+          { field: 'edema', label: 'Edema' },
+          { field: 'malpresentation', label: 'Malpresentation' },
+          { field: 'multifetalgestation', label: 'Multiple Fetal Gestation' },
+          { field: 'pprom', label: 'PPROM' },
+          { field: 'prom', label: 'PROM' },
+          { field: 'preeclampsia', label: 'Preeclampsia' },
+          { field: 'gestationaldiabetes', label: 'Gestational Diabetes' },
+          { field: 'gesthypertension', label: 'Gestational Hypertension' },
+          { field: 'placentaprevia', label: 'Placenta Previa' },
+          { field: 'primipaternity', label: 'Primipaternity' },
+        ]
+      },
+
+      // Medical conditions chip group
+      {
+        name: 'pregnancyMedicalGroup',
+        label: 'Current Medical Conditions',
+        type: 'chip-group',
+        chips: [
+          { field: 'anemia', label: 'Anemia' },
+          { field: 'severAnemia', label: 'Severe Anemia' },
+          { field: 'vitamindDeficiency', label: 'Vitamin D Deficiency' },
+          { field: 'highHb', label: 'High Hemoglobin' },
+          { field: 'malaria', label: 'Malaria' },
+          { field: 'hookworm', label: 'Hookworm' },
+        ]
+      },
     ]
   },
 
