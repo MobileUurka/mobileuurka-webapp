@@ -205,6 +205,70 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'maleAge', label: "Partner's Age", type: 'number' },
       { name: 'prevChildWeight', label: 'Previous Child Weight (grams)', type: 'number' },
 
+
+       // ── Obstetric data ───────────────────────────────────────────────────────
+
+      { name: 'lastPeriodDate', label: 'Last Menstrual Period', type: 'date', max: new Date().toISOString().split('T')[0] },
+      { name: 'estimatedDueDate', label: 'Estimated Due Date', type: 'date' },
+
+      // ── Obstetric data with counts ───────────────────────────────────────────
+      {
+        name: 'miscarriage',
+        label: 'Miscarriage',
+        type: 'select',
+        options: ['yes', 'no', 'unknown']
+      },
+      {
+        name: 'miscarriageNum',
+        label: 'Number of Miscarriages',
+        type: 'number',
+        min: 1,
+        placeholder: 'Enter number',
+        dependsOn: { field: 'miscarriage', value: 'yes' }
+      },
+      {
+        name: 'csection',
+        label: 'C-Section',
+        type: 'select',
+        options: ['yes', 'no', 'unknown']
+      },
+      {
+        name: 'csectionNum',
+        label: 'Number of C-Sections',
+        type: 'number',
+        min: 1,
+        placeholder: 'Enter number',
+        dependsOn: { field: 'csection', value: 'yes' }
+      },
+      {
+        name: 'stillbirth',
+        label: 'Stillbirth',
+        type: 'select',
+        options: ['yes', 'no', 'unknown']
+      },
+      {
+        name: 'stillbirthNum',
+        label: 'Number of Stillbirths',
+        type: 'number',
+        min: 1,
+        placeholder: 'Enter number',
+        dependsOn: { field: 'stillbirth', value: 'yes' }
+      },
+      {
+        name: 'prolongedLabour',
+        label: 'Prolonged Labour',
+        type: 'select',
+        options: ['yes', 'no', 'unknown']
+      },
+      {
+        name: 'prolongedLabourHours',
+        label: 'Prolonged Labour (Hours)',
+        type: 'number',
+        min: 1,
+        placeholder: 'Enter hours',
+        dependsOn: { field: 'prolongedLabour', value: 'yes' }
+      },
+
       // ── Family History chip group ────────────────────────────────────────────
       {
         name: 'familyHistoryGroup',
@@ -275,69 +339,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         ]
       },
 
-      // ── Obstetric data ───────────────────────────────────────────────────────
-
-      { name: 'lastPeriodDate', label: 'Last Menstrual Period', type: 'date', max: new Date().toISOString().split('T')[0] },
-      { name: 'estimatedDueDate', label: 'Estimated Due Date', type: 'date' },
-
-      // ── Obstetric data with counts ───────────────────────────────────────────
-      {
-        name: 'miscarriage',
-        label: 'Miscarriage',
-        type: 'select',
-        options: ['yes', 'no', 'unknown']
-      },
-      {
-        name: 'miscarriageNum',
-        label: 'Number of Miscarriages',
-        type: 'number',
-        min: 1,
-        placeholder: 'Enter number',
-        dependsOn: { field: 'miscarriage', value: 'yes' }
-      },
-      {
-        name: 'csection',
-        label: 'C-Section',
-        type: 'select',
-        options: ['yes', 'no', 'unknown']
-      },
-      {
-        name: 'csectionNum',
-        label: 'Number of C-Sections',
-        type: 'number',
-        min: 1,
-        placeholder: 'Enter number',
-        dependsOn: { field: 'csection', value: 'yes' }
-      },
-      {
-        name: 'stillbirth',
-        label: 'Stillbirth',
-        type: 'select',
-        options: ['yes', 'no', 'unknown']
-      },
-      {
-        name: 'stillbirthNum',
-        label: 'Number of Stillbirths',
-        type: 'number',
-        min: 1,
-        placeholder: 'Enter number',
-        dependsOn: { field: 'stillbirth', value: 'yes' }
-      },
-      {
-        name: 'prolongedLabour',
-        label: 'Prolonged Labour',
-        type: 'select',
-        options: ['yes', 'no', 'unknown']
-      },
-      {
-        name: 'prolongedLabourHours',
-        label: 'Prolonged Labour (Hours)',
-        type: 'number',
-        min: 1,
-        placeholder: 'Enter hours',
-        dependsOn: { field: 'prolongedLabour', value: 'yes' }
-      },
-
+     
     ]
   },
 
