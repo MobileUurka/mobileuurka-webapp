@@ -59,8 +59,7 @@ const Profile: React.FC<ProfileProps> = ({ patient }) => {
   ];
 
   const obstetricHistoryDetails = [
-    { label: "Gravida", value: latestHistory?.gravida },
-    { label: "Parity", value: latestHistory?.parity },
+    { label: "Gravida + Parity", value: (latestHistory?.gravida != null && latestHistory?.parity != null) ? `${latestHistory.gravida}+${latestHistory.parity}` : null },
     { label: "C-Section", value: latestHistory?.csection },
     { label: "Postpartum Hemorrhage (PPH)", value: latestHistory?.pph },
     { label: "Infertility", value: latestHistory?.infertility },
