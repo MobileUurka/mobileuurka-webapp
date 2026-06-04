@@ -340,9 +340,11 @@ const Screening = () => {
           firstPreeclampsiaHistory: data.firstPreeclampsiaHistory,
           prevChildWeight: data.prevChildWeight,
           prevGynaSurgery: data.prevGynaSurgery,
+          prevGynaSurgeryDetails: data.prevGynaSurgeryDetails,
           prolongedLabour: data.prolongedLabour,
           prolongedLabourHours: data.prolongedLabourHours,
           contraceptives: data.contraceptives,
+          contraceptivesDetails: data.contraceptivesDetails,
           pregnancyHistoryAnemia: data.pregnancyHistoryAnemia
         };
 
@@ -405,6 +407,7 @@ const Screening = () => {
             edema: data.edema,
             malpresentation: data.malpresentation,
             multifetalgestation: data.multifetalgestation,
+            multifetalgestationCount: data.multifetalgestationCount,
             pprom: data.pprom,
             prom: data.prom,
             preeclampsia: data.preeclampsia,
@@ -634,7 +637,7 @@ const Screening = () => {
           alcoholConsumption: data.alcoholConsumption,
           caffeine: data.caffeine,
           caffeineQuantity: data.caffeineQuantity,
-          sugarDrink: data.sugarDrink
+          sugarDrink: data.sugarDrink,
         };
 
         try {

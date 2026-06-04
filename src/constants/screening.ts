@@ -11,22 +11,10 @@ export const Categories = [
       id: "History",
     },
     {
-      title: "Lifestyle",
-      description:
-        "Record lifestyle factors relevant to patient health, such as smoking, alcohol use, diet, and exercise.",
-      id: "Lifestyle",
-    },
-    {
       title: "Patient Visits",
       description:
         "Document patient visit details, including date, reason, and follow-up plans.",
       id: "Visits",
-    },
-    {
-      title: "Allergy Records",
-      description:
-        "Capture and review patient allergy information to ensure safe care.",
-      id: "Allergy",
     },
     {
       title: "Triage",
@@ -45,11 +33,31 @@ export const Categories = [
       description: "Log lab results and update patient medical records.",
       id: "Lab",
     },
-    {
+     {
+      title: "Lifestyle",
+      description:
+        "Record lifestyle factors relevant to patient health, such as smoking, alcohol use, diet, and exercise.",
+      id: "Lifestyle",
+    },
+     {
+      title: "Allergy Records",
+      description:
+        "Capture and review patient allergy information to ensure safe care.",
+      id: "Allergy",
+    },
+     {
       title: "Infections",
       description: "Conduct tests and track results for maternal infections.",
       id: "Infection",
     },
+    
+    {
+      title: "Prescriptions",
+      description:
+        "Document prescribed medications and monitor dosage schedules.",
+      id: "Prescription",
+    },
+   
     {
       title: "Fetal Development",
       description:
@@ -62,12 +70,7 @@ export const Categories = [
       id: "Ultrasound",
     },
   
-    {
-      title: "Prescriptions",
-      description:
-        "Document prescribed medications and monitor dosage schedules.",
-      id: "Prescription",
-    },
+    
     {
       title: "Notes",
       description:

@@ -605,9 +605,9 @@ export const authService = {
       }
 
       if (response.status === 401) {
-        console.warn('Refresh token expired, logging out user');
-        this.logout();
-        window.dispatchEvent(new Event('auth-logout'));
+        console.warn('Refresh token expired or invalid');
+        // Do NOT auto-logout here — let the caller decide based on context.
+        // The apiClient 401 fallback will handle logout if a real API call fails.
       }
 
       return null;
@@ -622,7 +622,7 @@ export const authService = {
     const accessToken = this.getAccessToken();
 
     if (!accessToken) {
-      // No access token, try to refresh
+      // No access token, try to refresh via the cookie
       const newToken = await this.refreshToken();
       return !!newToken;
     }
@@ -634,11 +634,20 @@ export const authService = {
       const currentTime = Date.now();
       const timeUntilExpiry = expirationTime - currentTime;
 
-      // If token expires within 5 minutes, refresh it proactively
-      if (timeUntilExpiry < 5 * 60 * 1000) {
-        console.log('Token expiring soon, refreshing proactively');
+      // Token fully expired — must refresh
+      if (timeUntilExpiry <= 0) {
+        console.log('Token expired, attempting refresh');
         const newToken = await this.refreshToken();
         return !!newToken;
+      }
+
+      // Token expiring soon — try proactive refresh, but don't block if it fails
+      // (e.g. another tab already expired the cookie — avoids mid-form logouts)
+      if (timeUntilExpiry < 5 * 60 * 1000) {
+        console.log('Token expiring soon, refreshing proactively');
+        await this.refreshToken();
+        // Token is still technically valid even if refresh failed — let request proceed
+        return true;
       }
 
       return true;

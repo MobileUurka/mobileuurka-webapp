@@ -22,6 +22,7 @@ interface FormField {
   patternMessage?: string;
   max?: string | number;
   min?: string | number;
+  noPageBreak?: boolean;
 
   dependsOn?: {
     field: string;
@@ -200,7 +201,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'editor', label: 'Recorded By', type: 'text', required: true, readonly: true },
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
       { name: 'date', label: 'Date Recorded', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
-      { name: 'gravidaParity', label: 'Gravida + Parity', type: 'text', required: true, placeholder: 'e.g. 2+1', pattern: /^\d+\+\d+$/, patternMessage: 'Format must be Gravida+Parity (e.g. 2+1)' },
+      { name: 'gravidaParity', label: 'Gravida + Parity', type: 'text', required: true, placeholder: 'e.g. 2+1', pattern: /^\d+\+\d+$/, patternMessage: 'Format must be Gravida+Parity (e.g. 2+1) — Gravida must be \u2265 Parity' },
       { name: 'interval', label: 'Pregnancy Interval (months)', type: 'number' },
       { name: 'maleAge', label: "Partner's Age", type: 'number' },
       { name: 'prevChildWeight', label: 'Previous Child Weight (grams)', type: 'number' },
@@ -282,7 +283,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
           { field: 'famHistoryGestationalHypertension', label: 'Gestational Hypertension' },
           { field: 'famHistoryGestationalDiabetes', label: 'Gestational Diabetes' },
           { field: 'famHistoryAnemia', label: 'Anemia' },
-          { field: 'famObeseHistory', label: 'Obesity' },
+          { field: 'famObeseHistory', label: 'Obesity (BMI \u2265 30)' },
           { field: 'famHistoryAutoimmune', label: 'Autoimmune Disease' },
           { field: 'famSickleCell', label: 'Sickle Cell' },
           { field: 'famThalassemia', label: 'Thalassemia' },
@@ -314,9 +315,35 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
           { field: 'pcos', label: 'PCOS' },
           { field: 'uterineFibroids', label: 'Uterine Fibroids' },
           { field: 'hypothyroidism', label: 'Hypothyroidism' },
-          { field: 'prevGynaSurgery', label: 'Previous Gynecological Surgery' },
-          { field: 'contraceptives', label: 'Previous Contraceptive Use' },
         ]
+      },
+
+      // ── Gynecological Surgery & Contraceptive Use ────────────────────────────
+      {
+        name: 'prevGynaSurgery',
+        label: 'Previous Gynecological Surgery',
+        type: 'select',
+        options: ['yes', 'no', 'unknown']
+      },
+      {
+        name: 'prevGynaSurgeryDetails',
+        label: 'Which gynecological surgery?',
+        type: 'text',
+        placeholder: 'e.g. myomectomy, hysteroscopy',
+        dependsOn: { field: 'prevGynaSurgery', value: 'yes' }
+      },
+      {
+        name: 'contraceptives',
+        label: 'Previous Contraceptive Use',
+        type: 'select',
+        options: ['yes', 'no', 'unknown']
+      },
+      {
+        name: 'contraceptivesDetails',
+        label: 'Which contraceptive(s)?',
+        type: 'text',
+        placeholder: 'e.g. oral pills, IUD, implant',
+        dependsOn: { field: 'contraceptives', value: 'yes' }
       },
 
 
@@ -366,7 +393,6 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
           { field: 'eclampsia', label: 'Eclampsia' },
           { field: 'edema', label: 'Edema' },
           { field: 'malpresentation', label: 'Malpresentation' },
-          { field: 'multifetalgestation', label: 'Multiple Fetal Gestation' },
           { field: 'pprom', label: 'PPROM' },
           { field: 'prom', label: 'PROM' },
           { field: 'preeclampsia', label: 'Preeclampsia' },
@@ -375,6 +401,22 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
           { field: 'placentaprevia', label: 'Placenta Previa' },
           { field: 'primipaternity', label: 'Primipaternity' },
         ]
+      },
+
+      // Multiple Fetal Gestation — select with optional count
+      {
+        name: 'multifetalgestation',
+        label: 'Multiple Fetal Gestation',
+        type: 'select',
+        options: ['yes', 'no', 'unknown'],
+      },
+      {
+        name: 'multifetalgestationCount',
+        label: 'Number of Fetuses',
+        type: 'number',
+        min: 2,
+        placeholder: 'e.g. 3',
+        dependsOn: { field: 'multifetalgestation', value: 'yes' },
       },
 
       // Medical conditions chip group
@@ -491,13 +533,12 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'editor', label: 'Assessed By', type: 'text', required: true, readonly: true },
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
       { name: 'date', label: 'Assessment Date', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
-      { name: 'smoking', label: 'Smoking', type: 'select', required: true, options: ['yes', 'no', 'former'] },
-      { name: 'alcoholConsumption', label: 'Alcohol Consumption', type: 'select', required: true, options: ['none', 'occasional', 'regular'] },
+      { name: 'smoking', label: 'Smoking', type: 'text', required: true, placeholder: 'e.g. no / 10 cigarettes/day / former smoker' },
+      { name: 'alcoholConsumption', label: 'Alcohol Consumption', type: 'text', required: true, placeholder: 'e.g. no / 3 glasses/week' },
       { name: 'diet', label: 'Diet Quality', type: 'select', required: true, options: ['poor', 'fair', 'good', 'excellent'] },
       { name: 'exercise', label: 'Exercise (minutes/week)', type: 'number', required: true },
-      { name: 'caffeine', label: 'Caffeine Consumption', type: 'select', required: true, options: ['yes', 'no'] },
-      { name: 'caffeineQuantity', label: 'Caffeine Quantity', type: 'text', placeholder: 'e.g., 2 cups/day', dependsOn: { field: 'caffeine', value: 'yes' } },
-      { name: 'sugarDrink', label: 'Sugar Drinks', type: 'select', required: true, options: ['yes', 'no'] }
+      { name: 'caffeine', label: 'Caffeine Consumption', type: 'text', required: true, placeholder: 'e.g. no / 2 cups/day' },
+      { name: 'sugarDrink', label: 'Sugary Drinks', type: 'text', required: true, placeholder: 'e.g. no / 1 can/day' },
     ]
   },
 
@@ -541,7 +582,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'prescription', label: 'Prescription Instructions', type: 'text', required: true, placeholder: 'e.g., Once daily' },
       { name: 'startDate', label: 'Start Date', type: 'date', required: true },
       { name: 'stopDate', label: 'Stop Date', type: 'date' },
-      { name: 'medicationPurpose', label: 'Purpose', type: 'textarea', required: true, placeholder: 'Purpose of medication' }
+      { name: 'medicationPurpose', label: 'Purpose', type: 'textarea', required: true, placeholder: 'Purpose of medication', noPageBreak: true }
     ]
   }
 };

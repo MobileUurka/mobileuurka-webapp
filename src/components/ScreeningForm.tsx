@@ -96,6 +96,8 @@ interface FormField {
   patternMessage?: string;
   max?: string | number;
   min?: string | number;
+  /** When true, this field will not start a new page — it stays on the same page as the preceding field */
+  noPageBreak?: boolean;
 
   dependsOn?: {
     field: string;
@@ -224,15 +226,24 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
   // Split fields into pages:
   // – Each chip-group field gets its own dedicated page
   // – Regular fields are grouped up to 10 per page
+  // – Fields with noPageBreak:true are glued to the previous page (no hard break before them)
   const pages: FormField[][] = (() => {
     const result: FormField[][] = [];
     let regularBuffer: FormField[] = [];
 
     const flushBuffer = () => {
       if (regularBuffer.length === 0) return;
-      // Slice into chunks of 10
-      for (let i = 0; i < regularBuffer.length; i += 10) {
-        result.push(regularBuffer.slice(i, i + 10));
+      // Slice into chunks of 10, but respect noPageBreak — a field with noPageBreak
+      // must stay on the same page as the field immediately before it.
+      let chunkStart = 0;
+      while (chunkStart < regularBuffer.length) {
+        let chunkEnd = Math.min(chunkStart + 10, regularBuffer.length);
+        // If the field just past the cut has noPageBreak, extend the chunk to include it
+        while (chunkEnd < regularBuffer.length && regularBuffer[chunkEnd].noPageBreak) {
+          chunkEnd++;
+        }
+        result.push(regularBuffer.slice(chunkStart, chunkEnd));
+        chunkStart = chunkEnd;
       }
       regularBuffer = [];
     };
@@ -295,15 +306,15 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
             }
           }
         }
-        else{
-            setIsAutoFilling(false)
-            setFormData(prev => ({
-                ...prev,
-                gestationWeek: 1,
-                visitNumber: 1,
-                gestationweek: 1// Handle both naming conventions
-              }));
-          }
+        else {
+          setIsAutoFilling(false)
+          setFormData(prev => ({
+            ...prev,
+            gestationWeek: 1,
+            visitNumber: 1,
+            gestationweek: 1// Handle both naming conventions
+          }));
+        }
       } catch (error) {
         console.error('Failed to fetch patient visit history:', error);
       }
@@ -326,6 +337,27 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
     // Update form data
     const newFormData = { ...formData, [name]: value };
     setFormData(newFormData);
+
+    // Live validation: in Gravida+Parity format, gravida (first part) must be >= parity (second part)
+    if (name === 'gravidaParity' && typeof value === 'string') {
+      const match = value.match(/^(\d+)\+(\d+)$/);
+      if (match) {
+        const gravida = parseInt(match[1], 10);
+        const parity = parseInt(match[2], 10);
+        if (parity > gravida) {
+          setErrors(prev => ({
+            ...prev,
+            gravidaParity: 'Gravida must be greater than or equal to Parity (e.g. 2+1)',
+          }));
+        } else {
+          setErrors(prev => {
+            const next = { ...prev };
+            delete next.gravidaParity;
+            return next;
+          });
+        }
+      }
+    }
 
     // Auto-calculate BMI when height or weight changes
     if (name === 'height' || name === 'weight') {
@@ -603,8 +635,8 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
         <div className="flex items-center gap-4 mb-3">
           {([
             ['bg-[#008540]', 'Yes'],
-            ['bg-red-400',   'No'],
-            ['bg-gray-300',  'Uncertain'],
+            ['bg-red-400', 'No'],
+            ['bg-gray-300', 'Uncertain'],
           ] as const).map(([dot, lbl]) => (
             <span key={lbl} className="flex items-center gap-1.5 text-xs text-gray-500">
               <span className={`w-2 h-2 rounded-full ${dot}`} />
@@ -616,88 +648,88 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
         {/* Card list — 2 columns on desktop to use the full width */}
         <div className="rounded-xl border border-gray-200 bg-[#F6F6F6] overflow-hidden">
           <div className="grid grid-cols-1 lg:grid-cols-2">
-          {chips.map((chip) => {
-            const current = (formData[chip.field] ?? '') as ChipValue;
-            const isYes = current === 'yes';
-            const isNo  = current === 'no';
+            {chips.map((chip) => {
+              const current = (formData[chip.field] ?? '') as ChipValue;
+              const isYes = current === 'yes';
+              const isNo = current === 'no';
 
-            const handleChipClick = () => {
-              const next = CHIP_CYCLE[(CHIP_CYCLE.indexOf(current) + 1) % CHIP_CYCLE.length];
-              handleInputChange(chip.field, next);
-              if (next !== 'yes' && chip.countField) {
-                handleInputChange(chip.countField, '');
-              }
-            };
+              const handleChipClick = () => {
+                const next = CHIP_CYCLE[(CHIP_CYCLE.indexOf(current) + 1) % CHIP_CYCLE.length];
+                handleInputChange(chip.field, next);
+                if (next !== 'yes' && chip.countField) {
+                  handleInputChange(chip.countField, '');
+                }
+              };
 
-            const dotColor =
-              isYes ? 'bg-[#008540]' :
-              isNo  ? 'bg-red-400'   :
-              'bg-gray-300';
+              const dotColor =
+                isYes ? 'bg-[#008540]' :
+                  isNo ? 'bg-red-400' :
+                    'bg-gray-300';
 
-            const rowBg =
-              isYes ? 'bg-green-50' :
-              isNo  ? 'bg-red-50'   :
-              'bg-white';
+              const rowBg =
+                isYes ? 'bg-green-50' :
+                  isNo ? 'bg-red-50' :
+                    'bg-white';
 
-            const stateLabel =
-              isYes ? 'Yes' :
-              isNo  ? 'No'  :
-              'Uncertain';
+              const stateLabel =
+                isYes ? 'Yes' :
+                  isNo ? 'No' :
+                    'Uncertain';
 
-            const stateLabelColor =
-              isYes ? 'text-[#008540]' :
-              isNo  ? 'text-red-500'   :
-              'text-gray-400';
+              const stateLabelColor =
+                isYes ? 'text-[#008540]' :
+                  isNo ? 'text-red-500' :
+                    'text-gray-400';
 
-            return (
-              <div key={chip.field} className={`border-b border-gray-200 ${rowBg}`}>
-                {/* Toggle row */}
-                <button
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault(); // prevent focus stealing
-                    handleChipClick();
-                  }}
-                  className={`
+              return (
+                <div key={chip.field} className={`border-b border-gray-200 ${rowBg}`}>
+                  {/* Toggle row */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault(); // prevent focus stealing
+                      handleChipClick();
+                    }}
+                    className={`
                     w-full flex items-center justify-between px-4 py-3 lg:px-6 lg:py-4 text-left
                     transition-colors duration-100 active:opacity-70 cursor-pointer
                   `}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColor}`} />
-                    <span className="text-sm text-gray-700 truncate">{chip.label}</span>
-                  </div>
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColor}`} />
+                      <span className="text-sm text-gray-700 truncate">{chip.label}</span>
+                    </div>
 
-                  <span className={`text-xs font-medium shrink-0 ml-3 ${stateLabelColor}`}>
-                    {stateLabel}
-                  </span>
-                </button>
+                    <span className={`text-xs font-medium shrink-0 ml-3 ${stateLabelColor}`}>
+                      {stateLabel}
+                    </span>
+                  </button>
 
-                {/* Count input — shown below the row when Yes and a countField exists */}
-                {isYes && chip.countField && (
-                  <div className="px-4 pb-3 lg:px-6 lg:pb-4">
-                    <label className="block text-xs text-gray-500 mb-1">
-                      {chip.countLabel ?? 'Enter count'}
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={formData[chip.countField] ?? ''}
-                      onChange={(e) => {
-                        const n = parseInt(e.target.value, 10);
-                        handleInputChange(
-                          chip.countField!,
-                          e.target.value === '' || n <= 0 ? '' : n
-                        );
-                      }}
-                      placeholder="Enter number"
-                      className="w-32 px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-[#008540]"
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                  {/* Count input — shown below the row when Yes and a countField exists */}
+                  {isYes && chip.countField && (
+                    <div className="px-4 pb-3 lg:px-6 lg:pb-4">
+                      <label className="block text-xs text-gray-500 mb-1">
+                        {chip.countLabel ?? 'Enter count'}
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={formData[chip.countField] ?? ''}
+                        onChange={(e) => {
+                          const n = parseInt(e.target.value, 10);
+                          handleInputChange(
+                            chip.countField!,
+                            e.target.value === '' || n <= 0 ? '' : n
+                          );
+                        }}
+                        placeholder="Enter number"
+                        className="w-32 px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-[#008540]"
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -811,6 +843,46 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
                 value = value.replace(/\D/g, '').slice(0, 8);
               }
 
+              // 3-DIGIT LIMITS
+              if (
+                [
+                  'heartRate',
+                  'height',
+                  'systolic',
+                  'diastolic',
+                  'weight'
+                ].includes(field.name)
+              ) {
+                value = value.replace(/\D/g, '').slice(0, 3);
+              }
+
+              // TEMPERATURE FORMAT: XX.X
+              if (field.name === 'temperature') {
+                value = value.replace(/[^\d.]/g, '');
+
+                const parts = value.split('.');
+
+                // Maximum 2 digits before decimal
+                if (parts[0]) {
+                  parts[0] = parts[0].slice(0, 2);
+                }
+
+                // Maximum 1 digit after decimal
+                if (parts[1]) {
+                  parts[1] = parts[1].slice(0, 1);
+                }
+
+                value = parts.join('.');
+
+                // Prevent multiple decimal points
+                const firstDot = value.indexOf('.');
+                if (firstDot !== -1) {
+                  value =
+                    value.substring(0, firstDot + 1) +
+                    value.substring(firstDot + 1).replace(/\./g, '');
+                }
+              }
+
               if (field.type === 'number') {
                 value = value === '' ? '' : Number(value);
               }
@@ -854,6 +926,7 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
 
     if (hasVisitNumberField && lastVisitData?.visitNumber != null) {
       const visitNumber = Number(formData.visitNumber);
+
       if (visitNumber <= lastVisitData.visitNumber) {
         newErrors.visitNumber =
           `Visit number must be greater than last visit (${lastVisitData.visitNumber})`;
@@ -862,13 +935,30 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
 
     if (hasVisitNumberField && lastVisitData?.gestationWeek != null) {
       const gestationWeek = Number(formData.gestationWeek);
+
       if (gestationWeek <= lastVisitData.gestationWeek) {
         newErrors.gestationWeek =
           `Gestation week must be greater than last recorded (${lastVisitData.gestationWeek})`;
       }
     }
 
-    setErrors(prev => ({ ...prev, ...newErrors }));
+    // Gravida must be greater than or equal to Parity (combined gravidaParity field, format: "2+1")
+    const hasGravidaParityField = fields.some(f => f.name === 'gravidaParity');
+    if (hasGravidaParityField && formData.gravidaParity) {
+      const match = String(formData.gravidaParity).match(/^(\d+)\+(\d+)$/);
+      if (match) {
+        const gravida = parseInt(match[1], 10);
+        const parity = parseInt(match[2], 10);
+        if (parity > gravida) {
+          newErrors.gravidaParity = 'Gravida must be greater than or equal to Parity';
+        }
+      }
+    }
+
+    setErrors(prev => ({
+      ...prev,
+      ...newErrors,
+    }));
 
     return Object.keys(newErrors).length === 0;
   };
