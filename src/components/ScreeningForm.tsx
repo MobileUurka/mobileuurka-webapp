@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MdOutlineKeyboardArrowDown } from 'react-icons/md';
+import { IoInformationCircleOutline } from 'react-icons/io5';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { hospitalService } from '../services/hospitalServices';
 import { patientService } from '../services/patientServices';
@@ -7,6 +8,7 @@ import HospitalSelector from './HospitalSelector';
 import PatientSelector from './PatientSelector';
 import { usePerformanceTimer } from '../hooks/usePerformanceTimer';
 import { useAuth } from '../contexts/AuthContext';
+import { LIFESTYLE_FIELD_INFO } from '../constants/screeningForms';
 
 // Simple loading spinner component
 const LoadingSpinner = ({ size = 20 }: { size?: number }) => (
@@ -750,24 +752,45 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
 
     return (
       <div key={field.name} className="w-full lg:w-[95%] flex flex-col">
-        <label className="text-sm font-medium text-gray-700 mb-2">
-          {field.label}
-          {field.required && <span className="text-red-500 ml-1">*</span>}
+        <label className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
+          <span>
+            {field.label}
+            {field.required && <span className="text-red-500 ml-1">*</span>}
+          </span>
           {(field.name === 'bmi' || field.name === 'map') && (
-            <span className="text-xs text-green-600 ml-2 font-normal">
+            <span className="text-xs text-green-600 font-normal">
               (Auto-calculated)
             </span>
           )}
-
           {(field.name === 'gestationWeek' || field.name === 'gestationweek' || field.name == 'visitNumber') && (
-            <span className="text-xs text-green-600 ml-2 font-normal">
+            <span className="text-xs text-green-600 font-normal">
               {isAutoFilling ? "(Auto-filling from last visit...)" :
                 formData[field.name] != 0 ? "(Auto-filled from last visit)" : "(No previous Visits)"}
             </span>
           )}
           {field.name === 'estimatedDueDate' && formData.lastPeriodDate && formData[field.name] && (
-            <span className="text-xs text-green-600 ml-2 font-normal">
+            <span className="text-xs text-green-600 font-normal">
               (Auto-calculated from LMP)
+            </span>
+          )}
+
+          {/* Lifestyle info icon tooltip */}
+          {LIFESTYLE_FIELD_INFO[field.name] && (
+            <span className="relative group inline-flex items-center ml-1">
+              <IoInformationCircleOutline
+                size={16}
+                className="text-gray-400 hover:text-[#008540] cursor-help transition-colors"
+              />
+              <span className="
+                pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2
+                w-64 rounded-lg bg-gray-800 text-white text-xs px-3 py-2 leading-relaxed
+                opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50
+                shadow-lg
+              ">
+                {LIFESTYLE_FIELD_INFO[field.name]}
+                {/* Caret */}
+                <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+              </span>
             </span>
           )}
         </label>

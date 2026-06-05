@@ -4,6 +4,7 @@ import { Categories } from '../constants/screening';
 import { SCREENING_FORMS } from '../constants/screeningForms';
 import SearchContainer from '../components/SearchContainer';
 import ScreeningForm from '../components/ScreeningForm';
+import EditRecord from './EditRecord';
 import { patientService } from '../services/patientServices';
 
 const Screening = () => {
@@ -313,7 +314,7 @@ const Screening = () => {
           famHistoryAutoimmune: data.famHistoryAutoimmune,
           famSickleCell: data.famSickleCell,
           famThalassemia: data.famThalassemia,
-          maleAge: data.maleAge,
+          maleAge: data.maleAge != null && data.maleAge !== '' ? Number(data.maleAge) : 0,
           malePreeclampsiaPrevHistory: data.malePreeclampsiaPrevHistory,
           liver: data.liver,
           thyroid: data.thyroid,
@@ -777,7 +778,7 @@ const Screening = () => {
                 Screening
               </span>
               <span className="text-lg"> / </span>
-              <span className="text-[#008540]">{currentCategory?.title}</span>
+              <span className="text-[#008540]">{currentCategory?.title ?? tabId}</span>
             </div>
           ) : (
             "Screening"
@@ -840,7 +841,9 @@ const Screening = () => {
           <div className="bg-white min-h-[60vh] overflow-hidden">
             {/* Dynamic Form Injection */}
             <div className="p-8">
-              {tabId && SCREENING_FORMS[tabId] ? (
+              {tabId && tabId === 'EditRecord' ? (
+                <EditRecord />
+              ) : tabId && SCREENING_FORMS[tabId] ? (
                 <ScreeningForm
                   title={SCREENING_FORMS[tabId].title}
                   fields={SCREENING_FORMS[tabId].fields}

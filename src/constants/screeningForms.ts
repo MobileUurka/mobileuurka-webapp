@@ -30,6 +30,38 @@ interface FormField {
   };
 }
 
+// ── Lifestyle field helper text ─────────────────────────────────────────────
+// Displayed in the form as contextual hints beneath each lifestyle field label.
+export const LIFESTYLE_FIELD_INFO: Record<string, string> = {
+  smoking: 'E.g. "No", "Former smoker", "5 cigarettes/day". Occasional = less than weekly.',
+  alcoholConsumption: 'E.g. "No", "Occasional" (1–2 drinks/week), "Moderate" (3–7/week), "Heavy" (daily).',
+  diet: '"Poor" = mostly processed/fast food. "Fair" = mixed. "Good" = mostly whole foods. "Excellent" = consistently balanced, high fruit/veg.',
+  exercise: 'Total minutes of moderate activity per week. WHO recommends ≥150 min/week. 0 = sedentary.',
+  caffeine: 'E.g. "No", "1 cup/day", "Occasional" (a few times/week). Safe limit in pregnancy ≤200 mg/day (~2 cups coffee).',
+  sugarDrink: 'E.g. "No", "Occasional" (≤2/week), "Daily". Includes sodas, juices, energy drinks.',
+};
+
+// ── Edit-record type map ────────────────────────────────────────────────────
+// Maps the friendly dropdown label → { tableName, formKey }
+export const EDIT_RECORD_TYPES: {
+  label: string;
+  tableName: string;
+  formKey: string;
+}[] = [
+    { label: 'Patient Intake', tableName: 'patients', formKey: 'Intake' },
+    { label: 'Patient History', tableName: 'patientHistory', formKey: 'History' },
+    { label: 'Triage', tableName: 'triage', formKey: 'Triage' },
+    { label: 'Pregnancy Journey', tableName: 'currentPregnancyInfo', formKey: 'Journey' },
+    { label: 'Lab Tests', tableName: 'labwork', formKey: 'Lab' },
+    { label: 'Infection Screening', tableName: 'infections', formKey: 'Infection' },
+    { label: 'Lifestyle', tableName: 'patientLifestyle', formKey: 'Lifestyle' },
+    { label: 'Allergy Records', tableName: 'allergies', formKey: 'Allergy' },
+    { label: 'Fetal Development', tableName: 'fetalInfo', formKey: 'Fetal' },
+    { label: 'Ultrasound', tableName: 'ultrasounds', formKey: 'Ultrasound' },
+    { label: 'Prescriptions', tableName: 'medications', formKey: 'Prescription' },
+    { label: 'Patient Visits', tableName: 'visits', formKey: 'Visits' },
+  ];
+
 export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[] }> = {
   Intake: {
     title: "Patient Intake",
@@ -195,23 +227,39 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
   },
 
   History: {
+    
     title: "Patient Medical History",
     fields: [
+      
       // ── Admin / meta ────────────────────────────────────────────────────────
       { name: 'editor', label: 'Recorded By', type: 'text', required: true, readonly: true },
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
       { name: 'date', label: 'Date Recorded', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
       { name: 'gravidaParity', label: 'Gravida + Parity', type: 'text', required: true, placeholder: 'e.g. 2+1', pattern: /^\d+\+\d+$/, patternMessage: 'Format must be Gravida+Parity (e.g. 2+1) — Gravida must be \u2265 Parity' },
       { name: 'interval', label: 'Pregnancy Interval (months)', type: 'number' },
-      { name: 'maleAge', label: "Partner's Age", type: 'number' },
+      {
+        name: 'maleAge',
+        label: "Partner's Age (optional)",
+        type: 'number',
+        required: false,
+        min: 0,
+        max: 99,
+        placeholder: 'Leave blank if not disclosed',
+      },
       { name: 'prevChildWeight', label: 'Previous Child Weight (grams)', type: 'number' },
 
 
-       // ── Obstetric data ───────────────────────────────────────────────────────
+      // ── Obstetric data ───────────────────────────────────────────────────────
 
       { name: 'lastPeriodDate', label: 'Last Menstrual Period', type: 'date', max: new Date().toISOString().split('T')[0] },
       { name: 'estimatedDueDate', label: 'Estimated Due Date', type: 'date' },
-
+      {
+        name: 'prevPEHistoryDisclosure',
+        label: 'Previous Preeclampsia History (self-reported)',
+        type: 'select',
+        required: false,
+        options: ['yes', 'no', 'unknown', 'prefer not to say'],
+      },
       // ── Obstetric data with counts ───────────────────────────────────────────
       {
         name: 'miscarriage',
@@ -270,6 +318,36 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         dependsOn: { field: 'prolongedLabour', value: 'yes' }
       },
 
+      // ── Gynecological Surgery & Contraceptive Use ────────────────────────────
+      {
+        name: 'prevGynaSurgery',
+        label: 'Previous Gynecological Surgery',
+        type: 'select',
+        options: ['yes', 'no', 'unknown']
+      },
+      {
+        name: 'prevGynaSurgeryDetails',
+        label: 'Which gynecological surgery?',
+        type: 'text',
+        placeholder: 'e.g. myomectomy, hysteroscopy',
+        dependsOn: { field: 'prevGynaSurgery', value: 'yes' }
+      },
+      {
+        name: 'contraceptives',
+        label: 'Previous Contraceptive Use',
+        type: 'select',
+        noPageBreak: true,
+        options: ['yes', 'no', 'unknown']
+      },
+      {
+        name: 'contraceptivesDetails',
+        label: 'Which contraceptive(s)?',
+        type: 'text',
+        noPageBreak: true,
+        placeholder: 'e.g. oral pills, IUD, implant',
+        dependsOn: { field: 'contraceptives', value: 'yes' }
+      },
+
       // ── Family History chip group ────────────────────────────────────────────
       {
         name: 'familyHistoryGroup',
@@ -291,8 +369,6 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
 
         ]
       },
-
-      // ── Partner info ─────────────────────────────────────────────────────────
 
 
       // ── Medical History chip group ───────────────────────────────────────────
@@ -318,35 +394,6 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         ]
       },
 
-      // ── Gynecological Surgery & Contraceptive Use ────────────────────────────
-      {
-        name: 'prevGynaSurgery',
-        label: 'Previous Gynecological Surgery',
-        type: 'select',
-        options: ['yes', 'no', 'unknown']
-      },
-      {
-        name: 'prevGynaSurgeryDetails',
-        label: 'Which gynecological surgery?',
-        type: 'text',
-        placeholder: 'e.g. myomectomy, hysteroscopy',
-        dependsOn: { field: 'prevGynaSurgery', value: 'yes' }
-      },
-      {
-        name: 'contraceptives',
-        label: 'Previous Contraceptive Use',
-        type: 'select',
-        options: ['yes', 'no', 'unknown']
-      },
-      {
-        name: 'contraceptivesDetails',
-        label: 'Which contraceptive(s)?',
-        type: 'text',
-        placeholder: 'e.g. oral pills, IUD, implant',
-        dependsOn: { field: 'contraceptives', value: 'yes' }
-      },
-
-
 
       // ── Obstetric History chip group ─────────────────────────────────────────
       {
@@ -366,7 +413,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         ]
       },
 
-     
+
     ]
   },
 
@@ -381,7 +428,22 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       // Fetal
       { name: 'sexOfFetus', label: 'Sex of Fetus', type: 'select', required: true, options: ['male', 'female', 'unknown'] },
       { name: 'spe', label: 'SPE Measurement (mm)', type: 'number', required: true },
-
+      // Multiple Fetal Gestation — select with optional count
+      {
+        name: 'multifetalgestation',
+        label: 'Multiple Fetal Gestation',
+        type: 'select',
+        options: ['yes', 'no', 'unknown'],
+        required: false,
+      },
+      {
+        name: 'multifetalgestationCount',
+        label: 'Number of Fetuses',
+        type: 'number',
+        min: 2,
+        placeholder: 'e.g. 3',
+        dependsOn: { field: 'multifetalgestation', value: 'yes' },
+      },
       // Pregnancy complications chip group
       {
         name: 'pregnancyComplicationsGroup',
@@ -403,21 +465,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         ]
       },
 
-      // Multiple Fetal Gestation — select with optional count
-      {
-        name: 'multifetalgestation',
-        label: 'Multiple Fetal Gestation',
-        type: 'select',
-        options: ['yes', 'no', 'unknown'],
-      },
-      {
-        name: 'multifetalgestationCount',
-        label: 'Number of Fetuses',
-        type: 'number',
-        min: 2,
-        placeholder: 'e.g. 3',
-        dependsOn: { field: 'multifetalgestation', value: 'yes' },
-      },
+
 
       // Medical conditions chip group
       {

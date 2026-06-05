@@ -25,7 +25,6 @@ const Profile: React.FC<ProfileProps> = ({ patient }) => {
   };
 
   const latestHistory = getLatestEntry(patient?.patientHistory);
-
   // --- Sub-component for Sections ---
   const renderSection = (title: string, items: { label: string; value: string | number | boolean | null | undefined }[]) => (
     <section className="mb-8 ">
@@ -77,6 +76,8 @@ const Profile: React.FC<ProfileProps> = ({ patient }) => {
     { label: "Sickle Cell", value: latestHistory?.famSickleCell },
     { label: "Partner's Age", value: latestHistory?.maleAge },
   ];
+
+
 
   const medicalHistoryDetails = [
     { label: "Autoimmune Disorders", value: latestHistory?.autoimmune },

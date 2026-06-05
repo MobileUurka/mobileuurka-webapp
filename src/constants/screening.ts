@@ -76,6 +76,12 @@ export const Categories = [
       description:
         "Capture additional clinical observations, comments, and physician notes.",
       id: "Notes",
+    },
+    {
+      title: "Edit Patient Record",
+      description:
+        "Correct or update existing patient records — intake details, history, triage, and more.",
+      id: "EditRecord",
     }
   ];
   

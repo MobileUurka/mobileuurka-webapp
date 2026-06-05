@@ -13,6 +13,11 @@ export const patientService = {
         return api.get(`/patients?${query}`);
     },
 
+    async getArchivedPatients(params: { page?: number; limit?: number; search?: string } = {}) {
+        const query = new URLSearchParams({ ...params as any, showInactive: 'true' }).toString();
+        return api.get(`/patients?${query}`);
+    },
+
     async getPatient(patientId: string, includeAll: boolean = false) {
         return api.get(`/patients/${patientId}?includeAll=${includeAll}`);
     },
@@ -41,6 +46,14 @@ export const patientService = {
 
     async deletePatient(patientId: string) {
         return api.delete(`/patients/${patientId}`);
+    },
+
+    async dischargePatient(patientId: string, payload: { reason: string; notes?: string }) {
+        return api.post(`/patients/${patientId}/discharge`, payload);
+    },
+
+    async reactivatePatient(patientId: string) {
+        return api.post(`/patients/${patientId}/reactivate`, {});
     },
 
     // ===== DYNAMIC TABLE / RECORD OPERATIONS =====
