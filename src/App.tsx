@@ -28,6 +28,7 @@ import { useAppDispatch } from './store/hooks';
 import { resetStore } from './store';
 import { socketService } from './services/socketService';
 import { fetchNotifications } from './store/notificationsSlice';
+import { fetchFeedbackUnreadSummary } from './store/feedbackSlice';
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -71,6 +72,7 @@ function App() {
   useEffect(() => {
     if (isAuthenticated) {
       dispatch(fetchNotifications());
+      dispatch(fetchFeedbackUnreadSummary());
     }
   }, [isAuthenticated, dispatch]);
 

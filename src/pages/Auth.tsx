@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import Overlay from "../components/Overlay";
 import LoginForm from "../components/LoginForm";
 import { authService } from "../services/authServices";
+import { settingsService } from "../services/settingsService";
 import SignUpForm from "../components/SignUpForm";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 
@@ -60,6 +61,29 @@ const Auth = ({ onLoginSuccess }: AuthProps) => {
             window.history.replaceState({}, document.title);
         }
     }, [location.state]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const cancelAccount = params.get('cancelDeletion');
+        const cancelOrg = params.get('cancelOrgDeletion');
+        const cancelToken = cancelAccount || cancelOrg;
+        if (!cancelToken) return;
+
+        (async () => {
+            try {
+                const res = cancelOrg
+                    ? await settingsService.cancelOrgDeletion(cancelToken)
+                    : await settingsService.cancelDeletion(cancelToken);
+                setSuccessMessage(res.message ?? 'Deletion cancelled. You can sign in again.');
+            } catch (err: unknown) {
+                const msg = err && typeof err === 'object' && 'message' in err
+                    ? String((err as { message: string }).message)
+                    : 'Invalid or expired cancellation link.';
+                setError(msg);
+            }
+            navigate('/auth', { replace: true });
+        })();
+    }, [location.search, navigate]);
 
     // ── Step 1: normal login ─────────────────────────────────────────────────
     const handleLoginSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

@@ -10,8 +10,8 @@
  *   - No internal notes, no delete, no task assignment.
  */
 
-import { useEffect, useState, useCallback } from 'react';
-import { feedbackService, type FeedbackEntry } from '../services/feedbackService';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { feedbackService, type FeedbackEntry, type FeedbackReply } from '../services/feedbackService';
 import { getAllMetrics, clearMetrics, type PerfMetric } from '../hooks/usePerformanceTimer';
 import {
     FiTrash2, FiRefreshCw, FiClock, FiBarChart2,
@@ -20,6 +20,8 @@ import {
 import { MdOutlineFeedback } from 'react-icons/md';
 import MentionTextarea, { type AssignedMember } from '../components/MentionTextarea';
 import { useAuth } from '../contexts/AuthContext';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { markFeedbackRead } from '../store/feedbackSlice';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -67,6 +69,24 @@ function StatusBadge({ status }: { status: string }) {
             {status}
         </span>
     );
+}
+
+function UnreadReplyBadge({ count }: { count: number }) {
+    if (count <= 0) return null;
+    return (
+        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold bg-[#f05b56] text-white px-1.5 py-0.5 rounded-full">
+            <FiMessageSquare size={9} />
+            {count > 99 ? '99+' : count}
+        </span>
+    );
+}
+
+function useMarkFeedbackReadOnOpen() {
+    const dispatch = useAppDispatch();
+    return useCallback((feedbackId: string) => {
+        dispatch(markFeedbackRead(feedbackId));
+        feedbackService.markRead(feedbackId).catch(() => {});
+    }, [dispatch]);
 }
 
 // ─── Performance panel ────────────────────────────────────────────────────────
@@ -176,7 +196,113 @@ function PerformancePanel({ onClose }: { onClose: () => void }) {
     );
 }
 
+// ─── Reply thread (shared between admin and user views) ──────────────────────
+
+function ReplyThread({
+    entry,
+    currentUserId,
+    onRepliesUpdate,
+}: {
+    entry: FeedbackEntry;
+    currentUserId: string;
+    onRepliesUpdate: (replies: FeedbackReply[]) => void;
+}) {
+    const [draft, setDraft] = useState('');
+    const [sending, setSending] = useState(false);
+    const [error, setError] = useState('');
+    const bottomRef = useRef<HTMLDivElement>(null);
+
+    const replies: FeedbackReply[] = Array.isArray(entry.replies) ? entry.replies : [];
+
+    // Scroll to bottom when replies change
+    useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [replies.length]);
+
+    const handleSend = async () => {
+        if (!draft.trim()) return;
+        setSending(true);
+        setError('');
+        try {
+            const res = await feedbackService.addReply(entry.id, draft.trim());
+            if (res.success) {
+                onRepliesUpdate(res.data.feedback.replies ?? []);
+                setDraft('');
+            }
+        } catch {
+            setError('Failed to send reply. Please try again.');
+        } finally {
+            setSending(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            handleSend();
+        }
+    };
+
+    return (
+        <div className="flex flex-col gap-2">
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
+                <FiMessageSquare size={11} />
+                Conversation
+            </p>
+
+            {/* Thread */}
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {replies.length === 0 && (
+                    <p className="text-xs text-gray-400 text-center py-3">No replies yet — start the conversation below.</p>
+                )}
+                {replies.map(r => {
+                    const isMe = r.senderId === currentUserId;
+                    return (
+                        <div key={r.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${isMe ? 'bg-[#984815] text-white' : 'bg-gray-200 text-gray-600'}`}>
+                                {r.senderName.charAt(0).toUpperCase()}
+                            </div>
+                            <div className={`max-w-[75%] flex flex-col gap-0.5 ${isMe ? 'items-end' : 'items-start'}`}>
+                                <div className={`rounded-2xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${isMe ? 'bg-[#984815] text-white rounded-tr-sm' : 'bg-gray-100 text-gray-800 rounded-tl-sm'}`}>
+                                    {r.message}
+                                </div>
+                                <span className="text-[10px] text-gray-400">
+                                    {isMe ? 'You' : r.senderName} · {timeAgo(r.createdAt)}
+                                </span>
+                            </div>
+                        </div>
+                    );
+                })}
+                <div ref={bottomRef} />
+            </div>
+
+            {/* Input */}
+            {error && <p className="text-xs text-red-500">{error}</p>}
+            <div className="flex gap-2 items-end border border-gray-200 rounded-xl p-2 focus-within:border-[#984815] transition">
+                <textarea
+                    className="flex-1 text-sm outline-none resize-none bg-transparent placeholder:text-gray-400 min-h-[36px] max-h-24"
+                    rows={1}
+                    placeholder="Write a reply… (Ctrl+Enter to send)"
+                    value={draft}
+                    onChange={e => setDraft(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={sending}
+                />
+                <button
+                    onClick={handleSend}
+                    disabled={sending || !draft.trim()}
+                    className="shrink-0 bg-[#984815] text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-[#7a3a10] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {sending ? '…' : 'Send'}
+                </button>
+            </div>
+        </div>
+    );
+}
+
 // ─── Detail panel ─────────────────────────────────────────────────────────────
+
+type DetailTab = 'conversation' | 'notes' | 'assigned';
 
 function FeedbackDetail({
     entry,
@@ -189,8 +315,11 @@ function FeedbackDetail({
     onStatusChange: (id: string, status: string, updatedEntry: Partial<FeedbackEntry>) => void;
     onDelete: (id: string) => void;
 }) {
+    const { user } = useAuth();
+    const currentUserId = user?.id ?? '';
+
+    const [activeTab, setActiveTab] = useState<DetailTab>('conversation');
     const [notes, setNotes] = useState(entry.adminNotes ?? '');
-    const [reply, setReply] = useState(entry.adminReply ?? '');
     const [assignedTo, setAssignedTo] = useState<AssignedMember[]>(
         Array.isArray(entry.assignedTo) ? entry.assignedTo : []
     );
@@ -199,17 +328,17 @@ function FeedbackDetail({
     // Reset local state when a different entry is opened
     useEffect(() => {
         setNotes(entry.adminNotes ?? '');
-        setReply(entry.adminReply ?? '');
         setAssignedTo(Array.isArray(entry.assignedTo) ? entry.assignedTo : []);
+        setActiveTab('conversation');
     }, [entry.id]);
 
     const nextStatus = entry.status === 'pending' ? 'reviewed' : entry.status === 'reviewed' ? 'resolved' : null;
 
-    const handleSaveNotes = async () => {
+    const handleSave = async () => {
         setSaving(true);
         try {
-            await feedbackService.updateStatus(entry.id, entry.status, notes || undefined, assignedTo, reply || undefined);
-            onStatusChange(entry.id, entry.status, { adminNotes: notes, adminReply: reply, assignedTo });
+            await feedbackService.updateStatus(entry.id, entry.status, notes || undefined, assignedTo);
+            onStatusChange(entry.id, entry.status, { adminNotes: notes, assignedTo });
         } finally {
             setSaving(false);
         }
@@ -219,135 +348,197 @@ function FeedbackDetail({
         if (!nextStatus) return;
         setSaving(true);
         try {
-            await feedbackService.updateStatus(entry.id, nextStatus, notes || undefined, assignedTo, reply || undefined);
-            onStatusChange(entry.id, nextStatus, { adminNotes: notes, adminReply: reply, assignedTo });
+            await feedbackService.updateStatus(entry.id, nextStatus, notes || undefined, assignedTo);
+            onStatusChange(entry.id, nextStatus, { adminNotes: notes, assignedTo });
         } finally {
             setSaving(false);
         }
     };
 
+    const TABS: { key: DetailTab; label: string; badge?: number }[] = [
+        {
+            key: 'conversation',
+            label: 'Conversation',
+            badge: (Array.isArray(entry.replies) ? entry.replies.length : 0) || undefined,
+        },
+        { key: 'notes',    label: 'Internal notes' },
+        {
+            key: 'assigned',
+            label: 'Assigned',
+            badge: assignedTo.length || undefined,
+        },
+    ];
+
     return (
         <div className="flex flex-col h-full">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-                <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition text-sm flex items-center gap-1">
-                    ← Back
-                </button>
-                <button
-                    onClick={() => { onDelete(entry.id); onClose(); }}
-                    className="text-gray-400 hover:text-red-500 transition"
-                >
-                    <FiTrash2 size={16} />
-                </button>
-            </div>
+            {/* Header — meta + status actions */}
+            <div className="px-5 pt-4 pb-0 border-b border-gray-100 shrink-0">
+                <div className="flex items-start justify-between gap-2 mb-3">
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition text-xs flex items-center gap-1 shrink-0 mt-0.5">
+                        ← Back
+                    </button>
+                    <button
+                        onClick={() => { onDelete(entry.id); onClose(); }}
+                        className="text-gray-300 hover:text-red-400 transition shrink-0"
+                    >
+                        <FiTrash2 size={14} />
+                    </button>
+                </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-                {/* Meta */}
-                <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-full bg-[#984815]/10 flex items-center justify-center text-[#984815] shrink-0 text-sm font-semibold">
+                {/* Submitter row */}
+                <div className="flex items-start gap-3 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-[#984815]/10 flex items-center justify-center text-[#984815] shrink-0 text-xs font-bold">
                         {(entry.userName ?? entry.userEmail).charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-semibold text-sm">{entry.userName ?? entry.userEmail}</span>
-                            <span className="text-xs text-gray-400">{USER_TYPE_LABEL[entry.userType] ?? entry.userType}</span>
+                            <span className="text-[10px] text-gray-400">{USER_TYPE_LABEL[entry.userType] ?? entry.userType}</span>
                             <StatusBadge status={entry.status} />
-                            <span className="text-xs text-gray-400 ml-auto">{timeAgo(entry.createdAt)}</span>
+                            <span className="text-[10px] text-gray-400 ml-auto">{timeAgo(entry.createdAt)}</span>
                         </div>
-                        <p className="text-xs text-gray-400 mt-0.5 truncate">{entry.userEmail}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5 truncate">{entry.userEmail}</p>
                     </div>
                 </div>
 
-                {/* Context */}
-                <div className="bg-[#f5f5f5] rounded-lg px-4 py-3 text-xs space-y-1">
-                    <div className="flex gap-2"><span className="text-gray-400 w-20 shrink-0">Page</span><span className="text-gray-700">{entry.page}</span></div>
-                    {entry.pageUrl && <div className="flex gap-2"><span className="text-gray-400 w-20 shrink-0">URL</span><span className="text-gray-500 truncate">{entry.pageUrl}</span></div>}
-                    {entry.patientName && <div className="flex gap-2"><span className="text-gray-400 w-20 shrink-0">Patient</span><span className="text-gray-700">{entry.patientName}</span></div>}
-                </div>
-
-                {/* Message */}
-                <div>
-                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Message</p>
-                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{entry.message}</p>
-                </div>
-
-                {/* Reply to submitter */}
-                <div>
-                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
-                        Reply to submitter
-                    </p>
-                    <textarea
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#984815] resize-none"
-                        rows={3}
-                        placeholder={`Write a reply to ${entry.userName ?? entry.userEmail}...`}
-                        value={reply}
-                        onChange={e => setReply(e.target.value)}
-                    />
-                    {entry.adminReply && (
-                        <p className="text-[10px] text-gray-400 mt-1">
-                            Last saved: "{entry.adminReply.slice(0, 60)}{entry.adminReply.length > 60 ? '…' : ''}"
-                        </p>
-                    )}
-                </div>
-
-                {/* Admin notes with @mention */}
-                <div>
-                    <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-                            Internal notes &amp; task assignment
-                        </p>
-                        <span className="text-[10px] text-gray-400">type @ to assign staff</span>
+                {/* Original message */}
+                <div className="bg-gray-50 rounded-lg px-3 py-2.5 mb-3">
+                    <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">Feedback</p>
+                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap line-clamp-3">{entry.message}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                        <span className="text-[10px] text-gray-400 font-medium">{entry.page}</span>
+                        {entry.pageUrl && (
+                            <><span className="text-[10px] text-gray-300">·</span>
+                            <span className="text-[10px] text-gray-400 truncate max-w-[180px]">{entry.pageUrl}</span></>
+                        )}
+                        {entry.patientName && (
+                            <><span className="text-[10px] text-gray-300">·</span>
+                            <span className="text-[10px] text-gray-400">Patient: {entry.patientName}</span></>
+                        )}
                     </div>
-                    <MentionTextarea
-                        value={notes}
-                        onChange={setNotes}
-                        assignedTo={assignedTo}
-                        onAssignedChange={setAssignedTo}
-                        placeholder="Internal notes only... type @ to assign a task to someone"
-                        rows={3}
-                    />
                 </div>
 
-                {/* Currently assigned */}
-                {assignedTo.length > 0 && (
-                    <div className="bg-[#984815]/5 border border-[#984815]/15 rounded-lg px-4 py-3">
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-[#984815] mb-2">
-                            <FiUserCheck size={12} />
-                            Assigned to
-                        </div>
-                        <div className="space-y-1.5">
-                            {assignedTo.map(m => (
-                                <div key={m.id} className="flex items-center gap-2 text-xs text-gray-700">
-                                    <div className="w-5 h-5 rounded-full bg-[#984815] text-white text-[9px] flex items-center justify-center font-bold shrink-0">
-                                        {m.name.charAt(0).toUpperCase()}
-                                    </div>
-                                    <span className="font-medium">{m.name}</span>
-                                    <span className="text-gray-400">{m.email}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Action buttons */}
-                <div className="flex gap-2 pt-1">
+                {/* Status actions */}
+                <div className="flex gap-2 mb-3">
                     <button
-                        onClick={handleSaveNotes}
+                        onClick={handleSave}
                         disabled={saving}
-                        className="flex-1 flex items-center justify-center gap-2 border border-gray-200 text-gray-600 rounded-lg py-2.5 text-sm font-medium hover:bg-gray-50 transition disabled:opacity-60"
+                        className="flex-1 border border-gray-200 text-gray-600 rounded-lg py-1.5 text-xs font-medium hover:bg-gray-50 transition disabled:opacity-50"
                     >
-                        {saving ? 'Saving...' : 'Save'}
+                        {saving ? 'Saving…' : 'Save'}
                     </button>
-
                     {nextStatus && (
                         <button
                             onClick={handleAdvance}
                             disabled={saving}
-                            className="flex-1 flex items-center justify-center gap-2 bg-[#984815] text-white rounded-lg py-2.5 text-sm font-medium hover:bg-[#7a3a10] transition disabled:opacity-60"
+                            className="flex-1 bg-[#984815] text-white rounded-lg py-1.5 text-xs font-medium hover:bg-[#7a3a10] transition disabled:opacity-50"
                         >
-                            {saving ? 'Saving...' : `Mark as ${nextStatus}`}
+                            {saving ? 'Saving…' : `→ ${nextStatus.charAt(0).toUpperCase() + nextStatus.slice(1)}`}
                         </button>
                     )}
                 </div>
+
+                {/* Tab strip */}
+                <div className="flex gap-0">
+                    {TABS.map(t => (
+                        <button
+                            key={t.key}
+                            onClick={() => setActiveTab(t.key)}
+                            className={`flex items-center gap-1.5 px-3 py-2 text-[11px] font-medium border-b-2 transition -mb-px ${
+                                activeTab === t.key
+                                    ? 'border-[#984815] text-[#984815]'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            {t.label}
+                            {t.badge !== undefined && (
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${activeTab === t.key ? 'bg-[#984815] text-white' : 'bg-gray-200 text-gray-500'}`}>
+                                    {t.badge}
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Tab body */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 min-h-0">
+                {activeTab === 'conversation' && (
+                    <ReplyThread
+                        entry={entry}
+                        currentUserId={currentUserId}
+                        onRepliesUpdate={(replies) => onStatusChange(entry.id, entry.status, { replies })}
+                    />
+                )}
+
+                {activeTab === 'notes' && (
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <p className="text-xs text-gray-400">Internal only — not visible to the submitter</p>
+                            <span className="text-[10px] text-gray-400">type @ to assign staff</span>
+                        </div>
+                        <MentionTextarea
+                            value={notes}
+                            onChange={setNotes}
+                            assignedTo={assignedTo}
+                            onAssignedChange={setAssignedTo}
+                            placeholder="Add internal notes… type @ to assign a task"
+                            rows={6}
+                        />
+                        <button
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="w-full border border-gray-200 text-gray-600 rounded-lg py-2 text-xs font-medium hover:bg-gray-50 transition disabled:opacity-50"
+                        >
+                            {saving ? 'Saving…' : 'Save notes'}
+                        </button>
+                    </div>
+                )}
+
+                {activeTab === 'assigned' && (
+                    <div className="space-y-3">
+                        <p className="text-xs text-gray-400">
+                            Use @mentions in Internal notes to assign staff. They'll appear here.
+                        </p>
+                        {assignedTo.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-10 text-gray-400 gap-2">
+                                <FiUserCheck size={28} className="opacity-30" />
+                                <p className="text-sm">No one assigned yet</p>
+                                <p className="text-xs text-center max-w-[200px]">Switch to Internal notes and @mention a staff member</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {assignedTo.map(m => (
+                                    <div key={m.id} className="flex items-center gap-3 bg-[#984815]/5 border border-[#984815]/15 rounded-lg px-4 py-3">
+                                        <div className="w-8 h-8 rounded-full bg-[#984815] text-white text-xs flex items-center justify-center font-bold shrink-0">
+                                            {m.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-gray-800">{m.name}</p>
+                                            <p className="text-[11px] text-gray-400 truncate">{m.email}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                const updated = assignedTo.filter(a => a.id !== m.id);
+                                                setAssignedTo(updated);
+                                            }}
+                                            className="text-gray-300 hover:text-red-400 transition shrink-0"
+                                        >
+                                            <FiX size={13} />
+                                        </button>
+                                    </div>
+                                ))}
+                                <button
+                                    onClick={handleSave}
+                                    disabled={saving}
+                                    className="w-full border border-gray-200 text-gray-600 rounded-lg py-2 text-xs font-medium hover:bg-gray-50 transition disabled:opacity-50"
+                                >
+                                    {saving ? 'Saving…' : 'Save assignments'}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -377,10 +568,12 @@ function UserFeedbackDetail({
     entry,
     onClose,
     onStatusChange,
+    onRepliesUpdate,
 }: {
     entry: FeedbackEntry;
     onClose: () => void;
     onStatusChange?: (id: string, newStatus: string) => void;
+    onRepliesUpdate?: (id: string, replies: FeedbackReply[]) => void;
 }) {
     const { user } = useAuth();
     const currentUserId = user?.id ?? '';
@@ -445,25 +638,6 @@ function UserFeedbackDetail({
                     <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-[#f5f5f5] rounded-lg px-4 py-3">{entry.message}</p>
                 </div>
 
-                {/* Admin reply */}
-                {entry.adminReply ? (
-                    <div>
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-[#984815] uppercase tracking-wide mb-2">
-                            <FiMessageSquare size={12} />
-                            Reply from support
-                        </div>
-                        <div className="bg-[#984815]/5 border border-[#984815]/15 rounded-lg px-4 py-3 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                            {entry.adminReply}
-                        </div>
-                    </div>
-                ) : (
-                    <div className="text-xs text-gray-400 bg-gray-50 rounded-lg px-4 py-3 text-center">
-                        {entry.status === 'resolved'
-                            ? 'This issue has been resolved.'
-                            : "No reply yet — we'll get back to you soon."}
-                    </div>
-                )}
-
                 {/* Internal notes visible to assigned staff */}
                 {isAssignedToMe && entry.adminNotes && (
                     <div>
@@ -473,6 +647,13 @@ function UserFeedbackDetail({
                         </p>
                     </div>
                 )}
+
+                {/* Conversation thread — submitter and assigned can both reply */}
+                <ReplyThread
+                    entry={entry}
+                    currentUserId={currentUserId}
+                    onRepliesUpdate={(replies) => onRepliesUpdate?.(entry.id, replies)}
+                />
 
                 {/* Status action — only for assigned users on non-resolved items */}
                 {isAssignedToMe && nextStatus && (
@@ -498,6 +679,8 @@ function UserFeedbackView() {
 
     const { user } = useAuth();
     const currentUserId = user?.id ?? '';
+    const unreadByFeedbackId = useAppSelector(s => s.feedback.byFeedbackId);
+    const markReadOnOpen = useMarkFeedbackReadOnOpen();
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -523,7 +706,11 @@ function UserFeedbackView() {
         );
     };
 
-    // Split into submitted-by-me vs assigned-to-me (could overlap, show in both)
+    const handleRepliesUpdate = (id: string, replies: FeedbackReply[]) => {
+        setEntries(prev => prev.map(e => e.id === id ? { ...e, replies } : e));
+        setSelected(prev => prev?.id === id ? { ...prev, replies } : prev);
+    };
+
     const mySubmissions = entries.filter(e => e.userId === currentUserId);
     const assignedToMe  = entries.filter(e =>
         Array.isArray(e.assignedTo) && e.assignedTo.some(a => a.id === currentUserId)
@@ -600,7 +787,10 @@ function UserFeedbackView() {
                     {!loading && visibleEntries.map(entry => (
                         <div
                             key={entry.id}
-                            onClick={() => setSelected(entry)}
+                            onClick={() => {
+                                setSelected(entry);
+                                markReadOnOpen(entry.id);
+                            }}
                             className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-50 hover:bg-gray-50 transition ${selected?.id === entry.id ? 'bg-[#984815]/5' : ''}`}
                         >
                             <div className="flex-1 min-w-0">
@@ -612,11 +802,7 @@ function UserFeedbackView() {
                                             <FiUserCheck size={9} /> from {entry.userName ?? entry.userEmail}
                                         </span>
                                     )}
-                                    {entry.adminReply && (
-                                        <span className="inline-flex items-center gap-0.5 text-[10px] text-[#984815] font-medium">
-                                            <FiMessageSquare size={9} /> Reply received
-                                        </span>
-                                    )}
+                                    <UnreadReplyBadge count={unreadByFeedbackId[entry.id] ?? 0} />
                                     <span className="text-[10px] text-gray-400 ml-auto">{timeAgo(entry.createdAt)}</span>
                                 </div>
                                 <p className="text-sm text-gray-700 truncate mt-1">{entry.message}</p>
@@ -633,6 +819,7 @@ function UserFeedbackView() {
                             entry={selected}
                             onClose={() => setSelected(null)}
                             onStatusChange={handleStatusChange}
+                            onRepliesUpdate={handleRepliesUpdate}
                         />
                     </div>
                 )}
@@ -644,9 +831,15 @@ function UserFeedbackView() {
 // ─── Admin view ──────────────────────────────────────────────────────────────
 
 function AdminFeedbackView() {
+    const { user } = useAuth();
+    const currentUserId = user?.id ?? '';
+    const unreadByFeedbackId = useAppSelector(s => s.feedback.byFeedbackId);
+    const markReadOnOpen = useMarkFeedbackReadOnOpen();
+
     const [entries, setEntries] = useState<FeedbackEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<StatusFilter>('all');
+    const [activeTab, setActiveTab] = useState<'all' | 'assigned'>('all');
     const [selected, setSelected] = useState<FeedbackEntry | null>(null);
     const [showPerf, setShowPerf] = useState(false);
     const [error, setError] = useState('');
@@ -683,7 +876,13 @@ function AdminFeedbackView() {
         } catch { /* silent */ }
     };
 
-    const filtered = entries.filter(e => filter === 'all' || e.status === filter);
+    // Split: all entries vs ones assigned to me
+    const assignedToMe = entries.filter(e =>
+        Array.isArray(e.assignedTo) && e.assignedTo.some(a => a.id === currentUserId)
+    );
+    const sourceEntries = activeTab === 'assigned' ? assignedToMe : entries;
+    const filtered = sourceEntries.filter(e => filter === 'all' || e.status === filter);
+
     const counts = {
         all: entries.length,
         pending: entries.filter(e => e.status === 'pending').length,
@@ -692,16 +891,16 @@ function AdminFeedbackView() {
     };
 
     const FILTERS: { key: StatusFilter; label: string }[] = [
-        { key: 'all',      label: `All (${counts.all})` },
-        { key: 'pending',  label: `Pending (${counts.pending})` },
-        { key: 'reviewed', label: `Reviewed (${counts.reviewed})` },
-        { key: 'resolved', label: `Resolved (${counts.resolved})` },
+        { key: 'all',      label: `All (${sourceEntries.length})` },
+        { key: 'pending',  label: `Pending (${sourceEntries.filter(e => e.status === 'pending').length})` },
+        { key: 'reviewed', label: `Reviewed (${sourceEntries.filter(e => e.status === 'reviewed').length})` },
+        { key: 'resolved', label: `Resolved (${sourceEntries.filter(e => e.status === 'resolved').length})` },
     ];
 
     return (
         <div className="w-full h-full flex flex-col pt-4 px-4 sm:pt-6 sm:px-6 bg-white overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4 shrink-0">
+            <div className="flex items-center justify-between mb-2 shrink-0">
                 <div className="text-lg sm:text-[1.3em] font-medium flex items-center gap-3">
                     <MdOutlineFeedback className="text-[#984815]" />
                     Feedback
@@ -730,13 +929,35 @@ function AdminFeedbackView() {
                 </div>
             </div>
 
-            {/* Filter tabs */}
-            <div className="flex gap-1 mb-4 border-b border-gray-100 pb-0 shrink-0">
+            {/* Top-level tabs: All Feedback / Assigned to Me */}
+            <div className="flex gap-1 mb-0 border-b border-gray-100 shrink-0">
+                <button
+                    onClick={() => { setActiveTab('all'); setSelected(null); }}
+                    className={`px-3 py-2 text-xs font-medium rounded-t-lg transition border-b-2 -mb-px ${activeTab === 'all' ? 'border-[#984815] text-[#984815]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    All feedback
+                </button>
+                <button
+                    onClick={() => { setActiveTab('assigned'); setSelected(null); }}
+                    className={`px-3 py-2 text-xs font-medium rounded-t-lg transition border-b-2 -mb-px flex items-center gap-1.5 ${activeTab === 'assigned' ? 'border-[#984815] text-[#984815]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <FiUserCheck size={11} />
+                    Assigned to me
+                    {assignedToMe.length > 0 && (
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${activeTab === 'assigned' ? 'bg-[#984815] text-white' : 'bg-gray-200 text-gray-600'}`}>
+                            {assignedToMe.length}
+                        </span>
+                    )}
+                </button>
+            </div>
+
+            {/* Status filter sub-tabs */}
+            <div className="flex gap-1 mb-4 border-b border-gray-50 pb-0 shrink-0 mt-1">
                 {FILTERS.map(f => (
                     <button
                         key={f.key}
                         onClick={() => { setFilter(f.key); setSelected(null); }}
-                        className={`px-3 py-2 text-xs font-medium rounded-t-lg transition border-b-2 -mb-px ${filter === f.key ? 'border-[#984815] text-[#984815]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        className={`px-3 py-1.5 text-[11px] font-medium rounded-t transition border-b-2 -mb-px ${filter === f.key ? 'border-gray-400 text-gray-700' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
                     >
                         {f.label}
                     </button>
@@ -760,13 +981,20 @@ function AdminFeedbackView() {
                     {!loading && filtered.length === 0 && (
                         <div className="flex-1 flex flex-col items-center justify-center text-gray-400 py-16 gap-3">
                             <MdOutlineFeedback size={40} className="opacity-30" />
-                            <span className="text-sm">No feedback in this category</span>
+                            <span className="text-sm">
+                                {activeTab === 'assigned'
+                                    ? 'No feedback assigned to you yet.'
+                                    : 'No feedback in this category'}
+                            </span>
                         </div>
                     )}
                     {!loading && filtered.map(entry => (
                         <div
                             key={entry.id}
-                            onClick={() => setSelected(entry)}
+                            onClick={() => {
+                                setSelected(entry);
+                                markReadOnOpen(entry.id);
+                            }}
                             className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-50 hover:bg-gray-50 transition group ${selected?.id === entry.id ? 'bg-[#984815]/5' : ''}`}
                         >
                             <div className="w-8 h-8 rounded-full bg-[#984815]/10 flex items-center justify-center text-[#984815] text-xs font-semibold shrink-0 mt-0.5">
@@ -791,6 +1019,21 @@ function AdminFeedbackView() {
                                                 <FiUserCheck size={9} />
                                                 {entry.assignedTo.map(a => a.name.split(' ')[0]).join(', ')}
                                             </span>
+                                        </>
+                                    )}
+                                    {Array.isArray(entry.replies) && entry.replies.length > 0 && (
+                                        <>
+                                            <span className="text-[10px] text-gray-300">·</span>
+                                            <span className="inline-flex items-center gap-0.5 text-[10px] text-gray-400">
+                                                <FiMessageSquare size={9} />
+                                                {entry.replies.length}
+                                            </span>
+                                        </>
+                                    )}
+                                    {(unreadByFeedbackId[entry.id] ?? 0) > 0 && (
+                                        <>
+                                            <span className="text-[10px] text-gray-300">·</span>
+                                            <UnreadReplyBadge count={unreadByFeedbackId[entry.id]} />
                                         </>
                                     )}
                                 </div>

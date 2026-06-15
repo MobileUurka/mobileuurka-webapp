@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 // import { MdOutlineSpaceDashboard } from "react-icons/md";
 import { HiOutlineUserGroup } from "react-icons/hi";
-// import { IoSettingsOutline } from "react-icons/io5";
+import { IoSettingsOutline } from "react-icons/io5";
 import { FiBell } from "react-icons/fi";
 import { RiBubbleChartLine } from "react-icons/ri";
 import { useNavigate } from "react-router-dom";
@@ -40,6 +40,7 @@ const Sidebar = ({ activeItem, setActiveItem, setSideBarActive, sideBarActive }:
 const unreadCount = useAppSelector(s =>
     s.notifications.data.filter(n => !n.readAt).length
 );
+const feedbackUnreadCount = useAppSelector(s => s.feedback.totalUnread);
 
 const ClientItems = [
     // { name: "Dashboard", icon: <MdOutlineSpaceDashboard /> },
@@ -50,8 +51,8 @@ const ClientItems = [
 ];
 
 const activityItems = [
-    // { name: "Settings", icon: <IoSettingsOutline /> },
-    { name: "Feedback", icon: <MdOutlineFeedback /> },
+    { name: "Settings", icon: <IoSettingsOutline /> },
+    { name: "Feedback", icon: <MdOutlineFeedback />, showBadge: true },
     { name: "Notifications", icon: <FiBell />, showBadge: true },
     { name: "Logout", icon: <IoLogOutOutline /> }
 ];
@@ -182,9 +183,11 @@ return (
                                 {item.name}
                             </span>
                         )}
-                        {item.showBadge && unreadCount > 0 && (
+                        {item.showBadge && (item.name === 'Feedback' ? feedbackUnreadCount : unreadCount) > 0 && (
                             <span className={`bg-[#f05b56] text-white text-xs w-5 h-5 rounded-full flex items-center justify-center ${sideBarActive ? 'flex' : 'hidden'}`}>
-                                {unreadCount > 99 ? '99+' : unreadCount}
+                                {(item.name === 'Feedback' ? feedbackUnreadCount : unreadCount) > 99
+                                    ? '99+'
+                                    : (item.name === 'Feedback' ? feedbackUnreadCount : unreadCount)}
                             </span>
                         )}
                     </li>
@@ -230,9 +233,11 @@ return (
                             >
                                 <span className="text-[#aca287] text-lg">{item.icon}</span>
                                 <span className="flex-1">{item.name}</span>
-                                {item.showBadge && unreadCount > 0 && (
+                                {item.showBadge && (item.name === 'Feedback' ? feedbackUnreadCount : unreadCount) > 0 && (
                                     <span className="bg-[#f05b56] text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                                        {unreadCount > 99 ? '99+' : unreadCount}
+                                        {(item.name === 'Feedback' ? feedbackUnreadCount : unreadCount) > 99
+                                            ? '99+'
+                                            : (item.name === 'Feedback' ? feedbackUnreadCount : unreadCount)}
                                     </span>
                                 )}
                             </li>

@@ -38,6 +38,8 @@ export interface PaymentRequest {
   phoneNumber?: string;
   guestEmail?: string;
   features?: string[];
+  organizationId?: string;
+  returnTo?: 'onboarding' | 'settings';
   userData?: {
     email: string;
     firstName: string;
@@ -91,9 +93,11 @@ export const paymentService = {
           paymentMethod: request.paymentMethod,
           planId: request.planId,
           phoneNumber: request.phoneNumber,
-          features: request.features,       // ← add this
+          features: request.features,
           email: request.guestEmail ?? request.userData?.email,
           userData: request.userData,
+          organizationId: request.organizationId ?? request.userData?.organizationId,
+          returnTo: request.returnTo,
         }),
       });
 

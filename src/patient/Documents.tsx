@@ -22,9 +22,9 @@ interface DocumentsProps {
 
 const RISK_COLORS: Record<string, { bg: string; text: string }> = {
   CRITICAL: { bg: '#fef2f2', text: '#dc2626' },
-  HIGH:     { bg: '#fff7ed', text: '#ea580c' },
+  HIGH: { bg: '#fff7ed', text: '#ea580c' },
   MODERATE: { bg: '#fefce8', text: '#ca8a04' },
-  LOW:      { bg: '#f0fdf4', text: '#16a34a' },
+  LOW: { bg: '#f0fdf4', text: '#16a34a' },
 };
 
 function RiskBadge({ level }: { level?: string }) {
@@ -150,7 +150,7 @@ const Documents: React.FC<DocumentsProps> = ({
         // Match explanation by gestationweek + date, then pick closest by updatedAt
         const itemDate = new Date(item.date).toISOString().split("T")[0];
         const itemUpdatedAt = new Date(item.updatedAt || item.date).getTime();
-        
+
         const match = patient?.explanation
           ?.filter((exp: any) => {
             const expDate = new Date(exp.date).toISOString().split("T")[0];
@@ -162,7 +162,7 @@ const Documents: React.FC<DocumentsProps> = ({
             const bDiff = Math.abs(new Date(b.updatedAt || b.date).getTime() - itemUpdatedAt);
             return aDiff - bDiff;
           })?.[0];
-        
+
         result = match?.risklevel || "No risk level";
       }
       if (title === "Symptom Analysis") {
@@ -223,7 +223,7 @@ const Documents: React.FC<DocumentsProps> = ({
     {
       label: "Editor",
       key: "editor",
-      width: "150px",
+      width: "250px",
       render: (record: any) => (
         <div className="text-black/70 truncate">
           {record.isSymptomReport ? 'AI System' : resolveEditor(record.editor)}

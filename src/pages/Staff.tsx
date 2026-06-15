@@ -7,6 +7,7 @@ import SearchContainer from '../components/SearchContainer';
 import AddStaffModal, { type StaffFormData } from '../components/AddStaffModal';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
+import { FiTrash2 } from 'react-icons/fi';
 
 const STAFF_COLUMNS = [
   {
@@ -45,7 +46,7 @@ const STAFF_COLUMNS = [
     key: 'phone',
     width: '130px',
     render: (user: any) => <span className="text-gray-600">{user.phone || '—'}</span>
-  }
+  },
 ];
 
 const Staff = () => {
@@ -95,9 +96,46 @@ const Staff = () => {
     }
   };
 
-  const canAddStaff = ['doctor', 'admin'].includes(
+  const canManageStaff = ['doctor', 'admin'].includes(
     currentUser?.role?.toLowerCase() ?? ''
-  );
+  ) || currentUser?.organizationId != null;
+
+  const handleRemoveStaff = async (user: User) => {
+    if (!window.confirm(`Deactivate ${user.firstName} ${user.lastName}? They will no longer be able to sign in.`)) {
+      return;
+    }
+    try {
+      await userService.deleteUser(user.id);
+      showSuccess(`${user.firstName} ${user.lastName} has been deactivated.`);
+      dispatch(invalidateStaff());
+      dispatch(fetchStaff());
+    } catch (error: any) {
+      showError(error?.message ?? 'Failed to remove staff member');
+    }
+  };
+
+  const staffColumns = canManageStaff
+    ? [
+        ...STAFF_COLUMNS,
+        {
+          label: '',
+          key: 'actions',
+          width: '60px',
+          render: (user: User) =>
+            user.id === currentUser?.id ? null : (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleRemoveStaff(user); }}
+                className="text-gray-400 hover:text-red-500 p-1"
+                title="Deactivate staff"
+              >
+                <FiTrash2 size={15} />
+              </button>
+            ),
+        },
+      ]
+    : STAFF_COLUMNS;
+
   return (
     <div className="pt-4 px-4 sm:pt-6 sm:px-6 w-full h-full flex flex-col">
       <div className="w-full flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
@@ -108,8 +146,8 @@ const Staff = () => {
         <SearchContainer
           placeholder="Search staff..."
           onSearch={setSearchTerm}
-          showAdd={canAddStaff}
-          onAdd={canAddStaff ? () => setShowAddModal(true) : undefined}
+          showAdd={canManageStaff}
+          onAdd={canManageStaff ? () => setShowAddModal(true) : undefined}
           addButtonText="Add Staff"
           onRefresh={() => { dispatch(invalidateStaff()); dispatch(fetchStaff()); }}
           showRefresh={true}
@@ -120,7 +158,7 @@ const Staff = () => {
       </div>
 
       <DataTable<User>
-        columns={STAFF_COLUMNS}
+        columns={staffColumns}
         data={filteredUsers}
         emptyMessage={searchTerm ? `No staff found matching "${searchTerm}"` : 'No staff members found.'}
         initialItemsPerPage={10}

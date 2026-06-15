@@ -8,7 +8,13 @@ let refreshPromise: Promise<string | null> | null = null;
 
 async function request(endpoint: string, options: any = {}) {
     // List of endpoints that don't require authentication
-    const publicEndpoints = ['/auth/', '/payments/auth', '/payments/callback'];
+    const publicEndpoints = [
+        '/auth/',
+        '/payments/auth',
+        '/payments/callback',
+        '/settings/account/cancel-deletion',
+        '/organizations/me/cancel-deletion',
+    ];
     const isPublicEndpoint = publicEndpoints.some(publicPath => endpoint.includes(publicPath));
 
     // 1. Validate and refresh token proactively (skip for public endpoints)

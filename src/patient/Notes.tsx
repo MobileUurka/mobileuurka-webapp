@@ -91,7 +91,7 @@ const Notes: React.FC<NotesProps> = ({ patient, setActiveTitle, setNotes }) => {
       width: "180px",
       render: (note: any) => (
         <div className="text-black/70 truncate">
-          {editorNames[note.editor] || "System"}
+          {note.editorName || editorNames[note.editor] || "System"}
         </div>
       ),
     },

@@ -345,3 +345,12 @@ section .container .list:last-child {
 section .container .list .label {
   font-weight: bolder;
 }
+
+/* ─── Toast slide-up animation ───────────────────────────────────────────── */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up 0.2s ease-out forwards;
+}

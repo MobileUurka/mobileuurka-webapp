@@ -67,15 +67,12 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
     title: "Patient Intake",
     fields: [
       { name: 'editor', label: 'Recorded By', type: 'text', required: true, readonly: true },
-      { name: 'firstName', label: 'First Name', type: 'text', required: true },
-      { name: 'lastName', label: 'Last Name', type: 'text', required: true },
       {
-        name: 'dob',
-        label: 'Date of Birth',
-        type: 'date',
-        required: true,
-        max: new Date().toISOString().split('T')[0]
+        name: 'nationalId', label: 'National ID', type: 'text', required: false, minLength: 8,
+        maxLength: 8, patternMessage: 'National ID must be exactly 8 digits'
+
       },
+      { name: 'firstName', label: 'First Name', type: 'text', required: true },
       {
         name: 'phone',
         label: 'Phone Number',
@@ -87,11 +84,15 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         pattern: /^0\d{9}$/,
         patternMessage: 'Phone number must be exactly 10 digits and start with 0'
       },
+      { name: 'lastName', label: 'Last Name', type: 'text', required: true },
       {
-        name: 'nationalId', label: 'National ID', type: 'text', required: false, minLength: 8,
-        maxLength: 8, patternMessage: 'National ID must be exactly 8 digits'
-
+        name: 'dob',
+        label: 'Date of Birth',
+        type: 'date',
+        required: true,
+        max: new Date().toISOString().split('T')[0]
       },
+
       { name: 'email', label: 'Email Address', type: 'email' },
       { name: 'address', label: 'Address', type: 'text' },
       {
@@ -227,10 +228,10 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
   },
 
   History: {
-    
+
     title: "Patient Medical History",
     fields: [
-      
+
       // ── Admin / meta ────────────────────────────────────────────────────────
       { name: 'editor', label: 'Recorded By', type: 'text', required: true, readonly: true },
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
@@ -554,9 +555,9 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
     fields: [
       { name: 'editor', label: 'Tested By', type: 'text', required: true, readonly: true },
       { name: 'title', label: 'Title', type: "text" },
-      { name: 'notes', label: 'Clinical Notes', type: 'textarea', required: true, placeholder: 'Enter clinical notes here...' },
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
       { name: 'date', label: 'Date', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
+      { name: 'notes', label: 'Clinical Notes', type: 'textarea', required: true, placeholder: 'Enter clinical notes here...' },
       { name: 'gestationWeek', label: 'Gestation Week', type: 'number', required: true, min: 0, max: 43 },
     ]
   },

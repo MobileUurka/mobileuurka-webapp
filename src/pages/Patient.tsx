@@ -100,19 +100,26 @@ const Patient: React.FC = () => {
         ...(patient?.currentPregnancyInfo ?? []),
         ...(patient?.infections ?? []),
       ];
-      for (const item of sources) {
-        if (item?.editor && uuidLike.test(item.editor)) toResolve.add(item.editor);
-      }
-      if (toResolve.size === 0) return;
       const namesMap: Record<string, string> = {};
+      for (const item of sources) {
+        if (item?.editor && (item as { editorName?: string }).editorName) {
+          namesMap[item.editor] = (item as { editorName: string }).editorName;
+        } else if (item?.editor && uuidLike.test(item.editor)) {
+          toResolve.add(item.editor);
+        }
+      }
       for (const uid of toResolve) {
         try {
           const response = await userService.getUserById(uid);
           const user = response?.data?.user;
-          if (user) namesMap[uid] = `${user.firstName} ${user.lastName}`;
+          if (user) {
+            namesMap[uid] = user.displayLabel
+              ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()
+              ?? 'Former user';
+          }
         } catch { /* leave unresolved */ }
       }
-      setEditorNames(namesMap);
+      if (Object.keys(namesMap).length > 0) setEditorNames(namesMap);
     };
     fetchEditorNames();
   }, [patient]);

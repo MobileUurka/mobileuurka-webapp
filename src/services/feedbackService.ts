@@ -6,6 +6,16 @@ export interface AssignedStaffMember {
     email: string;
 }
 
+export interface FeedbackReply {
+    id: string;
+    senderId: string;
+    senderName: string;
+    senderEmail: string;
+    senderType: string;
+    message: string;
+    createdAt: string;
+}
+
 export interface FeedbackPayload {
     page: string;
     pageUrl: string;
@@ -30,6 +40,7 @@ export interface FeedbackEntry {
     adminNotes: string | null;
     adminReply: string | null;
     assignedTo: AssignedStaffMember[];
+    replies: FeedbackReply[];
     createdAt: string;
     updatedAt: string;
 }
@@ -62,7 +73,25 @@ export const feedbackService = {
         return api.patch(`/feedback/${id}`, { status, adminNotes, assignedTo, adminReply });
     },
 
+    async addReply(
+        id: string,
+        message: string,
+    ): Promise<{ success: boolean; data: { reply: FeedbackReply; feedback: FeedbackEntry } }> {
+        return api.post(`/feedback/${id}/replies`, { message });
+    },
+
     async deleteEntry(id: string): Promise<{ success: boolean }> {
         return api.delete(`/feedback/${id}`);
+    },
+
+    async getUnreadSummary(): Promise<{
+        success: boolean;
+        data: { totalUnread: number; byFeedbackId: Record<string, number> };
+    }> {
+        return api.get('/feedback/unread-summary');
+    },
+
+    async markRead(id: string): Promise<{ success: boolean }> {
+        return api.patch(`/feedback/${id}/read`, {});
     },
 };

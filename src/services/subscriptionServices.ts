@@ -87,7 +87,7 @@ export const subscriptionService = {
    */
   async getSubscription(id?: string): Promise<SubscriptionResponse> {
     try {
-      const endpoint = id ? `/subscriptions/${id}` : "/subscriptions";
+      const endpoint = id ? `/subscription/${id}` : "/subscription";
       const response = await authenticatedRequest(endpoint, { method: "GET" });
       return {
         success: true,
@@ -137,9 +137,8 @@ export const subscriptionService = {
    */
   async updateSubscription(id: string, updates: Partial<Subscription>): Promise<SubscriptionResponse> {
     try {
-      const response = await publicRequest(`/subscriptions/${id}`, {
+      const response = await authenticatedRequest(`/subscription/${id}`, {
         method: "PUT",
-        headers: apiHeaders(),
         body: JSON.stringify(updates),
       });
       return {
@@ -160,7 +159,7 @@ export const subscriptionService = {
    */
   async deleteSubscription(id: string): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await authenticatedRequest(`/subscriptions/${id}`, { method: "DELETE" });
+      const response = await authenticatedRequest(`/subscription/${id}`, { method: "DELETE" });
       return {
         success: true,
         message: response.message || "Subscription row destroyed",

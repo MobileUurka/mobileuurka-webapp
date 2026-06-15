@@ -109,4 +109,5 @@ export const SOCKET_EVENTS = {
     STAFF_UPDATED: 'staff:updated',
     STAFF_DELETED: 'staff:deleted',
     NOTIFICATION_NEW: 'notification:new',
+    FEEDBACK_REPLY: 'feedback:reply',
 } as const;

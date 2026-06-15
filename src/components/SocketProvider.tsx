@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { socketService, SOCKET_EVENTS } from '../services/socketService';
 import { useAppDispatch } from '../store/hooks';
 import { invalidatePatients, patientRemoved } from '../store/patientsSlice';
@@ -6,6 +6,10 @@ import { hospitalLinked, hospitalUnlinked, patientCountChanged } from '../store/
 import { staffMemberAdded, staffMemberUpdated, staffMemberRemoved } from '../store/staffSlice';
 import { profileUpdated, profileEvicted, invalidateProfile } from '../store/patientProfileSlice';
 import { addNotification } from '../store/notificationsSlice';
+import { incrementFeedbackUnread } from '../store/feedbackSlice';
+import { useToast } from '../contexts/ToastContext';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 /**
  * Mounts once inside the authenticated layout.
@@ -14,15 +18,24 @@ import { addNotification } from '../store/notificationsSlice';
  */
 export default function SocketProvider() {
     const dispatch = useAppDispatch();
+    const { showToast } = useToast();
+    const navigate = useNavigate();
+    const { user } = useAuth();
+
+    // Keep a ref to showToast so the socket handler always has the latest version
+    // without needing to re-register listeners on every render
+    const showToastRef = useRef(showToast);
+    const navigateRef = useRef(navigate);
+    const userIdRef = useRef(user?.id);
+    useEffect(() => { showToastRef.current = showToast; }, [showToast]);
+    useEffect(() => { navigateRef.current = navigate; }, [navigate]);
+    useEffect(() => { userIdRef.current = user?.id; }, [user?.id]);
 
     useEffect(() => {
         const sock = socketService.connect();
         if (!sock) return;
 
         // --- Patients ---
-        // The list endpoint (getPatientsRiskOverview) joins multiple tables for
-        // riskLevel/diagnosis — we can't patch rows in-place with the raw socket payload.
-        // Instead, invalidate the list so it re-fetches silently in the background.
         const onPatientCreated = () => {
             console.log('🔌 [socket] patient:created received');
             dispatch(invalidatePatients());
@@ -81,6 +94,23 @@ export default function SocketProvider() {
             if (data) dispatch(addNotification(data));
         };
 
+        // --- Feedback replies ---
+        const onFeedbackReply = (data: any) => {
+            console.log('🔔 [socket] feedback:reply received', data);
+            if (!data) return;
+            if (data.reply?.senderId && data.reply.senderId !== userIdRef.current && data.feedbackId) {
+                dispatch(incrementFeedbackUnread(data.feedbackId));
+            }
+            const sender = data.reply?.senderName ?? 'Someone';
+            const page   = data.feedbackPage ?? 'feedback';
+            showToastRef.current({
+                type: 'reply',
+                title: `New reply from ${sender}`,
+                message: `On "${page}" feedback: ${data.reply?.message?.slice(0, 60) ?? ''}${(data.reply?.message?.length ?? 0) > 60 ? '…' : ''}`,
+                onClick: () => navigateRef.current('/Feedback'),
+            });
+        };
+
         sock.on(SOCKET_EVENTS.PATIENT_CREATED, onPatientCreated);
         sock.on(SOCKET_EVENTS.PATIENT_UPDATED, onPatientUpdated);
         sock.on(SOCKET_EVENTS.PATIENT_DELETED, onPatientDeleted);
@@ -93,6 +123,7 @@ export default function SocketProvider() {
         sock.on(SOCKET_EVENTS.STAFF_UPDATED, onStaffUpdated);
         sock.on(SOCKET_EVENTS.STAFF_DELETED, onStaffDeleted);
         sock.on(SOCKET_EVENTS.NOTIFICATION_NEW, onNotificationNew);
+        sock.on(SOCKET_EVENTS.FEEDBACK_REPLY, onFeedbackReply);
 
         return () => {
             sock.off(SOCKET_EVENTS.PATIENT_CREATED, onPatientCreated);
@@ -107,6 +138,7 @@ export default function SocketProvider() {
             sock.off(SOCKET_EVENTS.STAFF_UPDATED, onStaffUpdated);
             sock.off(SOCKET_EVENTS.STAFF_DELETED, onStaffDeleted);
             sock.off(SOCKET_EVENTS.NOTIFICATION_NEW, onNotificationNew);
+            sock.off(SOCKET_EVENTS.FEEDBACK_REPLY, onFeedbackReply);
         };
     }, [dispatch]);
 

@@ -2,8 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { paymentService, type PaymentPlan } from '../services/paymentServices';
 import { authService } from '../services/authServices';
-import { subscriptionService } from '../services/subscriptionServices';
-
 type OnboardingStep = 'payment' | 'finish';
 
 function Onboarding() {
@@ -243,22 +241,6 @@ function Onboarding() {
         setError(null);
 
         try {
-
-            const subInitResponse = await subscriptionService.createSubscription({
-                planName: paymentData.id,
-                amount: paymentData.price,
-                currency: paymentData.currency || 'KES',
-                durationDays: 30,
-                email:email
-            });
-
-            if (!subInitResponse.success) {
-                throw new Error(subInitResponse.message || "Failed to initialize subscription tier mapping.");
-            }
-
-                        console.log(paymentData,pendingUserData,subInitResponse)
-
-
 
             const response = await authService.completeOrganizationCreation({
                 email: email,

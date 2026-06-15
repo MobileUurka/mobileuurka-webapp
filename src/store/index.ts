@@ -4,6 +4,7 @@ import hospitalsReducer from './hospitalsSlice';
 import staffReducer from './staffSlice';
 import patientProfileReducer from './patientProfileSlice';
 import notificationsReducer from './notificationsSlice';
+import feedbackReducer from './feedbackSlice';
 
 export const store = configureStore({
     reducer: {
@@ -12,6 +13,7 @@ export const store = configureStore({
         staff: staffReducer,
         patientProfile: patientProfileReducer,
         notifications: notificationsReducer,
+        feedback: feedbackReducer,
     },
 });
 
