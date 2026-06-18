@@ -111,7 +111,8 @@ export interface AuthResponse {
   code?: string;
   email?: string;
 }
-
+let isRefreshingToken = false;
+let refreshTokenPromise: Promise<string | null> | null = null;
 
 export const authService = {
 
@@ -392,16 +393,19 @@ export const authService = {
   },
 
   // Token management — access token in sessionStorage, refresh token in HttpOnly cookie (set by server)
-  setTokens(accessToken: string, _refreshToken: string) {
-    // _refreshToken is intentionally ignored for web — the server sets it as an HttpOnly cookie.
-    // We keep the parameter so mobile callers don't need to change their call signature.
+  // We ALSO save the refresh token encrypted in localStorage as a fallback for local dev where
+  // cross-origin POST requests block SameSite=Lax cookies.
+  setTokens(accessToken: string, refreshToken: string) {
     if (!encryption.hasKey()) {
       console.error('Cannot encrypt: encryption key not set');
       return;
     }
 
     sessionStorage.setItem('at', encryption.encrypt(accessToken));
-    // Refresh token is NOT stored in localStorage — it lives in the HttpOnly cookie.
+    
+    if (refreshToken) {
+      localStorage.setItem('rt', encryption.encrypt(refreshToken));
+    }
   },
 
   getAccessToken(): string | null {
@@ -417,9 +421,16 @@ export const authService = {
     return decrypted || null;
   },
 
-  // Kept for backward compatibility — web no longer stores the refresh token in JS-accessible storage.
   getRefreshToken(): string | null {
-    return null;
+    const encrypted = localStorage.getItem('rt');
+    if (!encrypted || !encryption.hasKey()) return null;
+    
+    try {
+      const decrypted = encryption.decrypt(encrypted);
+      return decrypted || null;
+    } catch {
+      return null;
+    }
   },
 
   clearTokens() {
@@ -565,6 +576,7 @@ export const authService = {
     localStorage.removeItem('sessionId');
     localStorage.removeItem('organization');
     localStorage.removeItem('organizations');
+    localStorage.removeItem('rt');
 
     encryption.clearKey();
     return data;
@@ -573,48 +585,67 @@ export const authService = {
 
 
   async refreshToken(): Promise<string | null> {
-    try {
-      console.log('Attempting to refresh token...');
-      const response = await fetch(`${API_URL}/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include', // sends the HttpOnly refresh token cookie
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        // No body needed — the refresh token travels as an HttpOnly cookie
-      });
-
-      const data = await response.json();
-      console.log('Refresh response:', { status: response.status, success: data.success });
-
-      if (response.ok && data.data?.accessToken) {
-        if (!encryption.hasKey()) {
-          console.error('Cannot encrypt new token: encryption key not set');
-          return null;
-        }
-
-        // Store new access token; the server already rotated the cookie
-        sessionStorage.setItem('at', encryption.encrypt(data.data.accessToken));
-
-        if (data.data.sessionId) {
-          this.setSessionId(data.data.sessionId);
-        }
-
-        console.log('Token refresh successful');
-        return data.data.accessToken;
-      }
-
-      if (response.status === 401) {
-        console.warn('Refresh token expired or invalid');
-        // Do NOT auto-logout here — let the caller decide based on context.
-        // The apiClient 401 fallback will handle logout if a real API call fails.
-      }
-
-      return null;
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-      return null;
+    if (isRefreshingToken && refreshTokenPromise) {
+      console.log('Already refreshing token, waiting for existing promise...');
+      return refreshTokenPromise;
     }
+
+    isRefreshingToken = true;
+    refreshTokenPromise = (async () => {
+      try {
+        console.log('Attempting to refresh token...');
+        const rt = this.getRefreshToken();
+        
+        const response = await fetch(`${API_URL}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include', // sends the HttpOnly refresh token cookie
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          // Send the RT in the body as a fallback if cookies are blocked
+          body: rt ? JSON.stringify({ refreshToken: rt }) : undefined,
+        });
+
+        const data = await response.json();
+        console.log('Refresh response:', { status: response.status, success: data.success });
+
+        if (response.ok && data.data?.accessToken) {
+          if (!encryption.hasKey()) {
+            console.error('Cannot encrypt new token: encryption key not set');
+            return null;
+          }
+
+          // Store new access token; the server already rotated the cookie
+          sessionStorage.setItem('at', encryption.encrypt(data.data.accessToken));
+          if (data.data.refreshToken) {
+            localStorage.setItem('rt', encryption.encrypt(data.data.refreshToken));
+          }
+
+          if (data.data.sessionId) {
+            this.setSessionId(data.data.sessionId);
+          }
+
+          console.log('Token refresh successful');
+          return data.data.accessToken;
+        }
+
+        if (response.status === 401) {
+          console.warn('Refresh token expired or invalid:', data.message);
+          // Do NOT auto-logout here — let the caller decide based on context.
+          // The apiClient 401 fallback will handle logout if a real API call fails.
+        }
+
+        return null;
+      } catch (error) {
+        console.error('Token refresh failed:', error);
+        return null;
+      } finally {
+        isRefreshingToken = false;
+        refreshTokenPromise = null;
+      }
+    })();
+
+    return refreshTokenPromise;
   },
 
   // Enhanced token validation with automatic refresh
@@ -639,15 +670,6 @@ export const authService = {
         console.log('Token expired, attempting refresh');
         const newToken = await this.refreshToken();
         return !!newToken;
-      }
-
-      // Token expiring soon — try proactive refresh, but don't block if it fails
-      // (e.g. another tab already expired the cookie — avoids mid-form logouts)
-      if (timeUntilExpiry < 5 * 60 * 1000) {
-        console.log('Token expiring soon, refreshing proactively');
-        await this.refreshToken();
-        // Token is still technically valid even if refresh failed — let request proceed
-        return true;
       }
 
       return true;

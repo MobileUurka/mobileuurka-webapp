@@ -180,6 +180,8 @@ const BloodPressureChart: React.FC<ChartProps> = ({
             tickLine={false}
             fontSize={11}
             tick={{ fill: "#9ca3af" }}
+            dy={10}
+            dx={10}
           />
 
           <YAxis

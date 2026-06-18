@@ -16,6 +16,25 @@ import {
   LuHeartPulse
 } from 'react-icons/lu';
 
+const renderFormattedText = (text: string) => {
+  if (!text) return null;
+  const parts = text.split(/\*\*(.*?)\*\*/g);
+  return (
+    <>
+      {parts.map((part, index) => {
+        if (index % 2 === 1) {
+          return (
+            <strong key={index} style={{ fontWeight: 700, color: '#111827' }}>
+              {part}
+            </strong>
+          );
+        }
+        return part;
+      })}
+    </>
+  );
+};
+
 interface ActionChecklistProps {
   immediateActions: string[];
   monitoringRequirements: string[];
@@ -80,7 +99,7 @@ const ActionChecklist: React.FC<ActionChecklistProps> = ({
                   fontSize: 13, color: '#374151', lineHeight: 1.5,
                   textDecoration: isDone ? 'line-through' : 'none',
                 }}>
-                  {item}
+                  {renderFormattedText(item)}
                 </span>
               </div>
             );

@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useNavigate } from 'react-router-dom';
 import { IoFlagSharp } from "react-icons/io5";
-import { FiChevronDown, FiMenu, FiX, FiRefreshCw, FiEdit2 } from "react-icons/fi";
+import { FiChevronDown, FiMenu, FiX, FiRefreshCw, FiEdit2, FiMoreVertical } from "react-icons/fi";
 import { Tooltip } from "react-tooltip";
 
 // Assets & Styles
@@ -65,6 +65,21 @@ const Patient: React.FC = () => {
   const [dischargeReason, setDischargeReason] = useState('');
   const [dischargeNotes, setDischargeNotes] = useState('');
   const [discharging, setDischarging] = useState(false);
+  // ... inside your component:
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close the dropdown automatically if the user clicks outside of it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 1024);
@@ -300,21 +315,54 @@ const Patient: React.FC = () => {
     </div>
   );
 
+  const getStatusBorderClass = (): string => {
+    if (!patient?.visits || patient.visits.length === 0) {
+      return 'border-gray-300'; // No history -> Gray
+    }
+
+    // 1. Convert dates and grab the maximum timestamp safely
+    const timestamps = patient.visits
+      .map(v => new Date(v.date).getTime())
+      .filter(t => !isNaN(t));
+
+    if (timestamps.length === 0) return 'border-gray-300';
+
+    const latestTimestamp = Math.max(...timestamps);
+
+    // 2. Check if latest visit is older than 1 month (approx. 30 days)
+    const oneMonthInMs = 30 * 24 * 60 * 60 * 1000;
+    const isOverOneMonth = Date.now() - latestTimestamp > oneMonthInMs;
+
+    // Green (emerald) if seen recently, Gray if missed for > 1 month
+    return isOverOneMonth ? 'border-gray-300' : 'border-emerald-500';
+  };
+
+  const borderClass = getStatusBorderClass();
+
+
+
+
   // --- Render ---
   return (
     <div className="w-full">
       {/* ── Main layout grid ─────────────────────────────────────────── */}
-      <div className={`w-full h-[90vh] transition-[translate] duration-300 ease-in-out relative ${
-        chatActive
-          ? 'lg:grid lg:grid-cols-[25%_75%_28%] flex flex-col lg:-translate-x-[28%]'
-          : 'lg:grid lg:grid-cols-[25%_75%] flex flex-col'
-      }`}>
+      <div className={`w-full h-[90vh] transition-[translate] duration-300 ease-in-out relative ${chatActive
+        ? 'lg:grid lg:grid-cols-[22%_78%_28%] flex flex-col lg:-translate-x-[28%]'
+        : 'lg:grid lg:grid-cols-[22%_78%] flex flex-col'
+        }`}>
 
         {/* ── Mobile Header ───────────────────────────────────────────── */}
         <div className="lg:hidden w-full bg-white border-gray-200 p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-white flex justify-center items-center overflow-hidden border border-gray-100 shadow-sm">
-              <img src={profilePic} alt="patient" className="w-full h-full object-cover" />
+            <div className={`w-[54px] h-[54px] rounded-full border-[2.5px] ${borderClass} flex justify-center items-center p-[2px]`}>
+              {/* Inner profile image container */}
+              <div className="w-full h-full rounded-full bg-white flex justify-center items-center overflow-hidden">
+                <img
+                  src={profilePic}
+                  alt="patient"
+                  className="w-full h-full object-cover"
+                />
+              </div>
             </div>
             <div className="font-bold text-black/80">{patient?.name}</div>
           </div>
@@ -354,17 +402,81 @@ const Patient: React.FC = () => {
           <div className="w-full mx-auto flex flex-col pb-5 h-[calc(100%-40px)] overflow-y-auto scrollbar-none">
 
             {/* Profile pic */}
-            <div className="w-full h-[100px] flex items-center py-8">
-              <div className="w-[50px] aspect-square rounded-full bg-white mr-[2px] flex justify-center items-center overflow-hidden border border-gray-100 shadow-sm">
-                <img src={profilePic} alt="patient" className="w-full h-full object-cover" />
+            <div className="w-full flex flex-row items-center justify-between">
+
+              <div className="w-full h-[100px] flex items-center py-8">
+                <div className={`w-[54px] h-[54px] rounded-full border-[2.5px] ${borderClass} flex justify-center items-center p-[2px]`}>
+                  {/* Inner profile image container */}
+                  <div className="w-full h-full rounded-full bg-white flex justify-center items-center overflow-hidden">
+                    <img
+                      src={profilePic}
+                      alt="patient"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+                <div className="ml-[15px] flex flex-col gap-[3px]">
+                  <div className="text-black/80 font-bold text-[0.9em]">{patient?.name}</div>
+                  {patient?.isActive === false && (
+                    <span className="text-xs text-amber-600 font-medium">Discharged</span>
+                  )}
+                </div>
               </div>
-              <div className="ml-[15px] flex flex-col gap-[3px]">
-                <div className="text-black/80 font-bold text-[0.9em]">{patient?.name}</div>
-                {patient?.isActive === false && (
-                  <span className="text-xs text-amber-600 font-medium">Discharged</span>
+              {/* Edit Records */}
+              <div className="relative inline-block text-left" ref={menuRef}>
+                {/* Three-Dot Trigger Button */}
+                <button
+                  onClick={() => setShowMenu(!showMenu)}
+                  title="More options"
+                  className="p-2.5 h-[40px] w-[40px] rounded-full bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 flex items-center justify-center transition-colors focus:outline-none"
+                >
+                  <FiMoreVertical size={18} />
+                </button>
+
+                {/* Dropdown Menu Card */}
+                {showMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-100 py-1 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+
+                    {/* Option 1: Edit */}
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        navigate('/Screening/EditRecord', { state: { patientId: id, patientName: patient?.name } });
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                    >
+                      <FiEdit2 size={14} className="text-gray-500" />
+                      Edit Record
+                    </button>
+
+                    {/* Option 2: Conditional Discharge or Reactivate */}
+                    {patient?.isActive !== false ? (
+                      <button
+                        onClick={() => {
+                          setShowMenu(false);
+                          setShowDischargeModal(true);
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors border-t border-gray-50"
+                      >
+                        Discharge Patient
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setShowMenu(false);
+                          handleReactivate();
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-xs font-medium text-green-700 hover:bg-green-50 flex items-center gap-2 transition-colors border-t border-gray-50"
+                      >
+                        Reactivate Patient
+                      </button>
+                    )}
+
+                  </div>
                 )}
               </div>
             </div>
+
 
             {renderSidebarSection("Patient Details", patientDetailsData)}
             {renderSidebarSection("Allergies", allergiesData)}
@@ -466,34 +578,7 @@ const Patient: React.FC = () => {
                   <FiRefreshCw size={18} className={`text-gray-600 ${status === 'loading' ? 'animate-spin' : ''}`} />
                 </button>
 
-                {/* Edit Records */}
-                <button
-                  onClick={() => navigate('/Screening/EditRecord', { state: { patientId: id, patientName: patient?.name } })}
-                  title="Edit patient records"
-                  className="px-3 h-[50px] rounded-[4px] bg-[#f1ede97a] hover:bg-[#f1ede9] text-gray-600 text-xs font-medium flex items-center gap-1.5 transition-colors"
-                >
-                  <FiEdit2 size={14} />
-                  Edit
-                </button>
 
-                {/* Discharge / Reactivate */}
-                {patient?.isActive !== false ? (
-                  <button
-                    onClick={() => setShowDischargeModal(true)}
-                    title="Discharge patient"
-                    className="px-3 h-[50px] rounded-[4px] bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium flex items-center gap-1.5 transition-colors border border-red-200"
-                  >
-                    Discharge
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleReactivate}
-                    title="Reactivate patient"
-                    className="px-3 h-[50px] rounded-[4px] bg-green-50 hover:bg-green-100 text-green-700 text-xs font-medium flex items-center gap-1.5 transition-colors border border-green-200"
-                  >
-                    Reactivate
-                  </button>
-                )}
 
                 {/* AI Chat */}
                 <div

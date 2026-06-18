@@ -10,19 +10,18 @@ interface PredispositionProps {
 }
 
 const Predisposition: React.FC<PredispositionProps> = ({ patient, setActiveTab }) => {
-  
+
   // 1. Diagnosis Parsing Logic
   const parseDiagnosis = (raw: string | undefined): string => {
     if (!raw) return "No diagnosis records";
 
     const parsePostgresArray = (str: string) => {
       return str
-        .replace(/^{|}$/g, "") 
-        .split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/) 
+        .replace(/^{|}$/g, "")
+        .split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/)
         .map((item) => item.replace(/^"(.*)"$/, "$1").trim());
     };
 
-    // Patterns that indicate no condition was found — never prefix with "Suspected to have"
     const isNegativeResult = (s: string) =>
       /^no\b/i.test(s) ||
       /^not\b/i.test(s) ||
@@ -43,11 +42,8 @@ const Predisposition: React.FC<PredispositionProps> = ({ patient, setActiveTab }
       );
 
     if (cleaned.length === 0) return "No diagnosis data found";
-
-    // If the first (or only) entry is a negative result, return it as-is
     if (isNegativeResult(cleaned[0])) return "No specific conditions detected";
 
-    // Filter out any negative entries mixed in with real diagnoses
     const positive = cleaned.filter((c) => !isNegativeResult(c));
     if (positive.length === 0) return "No specific conditions detected";
 
@@ -89,22 +85,22 @@ const Predisposition: React.FC<PredispositionProps> = ({ patient, setActiveTab }
     }
   };
 
-  const latestRisk = patient?.riskAssessment  ?.[patient.riskAssessment.length - 1];
+  const latestRisk = patient?.riskAssessment?.[patient.riskAssessment.length - 1];
   const latestLab = patient?.labwork?.[patient.labwork.length - 1];
   const latestExplanation = patient?.explanation?.[patient.explanation.length - 1];
 
   return (
     <div className="w-full h-full p-4 flex flex-col justify-center items-center">
       <div className="w-full max-w-md flex flex-col gap-4">
-        
+
         {/* Warning Banner */}
         <div className="flex items-start gap-3">
-          <div className=" text-yellow-500 text-2xl mt-1 shrink-0">
+          <div className="text-yellow-500 text-2xl mt-1 shrink-0">
             <IoIosWarning />
           </div>
           <p className="text-xs text-gray-600 leading-relaxed font-medium">
-            {!latestRisk?.riskassessment 
-              ? "No risk assessment records available" 
+            {!latestRisk?.riskassessment
+              ? "No risk assessment records available"
               : "Patient exhibits "}
             <span className="text-gray-900 font-semibold">
               {checkPredisposition(latestRisk?.riskassessment)}
@@ -114,10 +110,11 @@ const Predisposition: React.FC<PredispositionProps> = ({ patient, setActiveTab }
 
         {/* Results Grid */}
         <div className="flex flex-col gap-4 py-4 border-y border-gray-100">
-          
+
           {/* Diagnosis Row */}
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-blue-200/50 flex items-center justify-center text-blue-500 text-xl">
+            {/* FIX: Added shrink-0 to prevent the circle from distorting */}
+            <div className="w-10 h-10 rounded-full bg-blue-200/50 flex items-center justify-center text-blue-500 text-xl shrink-0">
               <FaChartSimple />
             </div>
             <div className="flex flex-col">
@@ -130,7 +127,8 @@ const Predisposition: React.FC<PredispositionProps> = ({ patient, setActiveTab }
 
           {/* Risk Level Row */}
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-orange-200/50 flex items-center justify-center text-orange-500 text-xl">
+            {/* FIX: Added shrink-0 here as well to protect the orange circle */}
+            <div className="w-10 h-10 rounded-full bg-orange-200/50 flex items-center justify-center text-orange-500 text-xl shrink-0">
               <MdBubbleChart />
             </div>
             <div className="flex flex-col">
@@ -143,9 +141,9 @@ const Predisposition: React.FC<PredispositionProps> = ({ patient, setActiveTab }
         </div>
 
         {/* Action Button */}
-        <button 
+        <button
           onClick={() => setActiveTab("documents")}
-          className="cursor-pointer w-full py-3 bg-[#ffc187] text-white rounded-xl font-semibold text-xs  transition-colors active:scale-95 duration-200"
+          className="cursor-pointer w-full py-3 bg-[#ffc187] text-white rounded-xl font-semibold text-xs transition-colors active:scale-95 duration-200"
         >
           View Documents
         </button>

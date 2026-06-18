@@ -19,58 +19,62 @@ interface OverviewProps {
 
 const Overview: React.FC<OverviewProps> = ({ patient, setActiveTab }) => {
   return (
-    <div className="w-full h-full flex flex-col overflow-y-auto pb-5 scrollbar-hide">
-      
-      {/* Grid 3: Weight, Fetal, Predisposition */}
-      <div className="w-full grid grid-cols-1 lg:grid-cols-[32.5%_32.5%_32.5%] gap-[0.75%]">
-        <div className="w-full aspect-square bg-[#F6F6F6] rounded-[10px] flex relative overflow-visible">
+    <div className="w-full h-full flex flex-col overflow-y-auto pb-10 px-2 sm:px-4 lg:px-0 scrollbar-hide overscroll-contain">
+
+      {/* ================= GRID 1 ================= */}
+      <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        {/* Increased mobile height for Weight Chart */}
+        <div className="w-full min-w-0 bg-[#F6F6F6] rounded-[10px] p-4 h-auto min-h-[340px] lg:min-h-0">
           <Weight patient={patient.triage} />
         </div>
-        <div className="w-full aspect-square bg-[#F6F6F6] rounded-[10px] flex relative overflow-visible">
-          <Fetal patient={patient?.fetalInfo} />
+
+        {/* Increased mobile height for Blood Pressure Chart */}
+        <div className="w-full min-w-0 bg-[#F6F6F6] rounded-[10px] p-4 h-auto min-h-[340px] lg:min-h-0">
+          <BloodPressure patient={patient} />
         </div>
-        <div className="w-full aspect-square bg-[#F6F6F6] rounded-[10px] flex relative overflow-visible">
+
+        {/* Kept descriptive card slightly shorter than charts */}
+        <div className="w-full min-w-0 bg-[#F6F6F6] rounded-[10px] p-4 h-auto min-h-[240px] lg:min-h-0">
           <Predisposition patient={patient} setActiveTab={setActiveTab} />
         </div>
+
       </div>
 
-      {/* Grid 2: Risk Assessment & Lab */}
-      <div className="w-full grid grid-cols-1 lg:grid-cols-[66.375%_32.375%] gap-[0.75%] my-[10px]">
-        <div className="w-full h-auto lg:aspect-[1/0.49] bg-[#F6F6F6] rounded-[10px] flex mt-3 lg:mt-0">
+      {/* ================= GRID 2 ================= */}
+      <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+
+        {/* Increased mobile height for Risk Assessment Donut Chart layout */}
+        <div className="lg:col-span-2 w-full min-w-0 bg-[#F6F6F6] rounded-[10px] p-4 h-auto min-h-[420px] lg:h-[380px]">
           <Riskassessment patient={patient} />
         </div>
-        <div className="w-full aspect-square bg-[#F6F6F6] rounded-[10px] flex relative ">
+
+        {/* Increased mobile height for Lab Results Chart */}
+        <div className="w-full min-w-0 bg-[#F6F6F6] rounded-[10px] p-4 h-auto min-h-[360px] lg:h-[380px]">
           <Lab patient={patient} />
         </div>
+
       </div>
 
-      {/* Grid 2 Reverse: Medications & (Blood Pressure + Symptoms) */}
-      <div className="w-full grid grid-cols-1 lg:grid-cols-[32.5%_32.5%_32.5%] gap-[0.75%] mb-[30px]">
-        <div className="w-full aspect-square bg-[#F6F6F6] rounded-[10px] flex relative">
+      {/* ================= GRID 3 ================= */}
+      <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4 mb-6">
+
+        <div className="w-full min-w-0 bg-[#F6F6F6] rounded-[10px] p-4 h-auto min-h-[240px] lg:h-[320px]">
           <Medications patient={patient} setActiveTab={setActiveTab} />
         </div>
-        
-        {/* Right side of Reverse Grid (x2 height/width container) */}
-        {/* <div className="w-full aspect-[1/0.49] bg-[#F6F6F6] rounded-[10px] flex">
-          <div className="w-full px-[15px] grid grid-cols-[54%_44%] gap-[2%] m-auto">
-            <div className="w-full m-auto bg-[#EDEDED] rounded-[5px] aspect-[1/0.85]">
-              <BloodPressure patient={patient?.triages} />
-            </div>
-            <div className="w-full m-auto bg-[#EDEDED] rounded-[5px] aspect-[1/1.05]">
-              <Symptom patient={patient} setActiveTab={setActiveTab} />
-            </div>
-          </div>
-        </div> */}
 
-        <div className="w-full aspect-square m-auto bg-[#F6F6F6]  rounded-[10px]">
-              <BloodPressure patient={patient} />
-            </div>
-            <div className="w-full m-auto bg-[#F6F6F6]  rounded-[10px] aspect-square">
-              <Symptom patient={patient} setActiveTab={setActiveTab} />
-            </div>
+        {/* Increased mobile height for Fetal Chart info if it renders a canvas */}
+        <div className="w-full min-w-0 bg-[#F6F6F6] rounded-[10px] p-4 h-auto min-h-[300px] lg:h-[320px]">
+          <Fetal patient={patient?.fetalInfo} />
+        </div>
+
+        <div className="w-full min-w-0 bg-[#F6F6F6] rounded-[10px] p-4 h-auto min-h-[240px] lg:h-[320px]">
+          <Symptom patient={patient} setActiveTab={setActiveTab} />
+        </div>
+
       </div>
 
-      {/* Global tooltip container for overview charts */}
+      {/* TOOLTIP */}
       <Tooltip
         id="overview-tooltip"
         style={{ fontSize: ".8em", zIndex: 99999 }}

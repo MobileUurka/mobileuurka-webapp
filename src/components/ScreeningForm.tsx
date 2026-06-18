@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { MdOutlineKeyboardArrowDown } from 'react-icons/md';
-import { IoInformationCircleOutline } from 'react-icons/io5';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { IoInformationCircleOutline, IoWarningOutline } from 'react-icons/io5';
+import { LuRefreshCw } from 'react-icons/lu';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { hospitalService } from '../services/hospitalServices';
 import { patientService } from '../services/patientServices';
 import HospitalSelector from './HospitalSelector';
@@ -122,11 +123,17 @@ interface ScreeningFormProps {
 
 const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep = false }: ScreeningFormProps) => {
   const navigate = useNavigate();
+  const { tabId } = useParams();
   const { user, isReady } = useAuth();
   const [formData, setFormData] = useState<Record<string, any>>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentPage, setCurrentPage] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // NEW STATE FOR DUPLICATE CHECK
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [duplicateDate, setDuplicateDate] = useState('');
+  const [ignoredDuplicate, setIgnoredDuplicate] = useState('');
 
   // Performance timer — starts when the form mounts, stops on successful submit
   const perfTimer = usePerformanceTimer(title);
@@ -165,6 +172,45 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
     }
   }, [location]); // Re-run if location changes
 
+  // Check for duplicate record on selected date
+  useEffect(() => {
+    const getTableName = (id: string) => {
+      switch (id) {
+        case 'Visits': return 'visits';
+        case 'Allergy': return 'allergies';
+        case 'Triage': return 'triage';
+        case 'History': return 'patientHistory';
+        case 'Journey': return 'currentPregnancyInfo';
+        case 'Lab': return 'labwork';
+        case 'Infection': return 'infections';
+        case 'Lifestyle': return 'patientLifestyle';
+        case 'Fetal': return 'fetalInfo';
+        case 'Ultrasound': return 'ultrasounds';
+        case 'Prescription': return 'medications';
+        case 'Notes': return 'notes';
+        default: return null;
+      }
+    };
+
+    if (formData.date && formData.patientId && tabId) {
+      if (formData.date === ignoredDuplicate) return;
+
+      const tableName = getTableName(tabId);
+      if (tableName) {
+        patientService.getRecords(tableName, { patientId: formData.patientId, limit: 10, orderBy: 'date', order: 'desc' })
+          .then(response => {
+            if (response.data?.records) {
+              const existingRecord = response.data.records.find((r: any) => r.date === formData.date);
+              if (existingRecord) {
+                setDuplicateDate(formData.date);
+                setShowDuplicateWarning(true);
+              }
+            }
+          })
+          .catch(err => console.error("Error checking duplicates:", err));
+      }
+    }
+  }, [formData.date, formData.patientId, tabId, ignoredDuplicate]);
 
   // Load hospital options for hospital dropdown
   useEffect(() => {
@@ -267,6 +313,19 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
   const currentFields = pages[currentPage] ?? [];
   const [isAutoFilling, setIsAutoFilling] = useState(false);
   const [lastVisitData, setLastVisitData] = useState<LastVisitData | null>(null);
+  const midpoint = Math.ceil(currentFields.length / 2);
+
+  const leftColumn = currentFields.slice(0, midpoint);
+  const rightColumn = currentFields.slice(midpoint);
+
+  // NEW STATE FOR MODAL
+  const [showGestationModal, setShowGestationModal] = useState(false);
+  const [calculatedGestation, setCalculatedGestation] = useState<{
+    currentWeek: number;
+    lastVisitDate: string;
+    lastGestationWeek: number;
+    visitNumber: number;
+  } | null>(null);
 
   // Handle patient selection and auto-fill gestation week
   const handlePatientSelection = async (patientId: string, patientName: string) => {
@@ -276,6 +335,7 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
     // Auto-fill gestation week based on last visit
     if (patientId) {
       setIsAutoFilling(true);
+      setLastVisitData(null);
 
       try {
         // Get complete patient profile to access visit history
@@ -295,16 +355,14 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
           if (lastVisit.gestationWeek && lastVisit.date) {
             const currentGestationWeek = calculateGestationWeek(lastVisit.date, lastVisit.gestationWeek);
             if (currentGestationWeek > 0) {
-              // Auto-fill gestation week fields
-
-              setIsAutoFilling(false)
-
-              setFormData(prev => ({
-                ...prev,
-                gestationWeek: currentGestationWeek,
-                visitNumber: lastVisit.visitNumber,
-                gestationweek: currentGestationWeek // Handle both naming conventions
-              }));
+              setIsAutoFilling(false);
+              setCalculatedGestation({
+                currentWeek: currentGestationWeek,
+                lastVisitDate: lastVisit.date,
+                lastGestationWeek: lastVisit.gestationWeek,
+                visitNumber: lastVisit.visitNumber
+              });
+              setShowGestationModal(true);
             }
           }
         }
@@ -762,10 +820,18 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
               (Auto-calculated)
             </span>
           )}
-          {(field.name === 'gestationWeek' || field.name === 'gestationweek' || field.name == 'visitNumber') && (
-            <span className="text-xs text-green-600 font-normal">
-              {isAutoFilling ? "(Auto-filling from last visit...)" :
-                formData[field.name] != 0 ? "(Auto-filled from last visit)" : "(No previous Visits)"}
+          {(field.name === 'gestationWeek' || field.name === 'gestationweek' || field.name == 'visitNumber') && formData.patientId && (
+            <span className="text-xs text-green-600 font-normal flex items-center gap-1">
+              {isAutoFilling ? (
+                <>
+                  <LoadingSpinner size={12} />
+                  <span>Fetching past visits...</span>
+                </>
+              ) : lastVisitData ? (
+                "(Loaded from last visit)"
+              ) : (
+                "(No previous visits)"
+              )}
             </span>
           )}
           {field.name === 'estimatedDueDate' && formData.lastPeriodDate && formData[field.name] && (
@@ -863,7 +929,7 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
 
               // NATIONAL ID VALIDATION
               if (field.name === 'nationalId') {
-                value = value.replace(/\D/g, '').slice(0, 8);
+                value = value.replace(/\D/g, '').slice(0, 9);
               }
 
               // 3-DIGIT LIMITS
@@ -986,6 +1052,15 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
     return Object.keys(newErrors).length === 0;
   };
 
+  // Helper function (add near top of component/file)
+  function friendlyDate(date: Date) {
+    return new Date(date).toLocaleDateString('en-GB', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'short',
+    }); // → "Thursday, 12 Jun"
+  }
+
   return (
     <div className="max-w-6xl mx-auto">
       {/* <div className="mb-6">
@@ -1004,11 +1079,23 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
       </div> */}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {currentFields.map(field =>
-          field.type === 'chip-group'
-            ? renderChipGroup(field)
-            : renderField(field)
-        )}
+
+        <div className="space-y-6">
+          {leftColumn.map(field =>
+            field.type === 'chip-group'
+              ? renderChipGroup(field)
+              : renderField(field)
+          )}
+        </div>
+
+        <div className="space-y-6">
+          {rightColumn.map(field =>
+            field.type === 'chip-group'
+              ? renderChipGroup(field)
+              : renderField(field)
+          )}
+        </div>
+
       </div>
 
       <div className="flex justify-between items-center pt-6">
@@ -1146,6 +1233,129 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
               >
                 Create Hospital
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Gestation Auto-Fill Modal */}
+      {showGestationModal && calculatedGestation && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100] animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl border border-gray-200 w-full max-w-md mx-4 overflow-hidden animate-in zoom-in-95 duration-200">
+
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3">
+              <LuRefreshCw size={20} className="text-gray-500" />
+              <h3 className="text-lg font-medium text-gray-800">Update Gestation Week</h3>
+            </div>
+
+            <div className="p-6">
+              <p className="text-gray-600 text-sm mb-5 leading-relaxed">
+                Based on the patient's last visit, we have calculated the current gestation week. Please select how you want to proceed.
+              </p>
+
+              {/* Data Rows */}
+              <div className="flex flex-col mb-6 border border-gray-200 rounded-lg overflow-hidden">
+
+                <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-200">
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-widest text-gray-400 mb-0.5">Last visit</p>
+                    <p className="text-sm font-medium text-gray-800">
+                      {friendlyDate(new Date(calculatedGestation.lastVisitDate))}
+                    </p>
+                  </div>
+                  <p className="text-xl font-medium text-gray-700">
+                    {calculatedGestation.lastGestationWeek}{" "}
+                    <span className="text-xs font-normal text-gray-400">wks</span>
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between px-4 py-3.5">
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-widest text-gray-400 mb-0.5">Calculated now</p>
+                    <p className="text-sm font-medium text-gray-800">
+                      {friendlyDate(new Date())}
+                    </p>
+                  </div>
+                  <p className="text-xl font-medium text-gray-800">
+                    {calculatedGestation.currentWeek}{" "}
+                    <span className="text-xs font-normal text-gray-400">wks</span>
+                  </p>
+                </div>
+
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowGestationModal(false);
+                    setFormData(prev => ({
+                      ...prev,
+                      gestationWeek: calculatedGestation.lastGestationWeek,
+                      visitNumber: calculatedGestation.visitNumber,
+                      gestationweek: calculatedGestation.lastGestationWeek
+                    }));
+                  }}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-600 font-medium rounded-lg hover:bg-gray-50 transition-colors focus:ring-2 focus:ring-gray-200 outline-none"
+                >
+                  Keep {calculatedGestation.lastGestationWeek} wks
+                </button>
+                <button
+                  onClick={() => {
+                    setFormData(prev => ({
+                      ...prev,
+                      gestationWeek: calculatedGestation.currentWeek,
+                      visitNumber: calculatedGestation.visitNumber,
+                      gestationweek: calculatedGestation.currentWeek
+                    }));
+                    setShowGestationModal(false);
+                  }}
+                  className="flex-[1.5] px-4 py-2.5 bg-[#008540] text-white font-medium rounded-lg hover:bg-[#007235] transition-colors focus:ring-2 focus:ring-[#008540] focus:ring-offset-2 outline-none"
+                >
+                  Update to {calculatedGestation.currentWeek} wks
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      )}
+
+      {/* Duplicate Record Warning Modal */}
+      {showDuplicateWarning && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[110] animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl border border-gray-200 w-full max-w-sm mx-4 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 text-center">
+              <div className="mx-auto w-12 h-12 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mb-4">
+                <IoWarningOutline size={24} />
+              </div>
+              <h3 className="text-lg font-medium text-gray-800 mb-2">Duplicate Entry?</h3>
+              <p className="text-sm text-gray-500 mb-6">
+                A {title} record already exists for <strong>{friendlyDate(new Date(duplicateDate))}</strong>. Are you sure you want to create another one?
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowDuplicateWarning(false);
+                    setFormData(prev => ({ ...prev, date: '' })); // clear the date
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors focus:ring-2 focus:ring-gray-200 outline-none"
+                >
+                  Change Date
+                </button>
+                <button
+                  onClick={() => {
+                    setIgnoredDuplicate(duplicateDate);
+                    setShowDuplicateWarning(false);
+                  }}
+                  className="flex-1 px-4 py-2 bg-amber-500 text-white font-medium rounded-lg hover:bg-amber-600 transition-colors focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 outline-none"
+                >
+                  Proceed Anyway
+                </button>
+              </div>
             </div>
           </div>
         </div>

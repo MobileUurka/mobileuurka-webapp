@@ -131,7 +131,7 @@ interface NoteCardProps {
 
 const NoteCard: React.FC<NoteCardProps> = ({ note, index, onDelete }) => {
     const [hovered, setHovered] = React.useState(false);
-
+    console.log(note)
     return (
         <div
             onMouseEnter={() => setHovered(true)}
@@ -139,7 +139,7 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, index, onDelete }) => {
             style={{
                 background: hovered ? "#fafafa" : "#fff",
                 border: "1px solid #e5e7eb",
-                borderRadius: 12,
+                borderRadius: 8,
                 overflow: "hidden",
                 transition: "box-shadow 0.15s, background 0.15s",
                 boxShadow: hovered ? "0 2px 12px rgba(0,0,0,0.07)" : "none",
@@ -184,9 +184,7 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, index, onDelete }) => {
                     display: "flex", alignItems: "center",
                     justifyContent: "space-between",
                 }}>
-                    <span style={{ fontSize: 10, color: "#9ca3af" }}>
-                        {formatTime(note.savedAt)}
-                    </span>
+                    <span style={{ fontSize: 10, color: "#9ca3af" }}>{note.editedBy} ~ {formatTime(note.savedAt)}</span>
                     {onDelete && (
                         <button
                             onClick={() => onDelete(index)}
@@ -194,7 +192,7 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, index, onDelete }) => {
                                 background: "transparent", border: "none",
                                 cursor: "pointer", padding: "3px 5px",
                                 borderRadius: 5, display: "flex", alignItems: "center",
-                                color: "#d1d5db", 
+                                color: "#d1d5db",
                                 opacity: hovered ? 1 : 0,
                                 transition: "opacity 0.15s, color 0.15s, background 0.15s",
                             } as React.CSSProperties}

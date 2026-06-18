@@ -31,35 +31,83 @@ const RISK_COLORS: Record<string, string> = {
   LOW: '#16a34a',
 };
 
-type ParseListField = 'keyRiskFactors' | 'primaryConcerns' | 'default';
+type ParseListField = 'keyRiskFactors' | 'primaryConcerns' | 'immediateActions' | 'monitoring' | 'recommendations' | 'default';
 
 const parseList = (raw: any, field: ParseListField = 'default'): string[] => {
   if (!raw) return [];
-  if (Array.isArray(raw)) return raw.filter(Boolean).map(String);
+
+  // Helper to optionally clean markdown based on field
+  const clean = (s: string) => {
+    const str = String(s).trim();
+    if (field === 'keyRiskFactors') {
+      return cleanMarkdown(str);
+    }
+    return str;
+  };
+
+  // Already an array — just clean it up
+  if (Array.isArray(raw)) {
+    return raw.filter(Boolean).map(s => clean(s)).filter(Boolean);
+  }
+
+  // Try JSON array string
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(Boolean).map(s => clean(s)).filter(Boolean);
+    }
   } catch { /* not valid JSON — fall through */ }
 
-  const str = String(raw).replace(/^\[|\]$/g, '').trim();
+  const str = (field === 'keyRiskFactors' ? cleanMarkdown(String(raw)) : String(raw)).replace(/^\[|\]$/g, '').trim();
 
-  // keyRiskFactors: items separated by "., " (period + comma + space)
   if (field === 'keyRiskFactors') {
+    // Try newline first
+    const byNewline = str.split(/\n+/).map(s => s.trim()).filter(Boolean);
+    if (byNewline.length > 1) return byNewline;
+
+    // Split on ", " only when followed by a capital letter or digit
+    // This avoids splitting mid-item on things like "120.0; unit/date not documented, Platelets..."
+    const byCommaCapital = str
+      .split(/,\s+(?=[A-Z0-9])/)
+      .map(s => s.replace(/\.$/, '').trim())
+      .filter(Boolean);
+    if (byCommaCapital.length > 1) return byCommaCapital;
+
+    // fallback: "., " separator
     return str
       .split(/\.,\s+/)
-      .map(s => s.replace(/^["']|["']$/g, '').replace(/\.$/, '').trim())
+      .map(s => s.replace(/\.$/, '').trim())
       .filter(Boolean);
   }
 
-  // primaryConcerns: same "., " boundary pattern
+  // primaryConcerns: backend sends semicolon-separated
+  // e.g. "Concern one; Concern two; Concern three"
   if (field === 'primaryConcerns') {
-    return str
-      .split(/\.,\s+/)
-      .map(s => s.replace(/^["']|["']$/g, '').replace(/\.$/, '').trim())
-      .filter(Boolean);
+    const bySemicolon = str.split(/;\s+/).map(s => s.trim()).filter(Boolean);
+    if (bySemicolon.length > 1) return bySemicolon;
+
+    // fallback: newline
+    const byNewline = str.split(/\n+/).map(s => s.trim()).filter(Boolean);
+    if (byNewline.length > 1) return byNewline;
+
+    return [str];
   }
 
-  // default: standard CSV split
+  // immediateActions / monitoring / recommendations:
+  // backend sends "., " (period-comma-space) as item boundary
+  // e.g. "Do X because Y., Do Z because W."
+  if (field === 'immediateActions' || field === 'monitoring' || field === 'recommendations') {
+    const byPeriodComma = str.split(/\.,\s+/).map(s => s.replace(/\.$/, '').trim()).filter(Boolean);
+    if (byPeriodComma.length > 1) return byPeriodComma;
+
+    // fallback: newline
+    const byNewline = str.split(/\n+/).map(s => s.trim()).filter(Boolean);
+    if (byNewline.length > 1) return byNewline;
+
+    return [str];
+  }
+
+  // default: standard comma split
   return str
     .split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)
     .map(s => s.replace(/^["']|["']$/g, '').trim())
@@ -76,86 +124,190 @@ const formatDate = (iso?: string, format: 'long' | 'short' = 'long') => {
   return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 };
 
+
 // ─── Clinical reasoning parser ────────────────────────────────────────────────
-interface ReasoningSection { title: string; body: string }
+
+interface ReasoningSection {
+  title: string;
+  body: string;
+}
+
+const cleanMarkdown = (text = "") =>
+  text
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/__(.*?)__/g, "$1")
+    .replace(/_(.*?)_/g, "$1")
+    .replace(/`(.*?)`/g, "$1")
+    .replace(/\r/g, "")
+    .trim();
 
 function parseClinicalReasoning(raw: string): ReasoningSection[] {
   if (!raw) return [];
 
-  const HEADERS = [
-    'Overview', 'Maternal Assessment', 'Fetal Assessment',
-    'Risk Factor Synthesis', 'Differential Considerations',
-    'Management Rationale', 'Monitoring & Escalation Plan',
-    'Kenya-Specific Adaptations',
-  ];
+  raw = raw.replace(/\r/g, "").trim();
 
-  const found: { title: string; start: number; contentStart: number }[] = [];
-  for (const h of HEADERS) {
-    let searchFrom = 0;
-    while (true) {
-      const idx = raw.indexOf(`${h}:`, searchFrom);
-      if (idx === -1) break;
-      found.push({ title: h, start: idx, contentStart: idx + h.length + 1 });
-      searchFrom = idx + 1;
+  // Match ANY "Title:" line
+  const headerRegex = /^([A-Za-z0-9 &/()\-]+):\s*$/gm;
+
+  const matches: { title: string; index: number }[] = [];
+
+  let match;
+  while ((match = headerRegex.exec(raw)) !== null) {
+    matches.push({
+      title: match[1].trim(),
+      index: match.index,
+    });
+  }
+
+  if (!matches.length) {
+    return [{ title: "Overview", body: raw }];
+  }
+
+  const sections: ReasoningSection[] = [];
+
+  // pre-header text
+  if (matches[0].index > 0) {
+    sections.push({
+      title: "Overview",
+      body: raw.slice(0, matches[0].index).trim(),
+    });
+  }
+
+  for (let i = 0; i < matches.length; i++) {
+    const start = matches[i].index;
+    const end =
+      i + 1 < matches.length ? matches[i + 1].index : raw.length;
+
+    const title = matches[i].title;
+    const body = raw.slice(start + title.length + 1, end).trim();
+
+    sections.push({ title, body });
+  }
+
+  return sections;
+}
+
+interface BodyItem {
+  type: 'bullet' | 'number' | 'paragraph';
+  text: string;
+  num?: string;
+}
+
+function parseSectionBody(bodyText: string): BodyItem[] {
+  const lines = bodyText.split('\n').map(l => l.trim()).filter(Boolean);
+  const items: BodyItem[] = [];
+
+  for (const line of lines) {
+    // Check for bullet list item
+    const bulletMatch = line.match(/^[-*•]\s+(.*)$/);
+    if (bulletMatch) {
+      items.push({ type: 'bullet', text: bulletMatch[1] });
+      continue;
+    }
+
+    // Check for numbered list item
+    const numberMatch = line.match(/^(\d+)\.\s+(.*)$/);
+    if (numberMatch) {
+      items.push({ type: 'number', text: numberMatch[2], num: numberMatch[1] });
+      continue;
+    }
+
+    // Otherwise it's a normal paragraph
+    items.push({ type: 'paragraph', text: line });
+  }
+
+  return items;
+}
+
+const renderFormattedText = (text: string) => {
+  if (!text) return null;
+  const parts = text.split(/\*\*(.*?)\*\*/g);
+  return (
+    <>
+      {parts.map((part, index) => {
+        if (index % 2 === 1) {
+          return (
+            <strong key={index} style={{ fontWeight: 700, color: '#111827' }}>
+              {part}
+            </strong>
+          );
+        }
+        return part;
+      })}
+    </>
+  );
+};
+
+const formatListItemText = (text: string): string => {
+  const colonIndex = text.indexOf(':');
+  if (colonIndex > 0 && colonIndex <= 35) {
+    const prefix = text.substring(0, colonIndex);
+    const suffix = text.substring(colonIndex + 1);
+    if (!prefix.includes('**')) {
+      return `**${prefix}:**${suffix}`;
     }
   }
-
-  if (found.length === 0) {
-    const sentences = raw.split(/;\s+/).map(s => s.trim()).filter(Boolean);
-    return [{ title: '', body: sentences.join('\n') }];
-  }
-
-  found.sort((a, b) => a.start - b.start);
-
-  const sections: ReasoningSection[] = found.map((h, i) => {
-    const end = i + 1 < found.length ? found[i + 1].start : raw.length;
-    const body = raw.slice(h.contentStart, end).trim().replace(/;?\s*$/, '').trim();
-    return { title: h.title, body };
-  });
-
-  return sections.filter(s => s.body.length > 0);
-}
-
-function splitIntoSentences(body: string): string[] {
-  return body
-    .split(/;\s*|\.\s+(?=[A-Z])/)
-    .map(s => s.trim().replace(/[;.]$/, '').trim())
-    .filter(s => s.length > 8)
-    .map(s => s.charAt(0).toUpperCase() + s.slice(1));
-}
+  return text;
+};
 
 const ClinicalReasoningBlock: React.FC<{ text: string }> = ({ text }) => {
-  const sections = parseClinicalReasoning(text);
-  if (sections.length === 0) return null;
-
-  const BulletList = ({ sentences }: { sentences: string[] }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      {sentences.map((s, i) => (
-        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-          <span style={{ color: '#9ca3af', flexShrink: 0, marginTop: 6, fontSize: 5 }}>●</span>
-          <span style={{ fontSize: 12, color: '#374151', lineHeight: 1.7 }}>{s}</span>
-        </div>
-      ))}
-    </div>
-  );
-
-  if (sections.length === 1 && !sections[0].title) {
-    return <BulletList sentences={splitIntoSentences(sections[0].body)} />;
+  const trimmed = text.trim();
+  if (trimmed.toLowerCase() === 'not documented') {
+    return (
+      <div style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic', paddingLeft: 4 }}>
+        Not documented
+      </div>
+    );
   }
+
+  const sections = parseClinicalReasoning(text);
+
+  if (!sections.length) return null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {sections.map((s, i) => {
-        const sentences = splitIntoSentences(s.body);
+      {sections.map((section, index) => {
+        const items = parseSectionBody(section.body);
         return (
-          <div key={i}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#111827', marginBottom: 7 }}>
-              {s.title}
+          <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {section.title && (
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#111827', marginTop: index > 0 ? 8 : 2 }}>
+                {section.title}
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {items.map((item, idx) => {
+                const formatted = formatListItemText(item.text);
+                if (item.type === 'bullet') {
+                  return (
+                    <div key={idx} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{ color: '#9ca3af', marginTop: 6, fontSize: 5, flexShrink: 0 }}>●</span>
+                      <span style={{ fontSize: 12, color: '#374151', lineHeight: 1.7 }}>
+                        {renderFormattedText(formatted)}
+                      </span>
+                    </div>
+                  );
+                } else if (item.type === 'number') {
+                  return (
+                    <div key={idx} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{ color: '#4b5563', fontSize: 12, fontWeight: 600, flexShrink: 0, minWidth: 15 }}>
+                        {item.num}.
+                      </span>
+                      <span style={{ fontSize: 12, color: '#374151', lineHeight: 1.7 }}>
+                        {renderFormattedText(formatted)}
+                      </span>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <p key={idx} style={{ fontSize: 12, color: '#374151', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>
+                      {renderFormattedText(formatted)}
+                    </p>
+                  );
+                }
+              })}
             </div>
-            {sentences.length > 0
-              ? <BulletList sentences={sentences} />
-              : <span style={{ fontSize: 12, color: '#374151', lineHeight: 1.7 }}>{s.body}</span>
-            }
           </div>
         );
       })}
@@ -178,14 +330,13 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const toggle = useCallback((key: string) => setChecked(p => ({ ...p, [key]: !p[key] })), []);
 
+
+  console.log(report)
+
   // Stores the exact DOM Range at the moment the user clicks "Add comment"
   // so we can use surroundContents() for precise single-occurrence highlighting.
   const pendingRangeRef = useRef<Range | null>(null);
-
   const menu = useSelectionMenu(printRef, menuRef);
-
-  console.log(report);
-
   const documentId: string = report?.id ?? report?.historyId ?? '';
 
   // ── Load existing comments from DB on mount ──────────────────────────────
@@ -197,6 +348,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
         setSavedNotes(rows.map(r => ({
           quotedText: r.selection,
           note: r.text,
+          editedBy: r.editorName,
           savedAt: r.createdAt ?? r.date ?? new Date().toISOString(),
         })));
         setCommentIds(rows.map(r => r.id));
@@ -286,9 +438,10 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
 
   const keyRiskFactors = parseList(medical?.key_risk_factors ?? report?.keyRiskFactors, 'keyRiskFactors');
   const primaryConcerns = parseList(medical?.primary_concerns ?? report?.primaryConcerns, 'primaryConcerns');
-  const recommendations = parseList(report?.recommendations ?? medical?.recommendations);
-  const monitoring = parseList(medical?.monitoring_requirements ?? report?.monitoringRequirements);
-  const immediateActions = parseList(medical?.immediate_actions ?? report?.immediateActions);
+  const recommendations = parseList(report?.recommendations ?? medical?.recommendations, 'recommendations');
+  const monitoring = parseList(medical?.monitoring_requirements ?? report?.monitoringRequirements, 'monitoring');
+  const immediateActions = parseList(medical?.immediate_actions ?? report?.immediateActions, 'immediateActions');
+
   const clinicalReasoning = medical?.clinical_reasoning ?? report?.clinicalReasoning ?? '';
   const vitalSigns = medical?.vital_signs_assessment ?? report?.vitalSignsAssessment ?? '';
   const labInterpretation = medical?.laboratory_interpretation ?? report?.laboratoryInterpretation ?? '';
@@ -440,7 +593,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
                     {done ? <LuCircleCheck size={16} /> : <LuCircle size={16} />}
                   </span>
                   <span style={{ fontSize: 13, color: '#374151', lineHeight: 1.5, textDecoration: done ? 'line-through' : 'none' }}>
-                    {item}
+                    {renderFormattedText(item)}
                   </span>
                 </div>
               );
@@ -480,7 +633,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
                     {done ? <LuCircleCheck size={16} /> : <LuCircle size={16} />}
                   </span>
                   <span style={{ fontSize: 13, color: '#374151', lineHeight: 1.5, textDecoration: done ? 'line-through' : 'none' }}>
-                    {item}
+                    {renderFormattedText(item)}
                   </span>
                 </div>
               );
@@ -589,7 +742,13 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
           {keyRiskFactors.length > 0 && (
             <div className="mb-4">
               <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Key Risk Factors</h3>
-              <RiskFactorBreakdown keyRiskFactors={keyRiskFactors} compact />
+              {keyRiskFactors.some(f => f.toLowerCase().includes('incomplete structured model output')) ? (
+                <div style={{ padding: '8px 12px', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: 6, fontSize: 12, color: '#b45309' }}>
+                  Incomplete structured model output - clinical validation required.
+                </div>
+              ) : (
+                <RiskFactorBreakdown keyRiskFactors={keyRiskFactors} compact />
+              )}
             </div>
           )}
 
@@ -597,14 +756,22 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
           {primaryConcerns.length > 0 && (
             <div className="mb-4">
               <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Primary Concerns</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {primaryConcerns.map((concern, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                    <span style={{ color: '#9ca3af', flexShrink: 0, marginTop: 6, fontSize: 5 }}>●</span>
-                    <span style={{ fontSize: 13, color: '#374151', lineHeight: 1.6 }}>{concern}</span>
-                  </div>
-                ))}
-              </div>
+              {primaryConcerns.some(c => c.toLowerCase().includes('partially malformed')) ? (
+                <div style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: 6, fontSize: 12, color: '#b91c1c' }}>
+                  Structured output was partially malformed. Please prioritize manual clinical validation of the patient details.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {primaryConcerns.map((concern, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{ color: '#9ca3af', flexShrink: 0, marginTop: 6, fontSize: 5 }}>●</span>
+                      <span className="capitalize" style={{ fontSize: 13, color: '#374151', lineHeight: 1.6 }}>
+                        {renderFormattedText(concern)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -645,7 +812,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
             <div className="mb-4">
               <h3 className="text-[13px] font-bold mb-1.5" style={{ color: '#111827' }}>Follow Up Timing</h3>
               <p className="text-[13px] leading-relaxed whitespace-pre-wrap" style={{ color: '#374151' }}>
-                {followUpTiming}
+                {renderFormattedText(followUpTiming)}
               </p>
             </div>
           )}

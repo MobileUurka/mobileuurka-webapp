@@ -184,6 +184,7 @@ const Documents: React.FC<DocumentsProps> = ({
     ...buildRecord(patient?.symptomReasoningReport, "Symptom Analysis"),
     ...buildRecord(patient?.triage, "Triage"),
     ...buildRecord(patient?.labwork, "Lab Work"),
+    ...buildRecord(patient?.visits, "Visits"),
     ...buildRecord(patient?.currentPregnancyInfo, "Pregnancy Journey"),
     ...buildRecord(patient?.infections, "Infections"),
   ].sort((a, b) => toMs(b.date_of_visit) - toMs(a.date_of_visit));

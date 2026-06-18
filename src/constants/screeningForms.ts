@@ -67,12 +67,10 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
     title: "Patient Intake",
     fields: [
       { name: 'editor', label: 'Recorded By', type: 'text', required: true, readonly: true },
-      {
-        name: 'nationalId', label: 'National ID', type: 'text', required: false, minLength: 8,
-        maxLength: 8, patternMessage: 'National ID must be exactly 8 digits'
 
-      },
       { name: 'firstName', label: 'First Name', type: 'text', required: true },
+      { name: 'lastName', label: 'Last Name', type: 'text', required: true },
+
       {
         name: 'phone',
         label: 'Phone Number',
@@ -84,7 +82,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         pattern: /^0\d{9}$/,
         patternMessage: 'Phone number must be exactly 10 digits and start with 0'
       },
-      { name: 'lastName', label: 'Last Name', type: 'text', required: true },
+
       {
         name: 'dob',
         label: 'Date of Birth',
@@ -93,8 +91,39 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         max: new Date().toISOString().split('T')[0]
       },
 
-      { name: 'email', label: 'Email Address', type: 'email' },
-      { name: 'address', label: 'Address', type: 'text' },
+      {
+        name: 'nationalId',
+        label: 'National ID',
+        type: 'text',
+        minLength: 8,
+        maxLength: 8,
+        patternMessage: 'National ID must be exactly 8 digits'
+      },
+
+      {
+        name: 'bloodgroup',
+        label: 'Blood Group',
+        type: 'select',
+        required: true,
+        options: ['A', 'B', 'AB', 'O', 'Unknown']
+      },
+
+      {
+        name: 'rh',
+        label: 'RH Factor',
+        type: 'select',
+        required: true,
+        options: ['+', '-', 'Unknown']
+      },
+
+      {
+        name: 'hospital',
+        label: 'Hospital',
+        type: 'select',
+        required: true,
+        options: []
+      },
+
       {
         name: 'insurance',
         label: 'Insurance Provider',
@@ -119,6 +148,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
           'Other'
         ]
       },
+
       {
         name: 'insurance_other',
         label: 'Specify Insurance Provider',
@@ -126,10 +156,28 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         placeholder: 'Enter insurance provider name',
         dependsOn: { field: 'insurance', value: 'Other' }
       },
-      { name: 'occupation', label: 'Occupation', type: 'text' },
 
-      // Emergency Contact (nested JSON flattened)
+      { name: 'email', label: 'Email Address', type: 'email' },
+      { name: 'occupation', label: 'Occupation', type: 'text' },
+      { name: 'address', label: 'Address', type: 'text' },
+
+      {
+        name: 'race',
+        label: 'Race / Ethnicity',
+        type: 'select',
+        options: [
+          'Black / African',
+          'Asian',
+          'White / Caucasian',
+          'Mixed / Multiracial',
+          'Middle Eastern',
+          'Indigenous / Native',
+          'Prefer not to say'
+        ]
+      },
+
       { name: 'emergencyContactName', label: 'Emergency Contact Name', type: 'text' },
+
       {
         name: 'emergencyContactPhone',
         label: 'Emergency Contact Phone',
@@ -140,24 +188,12 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         pattern: /^0\d{9}$/,
         patternMessage: 'Phone number must be exactly 10 digits and start with 0'
       },
-      { name: 'emergencyContactRelationship', label: 'Relationship with Emergency contact', type: 'text' },
-
-
-      { name: 'bloodgroup', label: 'Blood Group', type: 'select', required: true, options: ['A', 'B', 'AB', 'O', 'Unknown'] },
-      { name: 'rh', label: 'RH Factor', type: 'select', required: true, options: ['+', '-', 'Unknown'] },
 
       {
-        name: 'race', label: 'Race / Ethnicity', type: 'select', options: [
-          'Black / African',
-          'Asian',
-          'White / Caucasian',
-          'Mixed / Multiracial',
-          'Middle Eastern',
-          'Indigenous / Native',
-          'Prefer not to say'
-        ]
-      },
-      { name: 'hospital', label: 'Hospital', type: 'select', required: true, options: [] } // Will be populated dynamically
+        name: 'emergencyContactRelationship',
+        label: 'Relationship with Emergency Contact',
+        type: 'text'
+      }
     ]
   },
 
@@ -167,7 +203,20 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'editor', label: 'Doctor/Editor', type: 'text', required: true, readonly: true },
 
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
+
+      { name: 'date', label: 'Visit Date', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
+
       { name: 'visitNumber', label: 'Visit Number', type: 'number', required: true },
+
+      {
+        name: 'gestationWeek',
+        label: 'Gestation Week',
+        type: 'number',
+        required: true,
+        min: 0,
+        max: 43
+      },
+
       {
         name: 'visitReason',
         label: 'Visit Reason',
@@ -179,22 +228,20 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
           'Ultrasound Check',
           'Bleeding / Complication',
           'Fetal Wellbeing',
-          'Postnatal Visit',
-          // 'Other'
+          'Postnatal Visit'
         ]
       },
-      // {
-      //   name: 'visitReason2',
-      //   label: 'Other Visit Reason',
-      //   type: 'text',
-      //   required: true,
-      //   dependsOn: { field: 'visitReason', value: 'Other' }
 
-      // },
-      { name: 'gestationWeek', label: 'Gestation Week', type: 'number', required: true, min: 0, max: 43 },
-      { name: 'date', label: 'Visit Date', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
-      { name: 'visitExplanation', label: 'Visit Explanation', type: 'textarea', required: true, placeholder: 'Detailed explanation of visit' },
-      { name: 'nextVisit', label: 'Next Visit Date', type: 'date' }
+      { name: 'nextVisit', label: 'Next Visit Date', type: 'date' },
+
+      {
+        name: 'visitExplanation',
+        label: 'Visit Explanation',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Detailed explanation of visit',
+        noPageBreak: true
+      }
     ]
   },
 
@@ -202,10 +249,14 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
     title: "Allergy Information",
     fields: [
       { name: 'editor', label: 'Recorded By', type: 'text', required: true, readonly: true },
+
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
+
+      { name: 'date', label: 'Date Recorded', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
+
       { name: 'allergyType', label: 'Allergy Type', type: 'select', required: true, options: ['medication', 'food', 'environmental', 'other'] },
-      { name: 'allergies', label: 'Allergies', type: 'text', required: true, placeholder: 'List allergies' },
-      { name: 'date', label: 'Date Recorded', type: 'date', required: true, max: new Date().toISOString().split('T')[0] }
+
+      { name: 'allergies', label: 'Allergies', type: 'text', required: true, placeholder: 'List allergies' }
     ]
   },
 
@@ -231,13 +282,14 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
 
     title: "Patient Medical History",
     fields: [
-
-      // ── Admin / meta ────────────────────────────────────────────────────────
       { name: 'editor', label: 'Recorded By', type: 'text', required: true, readonly: true },
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
       { name: 'date', label: 'Date Recorded', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
-      { name: 'gravidaParity', label: 'Gravida + Parity', type: 'text', required: true, placeholder: 'e.g. 2+1', pattern: /^\d+\+\d+$/, patternMessage: 'Format must be Gravida+Parity (e.g. 2+1) — Gravida must be \u2265 Parity' },
+
+      { name: 'gravidaParity', label: 'Gravida + Parity', type: 'text', required: true, placeholder: 'e.g. 2+1', pattern: /^\d+\+\d+$/, patternMessage: 'Format must be Gravida+Parity (e.g. 2+1) — Gravida must be ≥ Parity' },
+
       { name: 'interval', label: 'Pregnancy Interval (months)', type: 'number' },
+
       {
         name: 'maleAge',
         label: "Partner's Age (optional)",
@@ -247,27 +299,27 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         max: 99,
         placeholder: 'Leave blank if not disclosed',
       },
+
       { name: 'prevChildWeight', label: 'Previous Child Weight (grams)', type: 'number' },
 
-
-      // ── Obstetric data ───────────────────────────────────────────────────────
-
       { name: 'lastPeriodDate', label: 'Last Menstrual Period', type: 'date', max: new Date().toISOString().split('T')[0] },
+
       { name: 'estimatedDueDate', label: 'Estimated Due Date', type: 'date' },
+
       {
         name: 'prevPEHistoryDisclosure',
         label: 'Previous Preeclampsia History (self-reported)',
         type: 'select',
-        required: false,
         options: ['yes', 'no', 'unknown', 'prefer not to say'],
       },
-      // ── Obstetric data with counts ───────────────────────────────────────────
+
       {
         name: 'miscarriage',
         label: 'Miscarriage',
         type: 'select',
         options: ['yes', 'no', 'unknown']
       },
+
       {
         name: 'miscarriageNum',
         label: 'Number of Miscarriages',
@@ -276,12 +328,14 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         placeholder: 'Enter number',
         dependsOn: { field: 'miscarriage', value: 'yes' }
       },
+
       {
         name: 'csection',
         label: 'C-Section',
         type: 'select',
         options: ['yes', 'no', 'unknown']
       },
+
       {
         name: 'csectionNum',
         label: 'Number of C-Sections',
@@ -290,12 +344,14 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         placeholder: 'Enter number',
         dependsOn: { field: 'csection', value: 'yes' }
       },
+
       {
         name: 'stillbirth',
         label: 'Stillbirth',
         type: 'select',
         options: ['yes', 'no', 'unknown']
       },
+
       {
         name: 'stillbirthNum',
         label: 'Number of Stillbirths',
@@ -304,12 +360,14 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         placeholder: 'Enter number',
         dependsOn: { field: 'stillbirth', value: 'yes' }
       },
+
       {
         name: 'prolongedLabour',
         label: 'Prolonged Labour',
         type: 'select',
         options: ['yes', 'no', 'unknown']
       },
+
       {
         name: 'prolongedLabourHours',
         label: 'Prolonged Labour (Hours)',
@@ -319,13 +377,13 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         dependsOn: { field: 'prolongedLabour', value: 'yes' }
       },
 
-      // ── Gynecological Surgery & Contraceptive Use ────────────────────────────
       {
         name: 'prevGynaSurgery',
         label: 'Previous Gynecological Surgery',
         type: 'select',
         options: ['yes', 'no', 'unknown']
       },
+
       {
         name: 'prevGynaSurgeryDetails',
         label: 'Which gynecological surgery?',
@@ -333,6 +391,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         placeholder: 'e.g. myomectomy, hysteroscopy',
         dependsOn: { field: 'prevGynaSurgery', value: 'yes' }
       },
+
       {
         name: 'contraceptives',
         label: 'Previous Contraceptive Use',
@@ -340,6 +399,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         noPageBreak: true,
         options: ['yes', 'no', 'unknown']
       },
+
       {
         name: 'contraceptivesDetails',
         label: 'Which contraceptive(s)?',
@@ -349,7 +409,6 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         dependsOn: { field: 'contraceptives', value: 'yes' }
       },
 
-      // ── Family History chip group ────────────────────────────────────────────
       {
         name: 'familyHistoryGroup',
         label: 'Family History — select all that apply (click to toggle Yes / Unsure / No)',
@@ -362,17 +421,14 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
           { field: 'famHistoryGestationalHypertension', label: 'Gestational Hypertension' },
           { field: 'famHistoryGestationalDiabetes', label: 'Gestational Diabetes' },
           { field: 'famHistoryAnemia', label: 'Anemia' },
-          { field: 'famObeseHistory', label: 'Obesity (BMI \u2265 30)' },
+          { field: 'famObeseHistory', label: 'Obesity (BMI ≥ 30)' },
           { field: 'famHistoryAutoimmune', label: 'Autoimmune Disease' },
           { field: 'famSickleCell', label: 'Sickle Cell' },
           { field: 'famThalassemia', label: 'Thalassemia' },
-          { field: 'malePreeclampsiaPrevHistory', label: "Partner's Previous Preeclampsia" },
-
+          { field: 'malePreeclampsiaPrevHistory', label: "Partner's Previous Preeclampsia" }
         ]
       },
 
-
-      // ── Medical History chip group ───────────────────────────────────────────
       {
         name: 'medicalHistoryGroup',
         label: 'Personal Medical History — select all that apply',
@@ -391,12 +447,10 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
           { field: 'menorrhagia', label: 'Menorrhagia' },
           { field: 'pcos', label: 'PCOS' },
           { field: 'uterineFibroids', label: 'Uterine Fibroids' },
-          { field: 'hypothyroidism', label: 'Hypothyroidism' },
+          { field: 'hypothyroidism', label: 'Hypothyroidism' }
         ]
       },
 
-
-      // ── Obstetric History chip group ─────────────────────────────────────────
       {
         name: 'obstetricHistoryGroup',
         label: 'Obstetric History — select all that apply',
@@ -410,11 +464,9 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
           { field: 'gestationalHypertensionHistory', label: 'Gestational Hypertension' },
           { field: 'preeclampsiaHistory', label: 'Preeclampsia' },
           { field: 'firstPreeclampsiaHistory', label: 'Preeclampsia (1st Pregnancy)' },
-          { field: 'pregnancyHistoryAnemia', label: 'Anemia in Pregnancy' },
+          { field: 'pregnancyHistoryAnemia', label: 'Anemia in Pregnancy' }
         ]
-      },
-
-
+      }
     ]
   },
 
@@ -422,30 +474,56 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
     title: "Current Pregnancy Information",
     fields: [
       { name: 'editor', label: 'Recorded By', type: 'text', required: true, readonly: true },
-      { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
-      { name: 'date', label: 'Date Recorded', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
-      { name: 'gestationWeek', label: 'Gestation Week', type: 'number', required: true, min: 0, max: 43 },
 
-      // Fetal
-      { name: 'sexOfFetus', label: 'Sex of Fetus', type: 'select', required: true, options: ['male', 'female', 'unknown'] },
-      { name: 'spe', label: 'SPE Measurement (mm)', type: 'number', required: true },
-      // Multiple Fetal Gestation — select with optional count
+      { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
+
+      {
+        name: 'date',
+        label: 'Date Recorded',
+        type: 'date',
+        required: true,
+        max: new Date().toISOString().split('T')[0]
+      },
+
+      {
+        name: 'gestationWeek',
+        label: 'Gestation Week',
+        type: 'number',
+        required: true,
+        min: 0,
+        max: 43
+      },
+
+      {
+        name: 'sexOfFetus',
+        label: 'Sex of Fetus',
+        type: 'select',
+        required: true,
+        options: ['male', 'female', 'unknown']
+      },
+      {
+        name: 'spe',
+        label: 'SPE Measurement (mm)',
+        type: 'number',
+        required: true
+      },
+
       {
         name: 'multifetalgestation',
         label: 'Multiple Fetal Gestation',
         type: 'select',
-        options: ['yes', 'no', 'unknown'],
-        required: false,
+        options: ['yes', 'no', 'unknown']
       },
+
       {
         name: 'multifetalgestationCount',
         label: 'Number of Fetuses',
         type: 'number',
         min: 2,
         placeholder: 'e.g. 3',
-        dependsOn: { field: 'multifetalgestation', value: 'yes' },
+        dependsOn: { field: 'multifetalgestation', value: 'yes' }
       },
-      // Pregnancy complications chip group
+
       {
         name: 'pregnancyComplicationsGroup',
         label: 'Current Pregnancy Complications',
@@ -462,13 +540,12 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
           { field: 'gestationaldiabetes', label: 'Gestational Diabetes' },
           { field: 'gesthypertension', label: 'Gestational Hypertension' },
           { field: 'placentaprevia', label: 'Placenta Previa' },
-          { field: 'primipaternity', label: 'Primipaternity' },
+          { field: 'primipaternity', label: 'Primipaternity' }
         ]
       },
 
 
 
-      // Medical conditions chip group
       {
         name: 'pregnancyMedicalGroup',
         label: 'Current Medical Conditions',
@@ -479,15 +556,16 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
           { field: 'vitamindDeficiency', label: 'Vitamin D Deficiency' },
           { field: 'highHb', label: 'High Hemoglobin' },
           { field: 'malaria', label: 'Malaria' },
-          { field: 'hookworm', label: 'Hookworm' },
+          { field: 'hookworm', label: 'Hookworm' }
         ]
-      },
+      }
     ]
   },
 
   Lab: {
     title: "Laboratory Results",
     fields: [
+      // Patient Information
       { name: 'editor', label: 'Recorded By', type: 'text', required: true, readonly: true },
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
       { name: 'date', label: 'Test Date', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
@@ -542,11 +620,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'urineGlucose', label: 'Urine Glucose', type: 'select', required: true, options: ['Negative', '+', '++', '+++'] },
       { name: 'urineNitrite', label: 'Urine Nitrite', type: 'select', required: true, options: ['Negative', 'Positive'] },
       { name: 'urineOdor', label: 'Urine Odor', type: 'select', required: true, options: ['normal', 'sweet', 'fishy', 'ammonia', 'foul'] },
-      { name: 'urineProtein', label: 'Urine Protein', type: 'select', required: true, options: ['negative', '+', '++', '+++'] },
-
-      // Diagnosis
-      // { name: 'diagnosis', label: 'Diagnosis', type: 'textarea', required: true, placeholder: 'Clinical diagnosis based on results' },
-      // { name: 'diagnosisId', label: 'Diagnosis ID', type: 'text' }
+      { name: 'urineProtein', label: 'Urine Protein', type: 'select', required: true, options: ['negative', '+', '++', '+++'] }
     ]
   },
 
@@ -554,11 +628,23 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
     title: "Clinical Notes",
     fields: [
       { name: 'editor', label: 'Tested By', type: 'text', required: true, readonly: true },
-      { name: 'title', label: 'Title', type: "text" },
+
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
+
       { name: 'date', label: 'Date', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
-      { name: 'notes', label: 'Clinical Notes', type: 'textarea', required: true, placeholder: 'Enter clinical notes here...' },
+
       { name: 'gestationWeek', label: 'Gestation Week', type: 'number', required: true, min: 0, max: 43 },
+
+      { name: 'title', label: 'Title', type: 'text' },
+
+      {
+        name: 'notes',
+        label: 'Clinical Notes',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Enter clinical notes here...',
+        // fullWidth: true
+      }
     ]
   },
 
@@ -566,13 +652,56 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
     title: "Infection Screening",
     fields: [
       { name: 'editor', label: 'Tested By', type: 'text', required: true, readonly: true },
+
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
-      { name: 'date', label: 'Test Date', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
-      { name: 'hiv', label: 'HIV Status', type: 'select', required: true, options: ['negative', 'positive', 'unknown'] },
-      { name: 'syphilis', label: 'Syphilis', type: 'select', required: true, options: ['negative', 'positive', 'unknown'] },
-      { name: 'hepB', label: 'Hepatitis B', type: 'select', required: true, options: ['negative', 'positive', 'unknown'] },
-      { name: 'hepC', label: 'Hepatitis C', type: 'select', required: true, options: ['negative', 'positive', 'unknown'] },
-      { name: 'rubella', label: 'Rubella Immunity', type: 'select', required: true, options: ['immune', 'non-immune', 'unknown'] }
+
+      {
+        name: 'date',
+        label: 'Test Date',
+        type: 'date',
+        required: true,
+        max: new Date().toISOString().split('T')[0]
+      },
+
+      {
+        name: 'hiv',
+        label: 'HIV Status',
+        type: 'select',
+        required: true,
+        options: ['negative', 'positive', 'unknown']
+      },
+
+      {
+        name: 'syphilis',
+        label: 'Syphilis',
+        type: 'select',
+        required: true,
+        options: ['negative', 'positive', 'unknown']
+      },
+
+      {
+        name: 'hepB',
+        label: 'Hepatitis B',
+        type: 'select',
+        required: true,
+        options: ['negative', 'positive', 'unknown']
+      },
+
+      {
+        name: 'hepC',
+        label: 'Hepatitis C',
+        type: 'select',
+        required: true,
+        options: ['negative', 'positive', 'unknown']
+      },
+
+      {
+        name: 'rubella',
+        label: 'Rubella Immunity',
+        type: 'select',
+        required: true,
+        options: ['immune', 'non-immune', 'unknown']
+      }
     ]
   },
 
@@ -580,14 +709,63 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
     title: "Lifestyle Assessment",
     fields: [
       { name: 'editor', label: 'Assessed By', type: 'text', required: true, readonly: true },
+
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
-      { name: 'date', label: 'Assessment Date', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
-      { name: 'smoking', label: 'Smoking', type: 'text', required: true, placeholder: 'e.g. no / 10 cigarettes/day / former smoker' },
-      { name: 'alcoholConsumption', label: 'Alcohol Consumption', type: 'text', required: true, placeholder: 'e.g. no / 3 glasses/week' },
-      { name: 'diet', label: 'Diet Quality', type: 'select', required: true, options: ['poor', 'fair', 'good', 'excellent'] },
-      { name: 'exercise', label: 'Exercise (minutes/week)', type: 'number', required: true },
-      { name: 'caffeine', label: 'Caffeine Consumption', type: 'text', required: true, placeholder: 'e.g. no / 2 cups/day' },
-      { name: 'sugarDrink', label: 'Sugary Drinks', type: 'text', required: true, placeholder: 'e.g. no / 1 can/day' },
+
+      {
+        name: 'date',
+        label: 'Assessment Date',
+        type: 'date',
+        required: true,
+        max: new Date().toISOString().split('T')[0]
+      },
+
+      {
+        name: 'diet',
+        label: 'Diet Quality',
+        type: 'select',
+        required: true,
+        options: ['poor', 'fair', 'good', 'excellent']
+      },
+
+      {
+        name: 'exercise',
+        label: 'Exercise (minutes/week)',
+        type: 'number',
+        required: true
+      },
+
+      {
+        name: 'smoking',
+        label: 'Smoking',
+        type: 'text',
+        required: true,
+        placeholder: 'e.g. no / 10 cigarettes/day / former smoker'
+      },
+
+      {
+        name: 'alcoholConsumption',
+        label: 'Alcohol Consumption',
+        type: 'text',
+        required: true,
+        placeholder: 'e.g. no / 3 glasses/week'
+      },
+
+      {
+        name: 'caffeine',
+        label: 'Caffeine Consumption',
+        type: 'text',
+        required: true,
+        placeholder: 'e.g. no / 2 cups/day'
+      },
+
+      {
+        name: 'sugarDrink',
+        label: 'Sugary Drinks',
+        type: 'text',
+        required: true,
+        placeholder: 'e.g. no / 1 can/day'
+      }
     ]
   },
 
@@ -595,14 +773,46 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
     title: "Fetal Development",
     fields: [
       { name: 'editor', label: 'Assessed By', type: 'text', required: true, readonly: true },
+
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
+
       {
-        name: 'date', label: 'Assessment Date', type: 'date', required: true, max: new Date().toISOString().split('T')[0]
+        name: 'date',
+        label: 'Assessment Date',
+        type: 'date',
+        required: true,
+        max: new Date().toISOString().split('T')[0]
       },
-      { name: 'gestationWeek', label: 'Gestation Week', type: 'number', required: true, min: 0, max: 43 },
-      { name: 'fhr', label: 'Fetal Heart Rate (bpm)', type: 'number', required: true },
-      { name: 'femurHeight', label: 'Femur Length (mm)', type: 'number', required: true },
-      { name: 'headCircumference', label: 'Head Circumference (cm)', type: 'number', required: true }
+
+      {
+        name: 'gestationWeek',
+        label: 'Gestation Week',
+        type: 'number',
+        required: true,
+        min: 0,
+        max: 43
+      },
+
+      {
+        name: 'fhr',
+        label: 'Fetal Heart Rate (bpm)',
+        type: 'number',
+        required: true
+      },
+
+      {
+        name: 'femurHeight',
+        label: 'Femur Length (mm)',
+        type: 'number',
+        required: true
+      },
+
+      {
+        name: 'headCircumference',
+        label: 'Head Circumference (cm)',
+        type: 'number',
+        required: true
+      }
     ]
   },
 
@@ -610,11 +820,39 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
     title: "Ultrasound Results",
     fields: [
       { name: 'editor', label: 'Performed By', type: 'text', required: true, readonly: true },
+
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
-      { name: 'date', label: 'Ultrasound Date', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
-      { name: 'gestationWeek', label: 'Gestation Week', type: 'number', required: true, min: 0, max: 43 },
-      { name: 'amniotic', label: 'Amniotic Fluid Index', type: 'number', required: true },
-      { name: 'imageUrl', label: 'Image URL', type: 'text', placeholder: 'URL to ultrasound image' }
+
+      {
+        name: 'date',
+        label: 'Ultrasound Date',
+        type: 'date',
+        required: true,
+        max: new Date().toISOString().split('T')[0]
+      },
+
+      {
+        name: 'gestationWeek',
+        label: 'Gestation Week',
+        type: 'number',
+        required: true,
+        min: 0,
+        max: 43
+      },
+
+      {
+        name: 'amniotic',
+        label: 'Amniotic Fluid Index',
+        type: 'number',
+        required: true
+      },
+
+      {
+        name: 'imageUrl',
+        label: 'Image URL',
+        type: 'text',
+        placeholder: 'URL to ultrasound image'
+      }
     ]
   },
 
@@ -622,16 +860,79 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
     title: "Medication Prescription",
     fields: [
       { name: 'editor', label: 'Prescribed By', type: 'text', required: true, readonly: true },
+
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
-      { name: 'date', label: 'Prescription Date', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
-      { name: 'gestationWeek', label: 'Gestation Week', type: 'number', required: true, min: 0, max: 43 },
-      { name: 'trimester', label: 'Trimester', type: 'select', required: true, options: ['1', '2', '3'] },
-      { name: 'medicine', label: 'Medicine Name', type: 'text', required: true, placeholder: 'e.g., Folic Acid' },
-      { name: 'dosage', label: 'Dosage', type: 'text', required: true, placeholder: 'e.g., 400mcg' },
-      { name: 'prescription', label: 'Prescription Instructions', type: 'text', required: true, placeholder: 'e.g., Once daily' },
-      { name: 'startDate', label: 'Start Date', type: 'date', required: true },
-      { name: 'stopDate', label: 'Stop Date', type: 'date' },
-      { name: 'medicationPurpose', label: 'Purpose', type: 'textarea', required: true, placeholder: 'Purpose of medication', noPageBreak: true }
+
+      {
+        name: 'date',
+        label: 'Prescription Date',
+        type: 'date',
+        required: true,
+        max: new Date().toISOString().split('T')[0]
+      },
+
+      {
+        name: 'gestationWeek',
+        label: 'Gestation Week',
+        type: 'number',
+        required: true,
+        min: 0,
+        max: 43
+      },
+
+      {
+        name: 'trimester',
+        label: 'Trimester',
+        type: 'select',
+        required: true,
+        options: ['1', '2', '3']
+      },
+
+      {
+        name: 'startDate',
+        label: 'Start Date',
+        type: 'date',
+        required: true
+      },
+
+      {
+        name: 'medicine',
+        label: 'Medicine Name',
+        type: 'text',
+        required: true,
+        placeholder: 'e.g., Folic Acid'
+      },
+
+      {
+        name: 'dosage',
+        label: 'Dosage',
+        type: 'text',
+        required: true,
+        placeholder: 'e.g., 400mcg'
+      },
+
+      {
+        name: 'prescription',
+        label: 'Prescription Instructions',
+        type: 'text',
+        required: true,
+        placeholder: 'e.g., Once daily'
+      },
+
+      {
+        name: 'stopDate',
+        label: 'Stop Date',
+        type: 'date'
+      },
+
+      {
+        name: 'medicationPurpose',
+        label: 'Purpose',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Purpose of medication',
+        noPageBreak: true
+      }
     ]
   }
 };

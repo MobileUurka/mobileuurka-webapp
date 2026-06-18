@@ -4,6 +4,7 @@ import { LuX, LuMessageSquarePlus, LuSend } from "react-icons/lu";
 export interface CommentPayload {
     quotedText: string;
     note: string;
+    editedBy?: string;
     savedAt: string; // ISO timestamp
 }
 

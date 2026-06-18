@@ -15,6 +15,25 @@
 import React, { useMemo } from 'react';
 import { LuTriangleAlert } from 'react-icons/lu';
 
+const renderFormattedText = (text: string) => {
+  if (!text) return null;
+  const parts = text.split(/\*\*(.*?)\*\*/g);
+  return (
+    <>
+      {parts.map((part, index) => {
+        if (index % 2 === 1) {
+          return (
+            <strong key={index} style={{ fontWeight: 700, color: '#111827' }}>
+              {part}
+            </strong>
+          );
+        }
+        return part;
+      })}
+    </>
+  );
+};
+
 interface RiskFactorBreakdownProps {
   keyRiskFactors: string[];
   /** Show a compact inline version (no header, smaller tags) */
@@ -76,25 +95,24 @@ const RiskFactorBreakdown: React.FC<RiskFactorBreakdownProps> = ({ keyRiskFactor
               display: 'inline-flex',
               alignItems: 'flex-start', // 👈 Changed from 'center' to snap to the top
               gap: 6,                   // Slight increase for cleaner badge spacing
-              fontSize: 10,
-              fontWeight: 500,
-              padding: '8px 12px',
+              fontWeight: 400,
+              fontSize: 12,
+              color: '#374151',
+              padding: '4px 8px',
               borderRadius: 20,
-              background: s.bg,
-              color: s.color,
-              border: `1px solid ${s.border}`,
+              background: 'transparent',
               lineHeight: '14px'        // Explicit line-height ensures predictable alignment
             }}>
               <span style={{
                 width: 5,
                 height: 5,
-                borderRadius: '50%',
+                borderRadius: '100%',
                 background: s.dot,
                 flexShrink: 0,
                 marginTop: '4.5px'      // 👈 Offsets the dot to align perfectly with the first line of text
               }} />
               <span style={{ textAlign: 'left' }}>
-                {f.text}
+                {renderFormattedText(f.text)}
               </span>
             </span>
           );
@@ -133,7 +151,7 @@ const RiskFactorBreakdown: React.FC<RiskFactorBreakdownProps> = ({ keyRiskFactor
               background: s.bg, color: s.color, border: `1px solid ${s.border}`,
             }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot, flexShrink: 0 }} />
-              {f.text}
+              {renderFormattedText(f.text)}
             </span>
           );
         })}
