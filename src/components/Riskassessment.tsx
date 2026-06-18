@@ -19,6 +19,7 @@ const Riskassessment: React.FC<RiskAssessmentProps> = ({ patient }) => {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [tooltipContent, setTooltipContent] = useState<string>("");
 
+  if (tooltipContent) console.log(tooltipContent);
   const isLongText = (text: string) => text && text.length > 180;
 
   useEffect(() => {
