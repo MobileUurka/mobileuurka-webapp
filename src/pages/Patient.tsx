@@ -237,7 +237,30 @@ const Patient: React.FC = () => {
     if (!patient) return [];
     const history = patient.patientHistory?.[0] || {};
     const lastVisit = patient.visits?.[patient.visits.length - 1] || {};
+
+
+    const getCurrentGestationWeek = (lastVisit: any) => {
+      if (!lastVisit || !lastVisit.date || lastVisit.gestationWeek === undefined) {
+        return "N/A";
+      }
+
+      const visitDate = new Date(lastVisit.date);
+      const today = new Date();
+
+      // Calculate the difference in milliseconds and convert to days
+      const diffInTime = today.getTime() - visitDate.getTime();
+      const diffInDays = Math.floor(diffInTime / (1000 * 60 * 60 * 24));
+
+      // Convert days to weeks (fractional or rounded based on your preference)
+      const weeksPassed = Math.floor(diffInDays / 7);
+
+      // Return the baseline gestation week + the weeks that have passed since
+      return lastVisit.gestationWeek + weeksPassed;
+    };
+
+
     return [
+      { label: "Gestation Week", value: getCurrentGestationWeek(lastVisit) },
       { label: "Age", value: calculateAge(patient.dob) },
       { label: "Gravida + Parity", value: `${history.gravida || 0}+${history.parity || 0}` },
       {
