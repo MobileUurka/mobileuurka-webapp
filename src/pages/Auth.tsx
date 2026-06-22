@@ -29,7 +29,11 @@ const Auth = ({ onLoginSuccess }: AuthProps) => {
     const location = useLocation();
 
     // ── Normal login state ───────────────────────────────────────────────────
-    const [loginFormData, setLoginFormData] = useState<{ email: string; password: string }>({ email: "", password: "" });
+    const [loginFormData, setLoginFormData] = useState<{ email: string; password: string; rememberMe?: boolean }>({
+        email: "",
+        password: "",
+        rememberMe: false,
+    });
     const [showLoginPassword, setShowLoginPassword] = useState<boolean>(false);
 
     // ── Staff first-login flow state ─────────────────────────────────────────
@@ -96,6 +100,7 @@ const Auth = ({ onLoginSuccess }: AuthProps) => {
             const response = await authService.signIn({
                 email: loginFormData.email,
                 password: loginFormData.password,
+                rememberMe: loginFormData.rememberMe,
             });
 
             if (response.mustChangePassword) {

@@ -21,9 +21,6 @@ async function request(endpoint: string, options: any = {}) {
     if (!isPublicEndpoint) {
         const isTokenValid = await authService.validateAndRefreshToken();
         if (!isTokenValid) {
-            console.error('No valid token available for endpoint:', endpoint);
-            authService.logout();
-            window.dispatchEvent(new Event('auth-logout'));
             throw new Error('Authentication required');
         }
     }

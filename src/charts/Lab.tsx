@@ -4,6 +4,8 @@ import { IoIosWarning } from "react-icons/io";
 import DropdownMenu from "../components/DropdownMenu";
 import LabChart from "./LabChart";
 import type { PatientData } from '../types/patient';
+import OverviewEmptyState from "../components/OverviewEmptyState";
+import { hasLabData } from "../utils/overviewData";
 
 interface OverviewProps {
   patient: PatientData;
@@ -77,6 +79,18 @@ const Lab: React.FC<OverviewProps> = ({ patient }) => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [active, patient]);
+
+  if (!hasLabData(patient)) {
+    return (
+      <OverviewEmptyState
+        title="No lab results"
+        description="Lab test values will display here once entered in screening."
+        screeningTab="Lab"
+        patientId={patient.id}
+        patientName={patient.name}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto w-full h-full flex flex-col p-4">

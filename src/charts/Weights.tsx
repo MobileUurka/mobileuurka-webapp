@@ -3,6 +3,8 @@ import { FaArrowTrendDown, FaArrowTrendUp } from "react-icons/fa6";
 import { IoFlagSharp } from "react-icons/io5";
 import { Tooltip } from "react-tooltip";
 import WeightChart from "./WeightChart";
+import OverviewEmptyState from "../components/OverviewEmptyState";
+import { hasWeightData } from "../utils/overviewData";
 
 // Interfaces
 interface TriageEntry {
@@ -24,9 +26,11 @@ interface WeightAnalysis {
 
 interface WeightsProps {
     patient?: TriageEntry[] | null;
+    patientId: string;
+    patientName: string;
 }
 
-const Weights: React.FC<WeightsProps> = ({ patient }) => {
+const Weights: React.FC<WeightsProps> = ({ patient, patientId, patientName }) => {
   const [weightAnalysis, setWeightAnalysis] = useState<WeightAnalysis | null>(null);
   const [latestWeights, setLatestWeights] = useState<{ date: string; weight: number }[]>([]);
   const [showFlag, setShowFlag] = useState<boolean>(false);
@@ -137,6 +141,18 @@ const Weights: React.FC<WeightsProps> = ({ patient }) => {
 
     return scenarios[direction] || scenarios["no change"];
   };
+
+  if (!hasWeightData(patient)) {
+    return (
+      <OverviewEmptyState
+        title="No weight data"
+        description="Record triage vitals including weight to track changes over time."
+        screeningTab="Triage"
+        patientId={patientId}
+        patientName={patientName}
+      />
+    );
+  }
 
   return (
     <div className="w-full h-full flex flex-col p-4 relative overflow-visible">

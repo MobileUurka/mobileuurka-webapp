@@ -4,6 +4,7 @@ import { FaInfo } from "react-icons/fa6";
 import { IoFlagSharp } from "react-icons/io5";
 import { Tooltip } from "react-tooltip";
 import type { PatientData, TabType } from '../types/patient';
+import OverviewEmptyState from "../components/OverviewEmptyState";
 
 interface OverviewProps {
   patient: PatientData;
@@ -28,6 +29,18 @@ const Medications: React.FC<OverviewProps> = ({ patient, setActiveTab }) => {
   // Filter for active medications (stopDate is in future or today)
   const currentDate = new Date().toISOString().split("T")[0];
   const activeMedications = allMedications.filter((med) => med.stopDate >= currentDate);
+
+  if (allMedications.length === 0) {
+    return (
+      <OverviewEmptyState
+        title="No medications recorded"
+        description="Prescriptions will appear here once added in screening."
+        screeningTab="Prescription"
+        patientId={patient.id}
+        patientName={patient.name}
+      />
+    );
+  }
 
   return (
     <div className="w-[88%] h-[92%] mx-auto flex flex-col">
@@ -99,20 +112,18 @@ const Medications: React.FC<OverviewProps> = ({ patient, setActiveTab }) => {
               );
             })
           ) : (
-            /* No Medications State */
             <div className="flex w-full flex-row gap-2.5 p-2.5 items-center bg-white rounded-md shadow-sm">
               <div className={`w-10 aspect-square flex justify-center items-center rounded-[4px] text-lg ${colors.green.bg}`} style={{ color: colors.green.color }}>
                 <TbPillFilled />
               </div>
               <div className="flex flex-col ml-1 text-[0.9em] font-bold">
-                <div className="text-gray-800">No medications</div>
-                <div className="font-normal text-[0.8em] text-black/60">Available</div>
+                <div className="text-gray-800">No active medications</div>
+                <div className="font-normal text-[0.8em] text-black/60">N/A</div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Action Button */}
         <div
           onClick={() => setActiveTab("medication" as TabType)}
           className="w-full absolute bottom-[15px] h-[50px] lg:h-[40px] bg-[#FFC187] rounded-md text-white flex justify-center items-center cursor-pointer text-[0.9em] lg:text-[0.8em] hover:bg-[#ffb36b] transition-colors"

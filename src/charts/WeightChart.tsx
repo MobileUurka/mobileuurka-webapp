@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
+import { padChartSlotsLeft, EMPTY_SLOT_LABEL } from "../utils/chartSlots";
 
 interface WeightData {
   date: string;
@@ -41,16 +42,14 @@ const WeightChart: React.FC<WeightChartProps> = ({ data }) => {
 
     formatted.sort((a, b) => a.rawDate - b.rawDate);
 
-    const cleaned: WeightData[] = formatted.map((item) => ({
-      date: item.shortDate,
-      weight: item.weight,
-    }));
+    const cleaned: WeightData[] = formatted
+      .filter((item) => item.weight != null && !Number.isNaN(item.weight))
+      .map((item) => ({
+        date: item.shortDate,
+        weight: item.weight,
+      }));
 
-    while (cleaned.length < 5) {
-      cleaned.push({ date: "--", weight: null });
-    }
-
-    return cleaned.slice(0, 5);
+    return padChartSlotsLeft(cleaned, () => ({ date: EMPTY_SLOT_LABEL, weight: null }));
   }, [data]);
 
   // Custom Tooltip (Recharts-controlled)

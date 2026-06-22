@@ -204,19 +204,8 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
 
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
 
-      { name: 'date', label: 'Visit Date', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
 
       { name: 'visitNumber', label: 'Visit Number', type: 'number', required: true },
-
-      {
-        name: 'gestationWeek',
-        label: 'Gestation Week',
-        type: 'number',
-        required: true,
-        min: 0,
-        max: 43
-      },
-
       {
         name: 'visitReason',
         label: 'Visit Reason',
@@ -231,9 +220,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
           'Postnatal Visit'
         ]
       },
-
-      { name: 'nextVisit', label: 'Next Visit Date', type: 'date' },
-
+      
       {
         name: 'visitExplanation',
         label: 'Visit Explanation',
@@ -241,7 +228,39 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         required: true,
         placeholder: 'Detailed explanation of visit',
         noPageBreak: true
-      }
+      },
+
+      {
+        name: 'gestationWeek',
+        label: 'Gestation Week',
+        type: 'number',
+        required: true,
+        min: 0,
+        max: 43
+      },
+      { name: 'date', label: 'Visit Date', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
+
+
+
+
+      { name: 'nextVisit', label: 'Next Visit Date', type: 'date' },
+
+      {
+        name: 'examination',
+        label: 'Examination Findings',
+        type: 'textarea',
+        placeholder: 'Physical examination findings, observations...',
+        noPageBreak: true
+      },
+
+      {
+        name: 'plan',
+        label: 'Plan',
+        type: 'textarea',
+        placeholder: 'Management plan, follow-up actions, referrals...',
+        noPageBreak: true
+      },
+
     ]
   },
 
@@ -425,8 +444,14 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
           { field: 'famHistoryAutoimmune', label: 'Autoimmune Disease' },
           { field: 'famSickleCell', label: 'Sickle Cell' },
           { field: 'famThalassemia', label: 'Thalassemia' },
-          { field: 'malePreeclampsiaPrevHistory', label: "Partner's Previous Preeclampsia" }
         ]
+      },
+
+      {
+        name: 'malePreeclampsiaPrevHistory',
+        label: "Did your partner's previous partner have preeclampsia during the pregnancy of their child?",
+        type: 'select',
+        options: ['yes', 'no', 'unknown']
       },
 
       {
@@ -441,7 +466,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
           { field: 'chronicRenalDisease', label: 'Chronic Renal Disease' },
           { field: 'cardiacDisease', label: 'Cardiac Disease' },
           { field: 'liver', label: 'Liver Condition' },
-          { field: 'thyroid', label: 'Thyroid Condition' },
+          { field: 'hyperthyroidism', label: 'Hyperthyroidism' },
           { field: 'kidney', label: 'Kidney Condition' },
           { field: 'rheumatoidArthritis', label: 'Rheumatoid Arthritis' },
           { field: 'menorrhagia', label: 'Menorrhagia' },
@@ -635,7 +660,13 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
 
       { name: 'gestationWeek', label: 'Gestation Week', type: 'number', required: true, min: 0, max: 43 },
 
-      { name: 'title', label: 'Title', type: 'text' },
+      {
+        name: 'noteType',
+        label: 'Note Type',
+        type: 'select',
+        required: true,
+        options: ['Examination', 'Plan', 'Assessment', 'Follow-up', 'Referral', 'General Note']
+      },
 
       {
         name: 'notes',

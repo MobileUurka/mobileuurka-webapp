@@ -215,6 +215,8 @@ const Screening = () => {
           gestationWeek: data.gestationWeek,
           visitReason: data.visitReason,
           visitExplanation: data.visitExplanation,
+          examination: data.examination,
+          plan: data.plan,
           nextVisit: data.nextVisit
         };
 
@@ -317,7 +319,8 @@ const Screening = () => {
           maleAge: data.maleAge != null && data.maleAge !== '' ? Number(data.maleAge) : 0,
           malePreeclampsiaPrevHistory: data.malePreeclampsiaPrevHistory,
           liver: data.liver,
-          thyroid: data.thyroid,
+          thyroid: data.thyroid || 'no',
+          hyperthyroidism: data.hyperthyroidism,
           cardiacDisease: data.cardiacDisease,
           chronicRenalDisease: data.chronicRenalDisease,
           kidney: data.kidney,
@@ -451,7 +454,7 @@ const Screening = () => {
             autoimmune: latestHistory?.autoimmune || "No",
             rheumatoid_Arthritis: latestHistory?.rheumatoidArthritis || "No",
             cardiacDisease: latestHistory?.cardiacDisease || "No",
-            thyroid: latestHistory?.thyroid || "Normal",
+            thyroid: latestHistory?.hyperthyroidism || latestHistory?.thyroid || "No",
             liver: latestHistory?.liver || "Normal",
             menorrhagia: latestHistory?.menorrhagia || "No",
             pcos: latestHistory?.pcos || "No",
@@ -739,7 +742,7 @@ const Screening = () => {
           editor: data.editor,
           date: data.date,
           gestationWeek: data.gestationWeek,
-          title: data.title,
+          title: data.noteType || data.title,
           notes: data.notes,
         };
 

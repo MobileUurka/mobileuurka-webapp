@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
+import { padChartSlotsLeft, EMPTY_SLOT_LABEL } from "../utils/chartSlots";
 
 interface FetalEntry {
   gestationWeek: number;
@@ -24,39 +25,21 @@ const FetalGraph: React.FC<FetalGraphProps> = ({
   selectedOption,
 }) => {
   const normalizedData = useMemo(() => {
-    const formatted = patient
+    const real = patient
       .map((entry) => ({
         date: `${entry.gestationWeek}`,
         rawWeek: entry.gestationWeek,
         value:
-          entry[selectedOption] != null
+          entry[selectedOption] != null && entry[selectedOption] !== ''
             ? Number(entry[selectedOption])
             : null,
       }))
-      .sort((a, b) => a.rawWeek - b.rawWeek);
+      .filter((entry) => entry.value != null && !Number.isNaN(entry.value))
+      .sort((a, b) => a.rawWeek - b.rawWeek)
+      .slice(-5)
+      .map(({ date, value }) => ({ date, value }));
 
-    // Take last 5 real entries
-    const lastFive = formatted.slice(-5);
-
-    // Baseline always first
-    const baseline = {
-      date: "0",
-      rawWeek: 0,
-      value: 0,
-    };
-
-    let result = [baseline, ...lastFive];
-
-    // Ensure minimum of 6 slots
-    while (result.length < 6) {
-      result.push({
-        date: "--",
-        rawWeek: 0,
-        value: null,
-      });
-    }
-
-    return result;
+    return padChartSlotsLeft(real, () => ({ date: EMPTY_SLOT_LABEL, value: null }));
   }, [patient, selectedOption]);
 
 
@@ -124,7 +107,7 @@ const FetalGraph: React.FC<FetalGraphProps> = ({
             strokeWidth={3}
             dot={{ r: 4, stroke: "#ffc187", strokeWidth: 2, fill: "#fff" }}
             activeDot={{ r: 6, fill: "#ffc187" }}
-            connectNulls
+            connectNulls={false}
           />
         </LineChart>
       </ResponsiveContainer>

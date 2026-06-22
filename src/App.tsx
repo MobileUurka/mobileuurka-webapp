@@ -11,7 +11,7 @@ import Patient from './pages/Patient';
 import Alerts from './pages/Alerts';
 import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { authService } from './services/authServices';
 import Hospital from './pages/Hospital';
 import Feedback from './pages/Feedback';
@@ -36,6 +36,7 @@ function App() {
   const [backendDown, setBackendDown] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const dispatch = useAppDispatch();
+  const isAuthenticatedRef = useRef(false);
 
   const checkAuth = useCallback(async () => {
     setBackendDown(false);
@@ -55,7 +56,9 @@ function App() {
     setIsInitialized(true);
   }, []);
 
-  
+  useEffect(() => {
+    isAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
 
   useEffect(() => {
     checkAuth();
@@ -64,9 +67,35 @@ function App() {
       dispatch(resetStore());
       socketService.disconnect();
       setIsAuthenticated(false);
+      setCurrentUser(null);
     };
     window.addEventListener('auth-logout', handleUnauthorized);
-    return () => window.removeEventListener('auth-logout', handleUnauthorized);
+
+    const handleVisibility = async () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!isAuthenticatedRef.current && !authService.getSessionId()) return;
+
+      const valid = await authService.revalidateSession();
+      if (valid) {
+        setIsAuthenticated(true);
+        setCurrentUser(authService.getUser() as AuthUser | null);
+      } else if (isAuthenticatedRef.current) {
+        handleUnauthorized();
+      }
+    };
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) handleVisibility();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pageshow', handlePageShow);
+
+    return () => {
+      window.removeEventListener('auth-logout', handleUnauthorized);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
   }, [checkAuth, dispatch]);
 
   useEffect(() => {

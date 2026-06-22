@@ -9,6 +9,7 @@ import {
   Tooltip,
 } from "recharts";
 import type { PatientData } from "../types/patient";
+import { padChartSlotsLeft, EMPTY_SLOT_LABEL } from "../utils/chartSlots";
 
 interface LabChartProps {
   patient: PatientData;
@@ -48,16 +49,11 @@ const LabChart: React.FC<LabChartProps> = ({ patient, selectedOption }) => {
       }))
       .sort((a, b) => a.rawDate - b.rawDate);
 
-    const cleaned: ChartDataItem[] = formatted.map(({ date, value }) => ({
-      date,
-      value,
-    }));
+    const cleaned: ChartDataItem[] = formatted
+      .filter((item) => item.value !== null && !Number.isNaN(item.value))
+      .map(({ date, value }) => ({ date, value }));
 
-    while (cleaned.length < 5) {
-      cleaned.push({ date: "--", value: null });
-    }
-
-    return cleaned.slice(0, 5);
+    return padChartSlotsLeft(cleaned, () => ({ date: EMPTY_SLOT_LABEL, value: null }));
   }, [patient, selectedOption]);
 
   // Custom Tooltip (Recharts-controlled)

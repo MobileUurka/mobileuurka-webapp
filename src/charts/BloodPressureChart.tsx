@@ -11,6 +11,7 @@ import {
 } from "recharts";
 
 import type { PatientData } from "../types/patient";
+import { padChartSlotsLeft, EMPTY_SLOT_LABEL } from "../utils/chartSlots";
 
 interface ChartProps {
   patient: PatientData;
@@ -142,16 +143,16 @@ const BloodPressureChart: React.FC<ChartProps> = ({
       .sort((a, b) => a.rawTime - b.rawTime)
       .map(({ rawTime, ...rest }) => rest);
 
-    while (formatted.length < 5) {
-      formatted.push({
-        date: "--",
-        value: null,
-        isAbnormal: false,
-        abnormalMessage: "",
-      });
-    }
+    const withValues = formatted
+      .filter((item) => item.value !== null && !Number.isNaN(item.value))
+      .slice(-5);
 
-    return formatted.slice(-5);
+    return padChartSlotsLeft(withValues, () => ({
+      date: EMPTY_SLOT_LABEL,
+      value: null,
+      isAbnormal: false,
+      abnormalMessage: '',
+    }));
   };
 
   const chartData = normalizeData();
@@ -228,7 +229,8 @@ const BloodPressureChart: React.FC<ChartProps> = ({
             stroke="#66BB6A"
             strokeWidth={2}
             fill="url(#colorVal)"
-            connectNulls
+            connectNulls={false}
+            dot={{ r: 4, fill: "#66BB6A", strokeWidth: 0 }}
           />
         </AreaChart>
       </ResponsiveContainer>

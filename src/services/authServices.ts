@@ -1,10 +1,17 @@
 import { encryption } from '../utils/encryption';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5500/api/v1';
+const IS_PROD = import.meta.env.PROD;
+
+/** Auth endpoints that set/read the HttpOnly refresh cookie. */
+function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(url, { credentials: 'include', ...init });
+}
 
 export interface LoginCredentials {
   email: string;
   password: string;
+  rememberMe?: boolean;
 }
 
 export interface OTPVerificationData {
@@ -118,7 +125,7 @@ export const authService = {
 
   // Sign in
   async signIn(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/signin`, {
+    const response = await authFetch(`${API_URL}/auth/signin`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -157,7 +164,7 @@ export const authService = {
 
   // Complete signup with OTP
   async completeSignupWithOTP(data: OTPVerificationData): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/signup/complete`, {
+    const response = await authFetch(`${API_URL}/auth/signup/complete`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -176,7 +183,7 @@ export const authService = {
 
   // Resend signup OTP
   async resendSignupOTP(data: ResendOTPData): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/signup/resend-otp`, {
+    const response = await authFetch(`${API_URL}/auth/signup/resend-otp`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -195,7 +202,7 @@ export const authService = {
 
   // Resend organization verification email
   async resendOrganizationVerification(data: OrganizationResendVerificationData): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/organizations/resend-verification`, {
+    const response = await authFetch(`${API_URL}/organizations/resend-verification`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -214,7 +221,7 @@ export const authService = {
 
   // Verify organization email with OTP
   async verifyOrganizationEmail(data: OrganizationVerifyEmailData): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/organizations/verify-email`, {
+    const response = await authFetch(`${API_URL}/organizations/verify-email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -233,7 +240,7 @@ export const authService = {
 
   // Initiate signup process
   async initiateSignup(data: SignupInitiateData): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/signup/initiate`, {
+    const response = await authFetch(`${API_URL}/auth/signup/initiate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -270,7 +277,7 @@ export const authService = {
 
   // Complete organization creation after payment and hospital setup
   async completeOrganizationCreation(data: CompleteOrganizationData): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/organization/create-after-payment`, {
+    const response = await authFetch(`${API_URL}/auth/organization/create-after-payment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -303,7 +310,7 @@ export const authService = {
 
   // Complete signup process
   async completeSignup(data: HospitalSetupData): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/signup/complete`, {
+    const response = await authFetch(`${API_URL}/auth/signup/complete`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -325,7 +332,7 @@ export const authService = {
 
   /** Verify the OTP sent during first-login (mustChangePassword). */
   async verifyStaffOTP(data: { email: string; otp: string }): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/staff/verify-otp`, {
+    const response = await authFetch(`${API_URL}/auth/staff/verify-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -341,7 +348,7 @@ export const authService = {
     newPassword: string;
     setPasswordToken: string;
   }): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/staff/set-password`, {
+    const response = await authFetch(`${API_URL}/auth/staff/set-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -363,7 +370,7 @@ export const authService = {
 
   /** Resend the first-login OTP. */
   async resendStaffOTP(data: { email: string }): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/staff/resend-otp`, {
+    const response = await authFetch(`${API_URL}/auth/staff/resend-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -374,7 +381,8 @@ export const authService = {
   },
 
   // Change password
-  async changePassword(data: ChangePasswordData): Promise<AuthResponse> {    const response = await fetch(`${API_URL}/auth/change-password`, {
+  async changePassword(data: ChangePasswordData): Promise<AuthResponse> {
+    const response = await authFetch(`${API_URL}/auth/change-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -392,9 +400,8 @@ export const authService = {
     return result;
   },
 
-  // Token management — access token in sessionStorage, refresh token in HttpOnly cookie (set by server)
-  // We ALSO save the refresh token encrypted in localStorage as a fallback for local dev where
-  // cross-origin POST requests block SameSite=Lax cookies.
+  // Token management — access token in sessionStorage, refresh token in HttpOnly cookie (set by server).
+  // In local dev only, also persist refresh token in localStorage (cross-origin cookies are unreliable).
   setTokens(accessToken: string, refreshToken: string) {
     if (!encryption.hasKey()) {
       console.error('Cannot encrypt: encryption key not set');
@@ -402,8 +409,8 @@ export const authService = {
     }
 
     sessionStorage.setItem('at', encryption.encrypt(accessToken));
-    
-    if (refreshToken) {
+
+    if (refreshToken && !IS_PROD) {
       localStorage.setItem('rt', encryption.encrypt(refreshToken));
     }
   },
@@ -422,9 +429,11 @@ export const authService = {
   },
 
   getRefreshToken(): string | null {
+    if (IS_PROD) return null;
+
     const encrypted = localStorage.getItem('rt');
     if (!encrypted || !encryption.hasKey()) return null;
-    
+
     try {
       const decrypted = encryption.decrypt(encrypted);
       return decrypted || null;
@@ -435,7 +444,9 @@ export const authService = {
 
   clearTokens() {
     sessionStorage.removeItem('at');
-    // No localStorage refresh token to clear — the server clears the cookie via Set-Cookie on logout.
+    if (!IS_PROD) {
+      localStorage.removeItem('rt');
+    }
   },
 
   // User management
@@ -553,9 +564,8 @@ export const authService = {
     const accessToken = this.getAccessToken();
     const sessionId = this.getSessionId();
 
-    const response = await fetch(`${API_URL}/auth/logout`, {
+    const response = await authFetch(`${API_URL}/auth/logout`, {
       method: 'POST',
-      credentials: 'include', // sends the HttpOnly refresh token cookie so the server can delete it
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${accessToken}`
@@ -595,14 +605,12 @@ export const authService = {
       try {
         console.log('Attempting to refresh token...');
         const rt = this.getRefreshToken();
-        
-        const response = await fetch(`${API_URL}/auth/refresh`, {
+
+        const response = await authFetch(`${API_URL}/auth/refresh`, {
           method: 'POST',
-          credentials: 'include', // sends the HttpOnly refresh token cookie
           headers: {
             'Content-Type': 'application/json',
           },
-          // Send the RT in the body as a fallback if cookies are blocked
           body: rt ? JSON.stringify({ refreshToken: rt }) : undefined,
         });
 
@@ -617,7 +625,7 @@ export const authService = {
 
           // Store new access token; the server already rotated the cookie
           sessionStorage.setItem('at', encryption.encrypt(data.data.accessToken));
-          if (data.data.refreshToken) {
+          if (data.data.refreshToken && !IS_PROD) {
             localStorage.setItem('rt', encryption.encrypt(data.data.refreshToken));
           }
 
@@ -672,6 +680,12 @@ export const authService = {
         return !!newToken;
       }
 
+      // Refresh proactively when within 5 minutes of expiry (e.g. tab was backgrounded)
+      if (timeUntilExpiry <= 5 * 60 * 1000) {
+        const newToken = await this.refreshToken();
+        return !!newToken;
+      }
+
       return true;
     } catch (error) {
       // If we can't parse the token, try to refresh
@@ -679,6 +693,13 @@ export const authService = {
       const newToken = await this.refreshToken();
       return !!newToken;
     }
+  },
+
+  /** Re-validate session after tab focus or BFCache restore. */
+  async revalidateSession(): Promise<boolean> {
+    const ready = await this.initializeEncryption();
+    if (!ready) return false;
+    return this.validateAndRefreshToken();
   },
 
   async initializeEncryption(): Promise<boolean> {
@@ -705,10 +726,9 @@ export const authService = {
 
       encryption.setKey(keyResult.data.key);
 
-      if (hasAccessToken) {
-        // Normal case: access token is in sessionStorage, we're good.
-        return true;
-      }
+    if (hasAccessToken) {
+        return this.validateAndRefreshToken();
+    }
 
       // No access token (e.g. hard page refresh cleared sessionStorage).
       // Attempt a silent refresh — the HttpOnly cookie will be sent automatically.

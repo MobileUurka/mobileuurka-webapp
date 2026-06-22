@@ -3,6 +3,8 @@ import Piechart from "../charts/Piechart";
 import { FaAngleLeft, FaAngleRight } from "react-icons/fa6";
 import { Tooltip } from "react-tooltip";
 import type { PatientData } from "../types/patient";
+import OverviewEmptyState from "../components/OverviewEmptyState";
+import { hasRiskAssessmentData } from "../utils/overviewData";
 
 interface RiskAssessmentProps {
   patient: PatientData;
@@ -67,6 +69,18 @@ const Riskassessment: React.FC<RiskAssessmentProps> = ({ patient }) => {
   };
 
   const visibleDates = dateRange.slice(currentIndex, currentIndex + 4);
+
+  if (!hasRiskAssessmentData(patient)) {
+    return (
+      <OverviewEmptyState
+        title="No risk assessment yet"
+        description="Complete patient history and record a visit to generate risk scores and analysis."
+        screeningTab="Visits"
+        patientId={patient.id}
+        patientName={patient.name}
+      />
+    );
+  }
 
   return (
     <div className="w-full p-4">

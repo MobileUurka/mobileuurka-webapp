@@ -26,7 +26,7 @@ const Overview: React.FC<OverviewProps> = ({ patient, setActiveTab }) => {
 
         {/* Increased mobile height for Weight Chart */}
         <div className="w-full min-w-0 bg-[#F6F6F6] rounded-[10px] p-4 h-auto min-h-[340px] lg:min-h-0">
-          <Weight patient={patient.triage} />
+          <Weight patient={patient.triage} patientId={patient.id} patientName={patient.name} />
         </div>
 
         {/* Increased mobile height for Blood Pressure Chart */}
@@ -65,7 +65,7 @@ const Overview: React.FC<OverviewProps> = ({ patient, setActiveTab }) => {
 
         {/* Increased mobile height for Fetal Chart info if it renders a canvas */}
         <div className="w-full min-w-0 bg-[#F6F6F6] rounded-[10px] p-4 h-auto min-h-[300px] lg:h-[320px]">
-          <Fetal patient={patient?.fetalInfo} />
+          <Fetal patient={patient?.fetalInfo} patientId={patient.id} patientName={patient.name} />
         </div>
 
         <div className="w-full min-w-0 bg-[#F6F6F6] rounded-[10px] p-4 h-auto min-h-[240px] lg:h-[320px]">

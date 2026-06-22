@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import DropdownMenu from '../components/DropdownMenu';
 import FetalGraph from './FetalGraph';
+import OverviewEmptyState from '../components/OverviewEmptyState';
+import { hasFetalData } from '../utils/overviewData';
 
 // Define the allowed graph types
 type FetalOption = "fhr" | "femurHeight" | "headCircumference";
 
 interface FetalProps {
-  // Assuming fetalInfos is the specific property inside patient
-  // If passing the whole patient object, keep it as PatientData
-  patient: any; 
+  patient?: any[];
+  patientId: string;
+  patientName: string;
 }
 
-const Fetal: React.FC<FetalProps> = ({ patient }) => {
+const Fetal: React.FC<FetalProps> = ({ patient, patientId, patientName }) => {
   const [selectedOption, setSelectedOption] = useState<FetalOption>("fhr");
 
   const dropdownData = [
@@ -19,6 +21,18 @@ const Fetal: React.FC<FetalProps> = ({ patient }) => {
     { value: "femurHeight", label: "Femur Height" },
     { value: "headCircumference", label: "Head Circumference" },
   ];
+
+  if (!hasFetalData(patient)) {
+    return (
+      <OverviewEmptyState
+        title="No fetal data"
+        description="FHR, femur length, and head circumference can be recorded in screening."
+        screeningTab="Fetal"
+        patientId={patientId}
+        patientName={patientName}
+      />
+    );
+  }
 
   return (
     <div className="w-full h-full flex flex-col">

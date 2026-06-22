@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import DropdownMenu from "../components/DropdownMenu";
 import BloodPressureChart from "./BloodPressureChart";
 import type { PatientData } from "../types/patient";
+import OverviewEmptyState from "../components/OverviewEmptyState";
+import { hasTriageVitals } from "../utils/overviewData";
 
 interface OverviewProps {
   patient: PatientData;
@@ -9,6 +11,18 @@ interface OverviewProps {
 
 const BloodPressure: React.FC<OverviewProps> = ({ patient }) => {
   const [selectedOption, setSelectedOption] = useState<string>("systolic");
+
+  if (!hasTriageVitals(patient.triage)) {
+    return (
+      <OverviewEmptyState
+        title="No triage data"
+        description="Blood pressure, heart rate, and other vitals will appear here once recorded."
+        screeningTab="Triage"
+        patientId={patient.id}
+        patientName={patient.name}
+      />
+    );
+  }
 
   return (
     <div className="w-full h-full flex flex-col min-w-0 overflow-hidden">
