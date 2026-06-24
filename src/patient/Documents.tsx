@@ -178,6 +178,7 @@ const Documents: React.FC<DocumentsProps> = ({
       };
     }) ?? [];
 
+    console.log('patient?.ultrasounds', patient?.ultrasounds);
   // ─── Build + sort all records newest first ─────────────────────────────────
 
   const allRecords = [
@@ -185,6 +186,7 @@ const Documents: React.FC<DocumentsProps> = ({
     ...buildRecord(patient?.triage, "Triage"),
     ...buildRecord(patient?.labwork, "Lab Work"),
     ...buildRecord(patient?.visits, "Visits"),
+    ...buildRecord(patient?.ultrasounds, "Ultrasound"),
     ...buildRecord(patient?.currentPregnancyInfo, "Pregnancy Journey"),
     ...buildRecord(patient?.infections, "Infections"),
   ].sort((a, b) => toMs(b.date_of_visit) - toMs(a.date_of_visit));

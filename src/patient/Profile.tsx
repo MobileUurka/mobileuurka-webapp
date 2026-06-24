@@ -1,5 +1,6 @@
 import React from "react";
 import { type PatientData } from "../types/patient";
+import { formatGravidaParityDisplay, readParityFromRecord } from "../utils/gravidaParity";
 
 interface ProfileProps {
   patient: PatientData;
@@ -57,8 +58,15 @@ const Profile: React.FC<ProfileProps> = ({ patient }) => {
     { label: "Hospital", value: patient?.hospital },
   ];
 
+  const parityParts = readParityFromRecord(latestHistory ?? {});
+
   const obstetricHistoryDetails = [
-    { label: "Gravida + Parity", value: (latestHistory?.gravida != null && latestHistory?.parity != null) ? `${latestHistory.gravida}+${latestHistory.parity}` : null },
+    {
+      label: "Gravida / Parity",
+      value: latestHistory?.gravida != null
+        ? formatGravidaParityDisplay(latestHistory.gravida, parityParts.viable, parityParts.loss)
+        : null,
+    },
     { label: "C-Section", value: latestHistory?.csection },
     { label: "Postpartum Hemorrhage (PPH)", value: latestHistory?.pph },
     { label: "Infertility", value: latestHistory?.infertility },

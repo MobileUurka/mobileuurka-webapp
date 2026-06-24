@@ -12,6 +12,8 @@ import profilePic from "/images/Default.png";
 import { userService } from '../services/userServices';
 import { api } from '../services/apiClient';
 import { patientService } from '../services/patientServices';
+import { formatGravidaParityDisplay, readParityFromRecord } from '../utils/gravidaParity';
+import { DIET_FOOD_GROUP_FIELDS } from '../utils/lifestyleDiet';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchPatientProfile, invalidateProfile } from '../store/patientProfileSlice';
 import { useFeedbackContext } from '../contexts/FeedbackContext';
@@ -259,10 +261,15 @@ const Patient: React.FC = () => {
     };
 
 
+    const parityParts = readParityFromRecord(history);
+
     return [
       { label: "Gestation Week", value: getCurrentGestationWeek(lastVisit) },
       { label: "Age", value: calculateAge(patient.dob) },
-      { label: "Gravida + Parity", value: `${history.gravida || 0}+${history.parity || 0}` },
+      {
+        label: "Gravida / Parity",
+        value: formatGravidaParityDisplay(history.gravida, parityParts.viable, parityParts.loss) ?? 'N/A',
+      },
       {
         label: (
           <div className="flex items-center gap-2">
@@ -299,6 +306,11 @@ const Patient: React.FC = () => {
 
   const lifestyleData = useMemo(() => {
     const latest = patient?.patientLifestyle?.[patient.patientLifestyle.length - 1];
+    const foodGroups = latest?.dietFoodGroups as Record<string, string> | undefined;
+    const eatenGroups = foodGroups
+      ? DIET_FOOD_GROUP_FIELDS.filter(f => foodGroups[f] === 'yes').length
+      : null;
+
     return [
       { label: "Alcohol", value: latest?.alcoholConsumption || "None" },
       { label: "Smoking", value: latest?.smoking || "None" },
@@ -311,8 +323,16 @@ const Patient: React.FC = () => {
             )}
           </div>
         ),
-        value: latest?.diet || "Not specified"
+        value: latest?.diet
+          ? `${latest.diet}${latest.mealsPerDay ? ` · ${latest.mealsPerDay} meals/day` : ''}`
+          : "Not specified",
       },
+      ...(latest?.dietFoodKinds
+        ? [{ label: "Regular Foods", value: latest.dietFoodKinds }]
+        : []),
+      ...(eatenGroups != null && eatenGroups > 0
+        ? [{ label: "Food Groups (Yes)", value: `${eatenGroups} of ${DIET_FOOD_GROUP_FIELDS.length} groups` }]
+        : []),
     ];
   }, [patient]);
 

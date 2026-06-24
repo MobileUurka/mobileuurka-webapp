@@ -10,6 +10,8 @@ import PatientSelector from './PatientSelector';
 import { usePerformanceTimer } from '../hooks/usePerformanceTimer';
 import { useAuth } from '../contexts/AuthContext';
 import { LIFESTYLE_FIELD_INFO } from '../constants/screeningForms';
+import { validateGravidaParity } from '../utils/gravidaParity';
+import { uploadService } from '../services/uploadService';
 
 // Simple loading spinner component
 const LoadingSpinner = ({ size = 20 }: { size?: number }) => (
@@ -84,7 +86,7 @@ interface ChipOption {
 interface FormField {
   name: string;
   label: string;
-  type: 'text' | 'number' | 'date' | 'select' | 'textarea' | 'email' | 'chip-group';
+  type: 'text' | 'number' | 'date' | 'select' | 'textarea' | 'email' | 'chip-group' | 'image';
   required?: boolean;
   options?: string[];
   /** chip-group: list of chips in this group */
@@ -101,6 +103,8 @@ interface FormField {
   min?: string | number;
   /** When true, this field will not start a new page — it stays on the same page as the preceding field */
   noPageBreak?: boolean;
+  /** When false, field is UX-only and is not sent to the API */
+  persist?: boolean;
 
   dependsOn?: {
     field: string;
@@ -129,6 +133,7 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentPage, setCurrentPage] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imageUploading, setImageUploading] = useState<string | null>(null);
 
   // NEW STATE FOR DUPLICATE CHECK
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
@@ -381,6 +386,38 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
     }
   };
 
+  const handleImageFileSelect = async (fieldName: string, file: File | null) => {
+    if (!file) return;
+
+    if (!formData.patientId) {
+      setErrors(prev => ({
+        ...prev,
+        [fieldName]: 'Select a patient before uploading an image',
+      }));
+      return;
+    }
+
+    setImageUploading(fieldName);
+    setErrors(prev => {
+      const next = { ...prev };
+      delete next[fieldName];
+      return next;
+    });
+
+    try {
+      const url = await uploadService.uploadUltrasoundImage(file, formData.patientId);
+      console.log('Uploaded image URL:', url);
+      setFormData(prev => ({ ...prev, [fieldName]: url }));
+    } catch (error: any) {
+      setErrors(prev => ({
+        ...prev,
+        [fieldName]: error?.message || 'Failed to upload image',
+      }));
+    } finally {
+      setImageUploading(null);
+    }
+  };
+
   const handleInputChange = (name: string, value: any) => {
     // Handle hospital selection trigger
     if (name === 'hospital' && value === '__SELECT_HOSPITAL__') {
@@ -396,26 +433,30 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
 
     // Update form data
     const newFormData = { ...formData, [name]: value };
+
+    // Clear partner preeclampsia follow-up when partner had no previous partner
+    if (name === 'partnerHadPreviousPartner' && value !== 'yes') {
+      newFormData.malePreeclampsiaPrevHistory = '';
+    }
+
     setFormData(newFormData);
 
-    // Live validation: in Gravida+Parity format, gravida (first part) must be >= parity (second part)
-    if (name === 'gravidaParity' && typeof value === 'string') {
-      const match = value.match(/^(\d+)\+(\d+)$/);
-      if (match) {
-        const gravida = parseInt(match[1], 10);
-        const parity = parseInt(match[2], 10);
-        if (parity > gravida) {
-          setErrors(prev => ({
-            ...prev,
-            gravidaParity: 'Gravida must be greater than or equal to Parity (e.g. 2+1)',
-          }));
-        } else {
-          setErrors(prev => {
-            const next = { ...prev };
-            delete next.gravidaParity;
-            return next;
-          });
-        }
+    // Live validation: gravida & parity (viable+loss notation)
+    if ((name === 'gravida' || name === 'parityNotation') && newFormData.gravida != null && newFormData.parityNotation) {
+      const gravida = Number(newFormData.gravida);
+      const parityNotation = String(newFormData.parityNotation);
+      const error = validateGravidaParity(gravida, parityNotation);
+      if (error) {
+        setErrors(prev => ({
+          ...prev,
+          parityNotation: error,
+        }));
+      } else {
+        setErrors(prev => {
+          const next = { ...prev };
+          delete next.parityNotation;
+          return next;
+        });
       }
     }
 
@@ -648,6 +689,10 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
       try {
         const cleanedFormData = { ...formData };
         fields.forEach(field => {
+          if (field.persist === false) {
+            delete cleanedFormData[field.name];
+            return;
+          }
           if (field.type === 'chip-group') {
             // Remove the synthetic group key — it's not a DB column
             delete cleanedFormData[field.name];
@@ -660,7 +705,9 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
             return;
           }
           if (!isFieldVisible(field)) {
-            if (field.type === 'number') {
+            if (field.name === 'malePreeclampsiaPrevHistory') {
+              cleanedFormData.malePreeclampsiaPrevHistory = 'no';
+            } else if (field.type === 'number') {
               cleanedFormData[field.name] = 0;
             } else {
               cleanedFormData[field.name] = '';
@@ -870,6 +917,45 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
             required={field.required}
             error={hasError}
           />
+        ) : field.type === 'image' ? (
+          <div className="space-y-3">
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              disabled={isReadonly || imageUploading === field.name}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                if (file) handleImageFileSelect(field.name, file);
+                e.target.value = '';
+              }}
+              className={`w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#008540] file:text-white file:cursor-pointer hover:file:bg-[#006b33] ${hasError ? 'border border-red-500 rounded-lg p-2' : ''}`}
+            />
+            {imageUploading === field.name && (
+              <p className="text-sm text-gray-500 flex items-center gap-2">
+                <LoadingSpinner size={14} />
+                Uploading image…
+              </p>
+            )}
+            {formData[field.name] && (
+              <div className="space-y-2">
+                <img
+                  src={formData[field.name]}
+                  alt="Ultrasound preview"
+                  className="max-h-52 rounded-lg border border-gray-200 object-contain bg-gray-50"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleInputChange(field.name, '')}
+                  className="text-sm text-red-600 hover:underline"
+                >
+                  Remove image
+                </button>
+              </div>
+            )}
+            {!formData.patientId && (
+              <p className="text-xs text-amber-600">Select a patient first, then choose an image to upload.</p>
+            )}
+          </div>
         ) : field.type === 'select' ? (
           <div className="relative">
             <select
@@ -1031,16 +1117,12 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
       }
     }
 
-    // Gravida must be greater than or equal to Parity (combined gravidaParity field, format: "2+1")
-    const hasGravidaParityField = fields.some(f => f.name === 'gravidaParity');
-    if (hasGravidaParityField && formData.gravidaParity) {
-      const match = String(formData.gravidaParity).match(/^(\d+)\+(\d+)$/);
-      if (match) {
-        const gravida = parseInt(match[1], 10);
-        const parity = parseInt(match[2], 10);
-        if (parity > gravida) {
-          newErrors.gravidaParity = 'Gravida must be greater than or equal to Parity';
-        }
+    // Gravida & parity (viable+loss notation)
+    const hasGravidaParityFields = fields.some(f => f.name === 'gravida') && fields.some(f => f.name === 'parityNotation');
+    if (hasGravidaParityFields && formData.gravida != null && formData.parityNotation) {
+      const error = validateGravidaParity(Number(formData.gravida), String(formData.parityNotation));
+      if (error) {
+        newErrors.parityNotation = error;
       }
     }
 

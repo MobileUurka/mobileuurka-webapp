@@ -8,7 +8,7 @@ interface ChipOption {
 interface FormField {
   name: string;
   label: string;
-  type: 'text' | 'number' | 'date' | 'select' | 'textarea' | 'email' | 'chip-group';
+  type: 'text' | 'number' | 'date' | 'select' | 'textarea' | 'email' | 'chip-group' | 'image';
   required?: boolean;
   options?: string[];
   chips?: ChipOption[];
@@ -23,6 +23,8 @@ interface FormField {
   max?: string | number;
   min?: string | number;
   noPageBreak?: boolean;
+  /** When false, field is used for UX only and is not sent to the API (default true). */
+  persist?: boolean;
 
   dependsOn?: {
     field: string;
@@ -36,6 +38,9 @@ export const LIFESTYLE_FIELD_INFO: Record<string, string> = {
   smoking: 'E.g. "No", "Former smoker", "5 cigarettes/day". Occasional = less than weekly.',
   alcoholConsumption: 'E.g. "No", "Occasional" (1–2 drinks/week), "Moderate" (3–7/week), "Heavy" (daily).',
   diet: '"Poor" = mostly processed/fast food. "Fair" = mixed. "Good" = mostly whole foods. "Excellent" = consistently balanced, high fruit/veg.',
+  mealsPerDay: 'Typical number of main meals per day (including breakfast, lunch, dinner).',
+  dietFoodKinds: 'List the foods eaten regularly, e.g. ugali, sukuma, beans, fruit, fish.',
+  dietFoodKindsGroup: 'Tap each food group the patient eats regularly — Yes / No / Uncertain.',
   exercise: 'Total minutes of moderate activity per week. WHO recommends ≥150 min/week. 0 = sedentary.',
   caffeine: 'E.g. "No", "1 cup/day", "Occasional" (a few times/week). Safe limit in pregnancy ≤200 mg/day (~2 cups coffee).',
   sugarDrink: 'E.g. "No", "Occasional" (≤2/week), "Daily". Includes sodas, juices, energy drinks.',
@@ -305,9 +310,31 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'patientId', label: 'Patient', type: 'text', required: true, placeholder: 'Select patient from list' },
       { name: 'date', label: 'Date Recorded', type: 'date', required: true, max: new Date().toISOString().split('T')[0] },
 
-      { name: 'gravidaParity', label: 'Gravida + Parity', type: 'text', required: true, placeholder: 'e.g. 2+1', pattern: /^\d+\+\d+$/, patternMessage: 'Format must be Gravida+Parity (e.g. 2+1) — Gravida must be ≥ Parity' },
+      {
+        name: 'gravida',
+        label: 'Gravida',
+        type: 'number',
+        required: true,
+        min: 1,
+        placeholder: 'Total pregnancies including current (e.g. 2)',
+      },
+      {
+        name: 'parityNotation',
+        label: 'Parity',
+        type: 'text',
+        required: true,
+        placeholder: 'e.g. 0+1 (viable≥28wks + loss before 28wks)',
+        pattern: /^\d+\+\d+$/,
+        patternMessage: 'Parity format: viable+loss (e.g. 0+1 for miscarriage, 1+0 if current pregnancy ≥28 weeks)',
+      },
 
       { name: 'interval', label: 'Pregnancy Interval (months)', type: 'number' },
+
+      { name: 'prevChildWeight', label: 'Previous Child Weight (grams)', type: 'number' },
+
+      { name: 'lastPeriodDate', label: 'Last Menstrual Period', type: 'date', max: new Date().toISOString().split('T')[0] },
+
+      { name: 'estimatedDueDate', label: 'Estimated Due Date', type: 'date' },
 
       {
         name: 'maleAge',
@@ -318,17 +345,29 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         max: 99,
         placeholder: 'Leave blank if not disclosed',
       },
-
-      { name: 'prevChildWeight', label: 'Previous Child Weight (grams)', type: 'number' },
-
-      { name: 'lastPeriodDate', label: 'Last Menstrual Period', type: 'date', max: new Date().toISOString().split('T')[0] },
-
-      { name: 'estimatedDueDate', label: 'Estimated Due Date', type: 'date' },
+      {
+        name: 'partnerHadPreviousPartner',
+        label: 'Has your partner had a previous partner?',
+        type: 'select',
+        required: true,
+        persist: false,
+        options: ['yes', 'no'],
+      },
+      {
+        name: 'malePreeclampsiaPrevHistory',
+        label: "Did your partner's previous partner have preeclampsia during that pregnancy?",
+        type: 'select',
+        required: true,
+        noPageBreak: true,
+        options: ['yes', 'no', 'unknown'],
+        dependsOn: { field: 'partnerHadPreviousPartner', value: 'yes' },
+      },
 
       {
         name: 'prevPEHistoryDisclosure',
         label: 'Previous Preeclampsia History (self-reported)',
         type: 'select',
+        required:true,
         options: ['yes', 'no', 'unknown', 'prefer not to say'],
       },
 
@@ -336,6 +375,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         name: 'miscarriage',
         label: 'Miscarriage',
         type: 'select',
+        required:true,
         options: ['yes', 'no', 'unknown']
       },
 
@@ -352,6 +392,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         name: 'csection',
         label: 'C-Section',
         type: 'select',
+        required:true,
         options: ['yes', 'no', 'unknown']
       },
 
@@ -368,6 +409,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         name: 'stillbirth',
         label: 'Stillbirth',
         type: 'select',
+        required:true,
         options: ['yes', 'no', 'unknown']
       },
 
@@ -384,6 +426,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         name: 'prolongedLabour',
         label: 'Prolonged Labour',
         type: 'select',
+        required:true,
         options: ['yes', 'no', 'unknown']
       },
 
@@ -400,6 +443,8 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         name: 'prevGynaSurgery',
         label: 'Previous Gynecological Surgery',
         type: 'select',
+        required:true,
+        noPageBreak:true,
         options: ['yes', 'no', 'unknown']
       },
 
@@ -445,13 +490,6 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
           { field: 'famSickleCell', label: 'Sickle Cell' },
           { field: 'famThalassemia', label: 'Thalassemia' },
         ]
-      },
-
-      {
-        name: 'malePreeclampsiaPrevHistory',
-        label: "Did your partner's previous partner have preeclampsia during the pregnancy of their child?",
-        type: 'select',
-        options: ['yes', 'no', 'unknown']
       },
 
       {
@@ -760,6 +798,24 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       },
 
       {
+        name: 'mealsPerDay',
+        label: 'Meals per Day',
+        type: 'number',
+        required: true,
+        min: 1,
+        max: 10,
+        placeholder: 'e.g. 3',
+      },
+
+      {
+        name: 'dietFoodKinds',
+        label: 'Regular Foods (types & examples)',
+        type: 'text',
+        required: false,
+        placeholder: 'e.g. ugali, sukuma, beans, fruit, fish',
+      },
+
+      {
         name: 'exercise',
         label: 'Exercise (minutes/week)',
         type: 'number',
@@ -796,6 +852,21 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         type: 'text',
         required: true,
         placeholder: 'e.g. no / 1 can/day'
+      },
+
+      {
+        name: 'dietFoodKindsGroup',
+        label: 'Food Groups Typically Eaten',
+        type: 'chip-group',
+        chips: [
+          { field: 'dietGroupFruitsVeg', label: 'Fruits & Vegetables' },
+          { field: 'dietGroupWholeGrains', label: 'Whole Grains / Staples' },
+          { field: 'dietGroupProtein', label: 'Protein (meat, fish, eggs, legumes)' },
+          { field: 'dietGroupDairy', label: 'Dairy' },
+          { field: 'dietGroupProcessed', label: 'Processed / Packaged Foods' },
+          { field: 'dietGroupFastFood', label: 'Fast Food / Fried Foods' },
+          { field: 'dietGroupSugary', label: 'Sugary Snacks & Drinks' },
+        ],
       }
     ]
   },
@@ -880,9 +951,9 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
 
       {
         name: 'imageUrl',
-        label: 'Image URL',
-        type: 'text',
-        placeholder: 'URL to ultrasound image'
+        label: 'Ultrasound Image',
+        type: 'image',
+        required: true,
       }
     ]
   },

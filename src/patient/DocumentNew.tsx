@@ -90,6 +90,16 @@ const isIdField = (key: string): boolean => {
   return k === "id" || k.endsWith("id");
 };
 
+const isImageUrlField = (key: string): boolean => {
+  const k = key.toLowerCase().replace(/_/g, "");
+  return k.includes("imageurl") || k.includes("ultrasoundurl") || k.includes("imagekey");
+};
+
+const isUrlValue = (value: any): boolean => {
+  if (typeof value !== "string") return false;
+  return value.startsWith("http://") || value.startsWith("https://");
+};
+
 type Item = { key: string; label: string; display: string; raw: any };
 
 const DocumentNew: React.FC<DocumentProps> = ({
@@ -103,7 +113,6 @@ const DocumentNew: React.FC<DocumentProps> = ({
   const [resolvedNames, setResolvedNames] = useState<Record<string, string>>(editorNames);
 
   useEffect(() => {
-    // Merge any new names from props with existing resolved names
     setResolvedNames(prev => ({ ...prev, ...editorNames }));
   }, [editorNames]);
 
@@ -116,8 +125,7 @@ const DocumentNew: React.FC<DocumentProps> = ({
     for (const [key, value] of Object.entries(document)) {
       if (typeof value === "string" && uuidLike.test(value)) {
         const k = key.toLowerCase();
-        if (k === "editor" || k === "patient" || k.endsWith("_id") || k.endsWith("id")) {
-          // Only resolve if not already in editorNames
+        if (k === "editor" || k === "patient") {
           if (!editorNames[value] && !toResolve.includes(value)) {
             toResolve.push(value);
           }
@@ -159,7 +167,19 @@ const DocumentNew: React.FC<DocumentProps> = ({
     if (k !== "editor" && !isIdField(k)) ordered[k] = raw[k];
   }
 
-  const items: Item[] = Object.entries(ordered).map(([key, value]) => {
+  // Separate image URL fields from regular fields
+  const imageFields: { key: string; label: string; url: string }[] = [];
+  const regularOrdered: Record<string, any> = {};
+
+  for (const [k, v] of Object.entries(ordered)) {
+    if (isImageUrlField(k) && isUrlValue(v)) {
+      imageFields.push({ key: k, label: cleanKey(k), url: v as string });
+    } else {
+      regularOrdered[k] = v;
+    }
+  }
+
+  const items: Item[] = Object.entries(regularOrdered).map(([key, value]) => {
     const rawVal = value;
     const resolved =
       typeof rawVal === "string" && resolvedNames[rawVal]
@@ -182,19 +202,13 @@ const DocumentNew: React.FC<DocumentProps> = ({
   }
 
   const handleDownloadPDF = async () => {
-    if (!printRef.current) {
-      console.error('Print ref not available');
-      return;
-    }
+    if (!printRef.current) return;
 
     try {
       const patientName = patient?.name?.replace(/\s+/g, ' ').trim() || 'Patient';
       const dateStr = formatDate(document?.date || new Date().toISOString(), 'short').replace(/\//g, '-');
       const filename = `${title} - ${patientName} - ${dateStr}.pdf`;
 
-      console.log('Starting PDF generation...');
-
-      // Wait a bit for any images to load
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const canvas = await html2canvas(printRef.current, {
@@ -206,8 +220,6 @@ const DocumentNew: React.FC<DocumentProps> = ({
         windowHeight: printRef.current.scrollHeight,
       });
 
-      console.log('Canvas created, generating PDF...');
-
       const imgWidth = 210;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
@@ -216,8 +228,6 @@ const DocumentNew: React.FC<DocumentProps> = ({
 
       pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
       pdf.save(filename);
-
-      console.log('PDF saved successfully:', filename);
     } catch (error) {
       console.error('PDF generation failed:', error);
       alert('Failed to generate PDF. Please try again.');
@@ -305,132 +315,53 @@ const DocumentNew: React.FC<DocumentProps> = ({
           >
             <table className="w-full text-xs">
               <thead>
-                <tr
-                  style={{
-                    backgroundColor: '#f9fafb',
-                    borderBottom: '1px solid #e5e7eb',
-                  }}
-                >
-                  <th
-                    className="text-left py-2 px-3 text-[10px] font-semibold uppercase tracking-wide w-[22%]"
-                    style={{ color: '#4b5563' }}
-                  >
-                    Field
-                  </th>
-
-                  <th
-                    className="text-left py-2 px-3 text-[10px] font-semibold uppercase tracking-wide w-[28%]"
-                    style={{ color: '#4b5563' }}
-                  >
-                    Value
-                  </th>
-
-                  {/* Hide on mobile */}
-                  <th
-                    className="hidden md:table-cell text-left py-2 px-3 text-[10px] font-semibold uppercase tracking-wide w-[22%]"
-                    style={{ color: '#4b5563' }}
-                  >
-                    Field
-                  </th>
-
-                  <th
-                    className="hidden md:table-cell text-left py-2 px-3 text-[10px] font-semibold uppercase tracking-wide w-[28%]"
-                    style={{ color: '#4b5563' }}
-                  >
-                    Value
-                  </th>
+                <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                  <th className="text-left py-2 px-3 text-[10px] font-semibold uppercase tracking-wide w-[22%]" style={{ color: '#4b5563' }}>Field</th>
+                  <th className="text-left py-2 px-3 text-[10px] font-semibold uppercase tracking-wide w-[28%]" style={{ color: '#4b5563' }}>Value</th>
+                  <th className="hidden md:table-cell text-left py-2 px-3 text-[10px] font-semibold uppercase tracking-wide w-[22%]" style={{ color: '#4b5563' }}>Field</th>
+                  <th className="hidden md:table-cell text-left py-2 px-3 text-[10px] font-semibold uppercase tracking-wide w-[28%]" style={{ color: '#4b5563' }}>Value</th>
                 </tr>
               </thead>
 
               <tbody>
                 {pairs.map(([item1, item2], index) => (
                   <React.Fragment key={index}>
-                    {/* First item */}
                     <tr
                       style={{
-                        backgroundColor:
-                          index % 2 === 0 ? '#ffffff' : '#f9fafb',
-                        borderBottom:
-                          index === pairs.length - 1
-                            ? 'none'
-                            : '1px solid #f3f4f6',
+                        backgroundColor: index % 2 === 0 ? '#ffffff' : '#f9fafb',
+                        borderBottom: index === pairs.length - 1 ? 'none' : '1px solid #f3f4f6',
                       }}
                     >
-                      <td
-                        className="py-2 px-3 font-medium"
-                        style={{ color: '#374151' }}
-                      >
-                        {item1.label}
+                      <td className="py-2 px-3 font-medium" style={{ color: '#374151' }}>{item1.label}</td>
+                      <td className="py-2 px-3" style={{ color: '#111827' }}>
+                        {isBool(item1.raw) ? <BoolBadge val={item1.raw} /> : item1.display}
                       </td>
-
-                      <td
-                        className="py-2 px-3"
-                        style={{ color: '#111827' }}
-                      >
-                        {isBool(item1.raw)
-                          ? <BoolBadge val={item1.raw} />
-                          : item1.display}
-                      </td>
-
-                      {/* Desktop only */}
                       {item2 ? (
                         <>
-                          <td
-                            className="hidden md:table-cell py-2 px-3 font-medium"
-                            style={{
-                              color: '#374151',
-                              borderLeft: '1px solid #e5e7eb',
-                            }}
-                          >
-                            {item2.label}
-                          </td>
-
+                          <td className="hidden md:table-cell py-2 px-3 font-medium" style={{ color: '#374151', borderLeft: '1px solid #e5e7eb' }}>{item2.label}</td>
                           <td className="hidden md:table-cell py-2 px-3" style={{ color: '#111827' }}>
-                            {isBool(item2.raw)
-                              ? <BoolBadge val={item2.raw} />
-                              : item2.label === 'Updated At'
-                                ? formatDate(item2.display)
-                                : item2.display}
+                            {isBool(item2.raw) ? <BoolBadge val={item2.raw} /> : item2.label === 'Updated At' ? formatDate(item2.display) : item2.display}
                           </td>
                         </>
                       ) : (
                         <>
-                          <td
-                            className="hidden md:table-cell py-2 px-3"
-                            style={{ borderLeft: '1px solid #e5e7eb' }}
-                          ></td>
-
+                          <td className="hidden md:table-cell py-2 px-3" style={{ borderLeft: '1px solid #e5e7eb' }}></td>
                           <td className="hidden md:table-cell py-2 px-3"></td>
                         </>
                       )}
                     </tr>
 
-                    {/* Mobile second item */}
                     {item2 && (
                       <tr
                         className="md:hidden"
                         style={{
-                          backgroundColor:
-                            index % 2 === 0 ? '#ffffff' : '#f9fafb',
-                          borderBottom:
-                            index === pairs.length - 1
-                              ? 'none'
-                              : '1px solid #f3f4f6',
+                          backgroundColor: index % 2 === 0 ? '#ffffff' : '#f9fafb',
+                          borderBottom: index === pairs.length - 1 ? 'none' : '1px solid #f3f4f6',
                         }}
                       >
-                        <td
-                          className="py-2 px-3 font-medium"
-                          style={{ color: '#374151' }}
-                        >
-                          {item2.label}
-                        </td>
-
+                        <td className="py-2 px-3 font-medium" style={{ color: '#374151' }}>{item2.label}</td>
                         <td className="py-2 px-3" style={{ color: '#111827' }}>
-                          {isBool(item2.raw)
-                            ? <BoolBadge val={item2.raw} />
-                            : item2.label === 'Updated At'
-                              ? formatDate(item2.display)
-                              : item2.display}
+                          {isBool(item2.raw) ? <BoolBadge val={item2.raw} /> : item2.label === 'Updated At' ? formatDate(item2.display) : item2.display}
                         </td>
                       </tr>
                     )}
@@ -440,6 +371,34 @@ const DocumentNew: React.FC<DocumentProps> = ({
             </table>
           </div>
         </div>
+
+        {/* Ultrasound / Image Section */}
+        {imageFields.length > 0 && (
+          <div className="mb-5">
+            <h3 className="text-sm font-bold mb-3" style={{ color: '#111827' }}>Ultrasound Images</h3>
+            <div className="flex flex-col gap-4">
+              {imageFields.map((field) => (
+                <div key={field.key} className="rounded overflow-hidden" style={{ border: '1px solid #e5e7eb' }}>
+                  <div className="px-3 py-2" style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#4b5563' }}>{field.label}</p>
+                  </div>
+                  <div className="p-3">
+                    <img
+                      src={field.url}
+                      alt={field.label}
+                      crossOrigin="anonymous"
+                      className="w-full rounded"
+                      style={{ maxHeight: '400px', objectFit: 'contain' }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="mt-8 pt-3" style={{ borderTop: '1px solid #e5e7eb' }}>

@@ -109,41 +109,44 @@ const Medication: React.FC<MedicationProps> = ({ patient, setActiveTab }) => {
         </button>
       </div>
 
-      {/* Allergy alert — shown above the table when relevant */}
-      {medicationAllergies && medicationAllergies.trim() !== "" && (
-        <div className="w-full p-5 bg-[#fdf5e6e6] rounded-[10px] flex flex-col gap-3 border border-[#dc9b320d] mb-5">
-          <div className="flex items-start gap-4">
-            <div className="w-[46px] h-[46px] rounded-full bg-[#f5b74a1a] flex justify-center items-center text-[#dc9b32] text-[1.4em] flex-shrink-0">
-              <IoWarningOutline />
-            </div>
-            <div className="flex-1">
-              <div className="font-[900] text-[0.9em] text-black mb-1">Medication Alert</div>
-              <p className="text-[#22110a] text-[0.8em] leading-normal m-0">
-                The patient has a known adverse reaction to{" "}
-                <span className="font-bold underline">{medicationAllergies}</span>.
-                Please review the allergy history and consider alternative medications.
-              </p>
-              <button
-                onClick={() => setActiveTab("profile")}
-                className="mt-[15px] w-[150px] h-[45px] bg-[#2f1104] text-white rounded-md flex justify-center items-center text-[0.8em] cursor-pointer hover:bg-black transition-all"
-              >
-                View Allergies
-              </button>
+      <div className="w-full grid grid-cols-1 md:grid-cols-[74%_26%] gap-4">
+
+
+        <DataTable
+          columns={medColumns}
+          data={filteredMeds}
+          emptyMessage={
+            searchTerm
+              ? `No medications found matching "${searchTerm}"`
+              : "No active medications prescribed."
+          }
+          initialItemsPerPage={5}
+        />
+        {/* Allergy alert — shown above the table when relevant */}
+        {medicationAllergies && medicationAllergies.trim() !== "" && (
+          <div className="w-full p-5 bg-[#fdf5e6e6] rounded-[10px] flex flex-col gap-3 border border-[#dc9b320d] mb-5">
+            <div className="flex flex-col items-start gap-4">
+              <div className="w-[46px] h-[46px] rounded-full bg-[#f5b74a1a] flex justify-center items-center text-[#dc9b32] text-[1.4em] flex-shrink-0">
+                <IoWarningOutline />
+              </div>
+              <div className="flex-1">
+                <div className="font-[900] text-[0.9em] text-black mb-1">Medication Alert</div>
+                <p className="text-[#22110a] text-[0.8em] leading-normal m-0">
+                  The patient has a known adverse reaction to{" "}
+                  <span className="font-bold underline">{medicationAllergies}</span>.
+                  Please review the allergy history and consider alternative medications.
+                </p>
+                <button
+                  onClick={() => setActiveTab("profile")}
+                  className="mt-[15px] w-[150px] h-[45px] bg-[#2f1104] text-white rounded-md flex justify-center items-center text-[0.8em] cursor-pointer hover:bg-black transition-all"
+                >
+                  View Allergies
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-
-      <DataTable
-        columns={medColumns}
-        data={filteredMeds}
-        emptyMessage={
-          searchTerm
-            ? `No medications found matching "${searchTerm}"`
-            : "No active medications prescribed."
-        }
-        initialItemsPerPage={5}
-      />
+        )}
+      </div>
     </div>
   );
 };

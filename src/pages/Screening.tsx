@@ -6,6 +6,8 @@ import SearchContainer from '../components/SearchContainer';
 import ScreeningForm from '../components/ScreeningForm';
 import EditRecord from './EditRecord';
 import { patientService } from '../services/patientServices';
+import { formatParityNotation, readParityFromRecord, toParityStorage } from '../utils/gravidaParity';
+import { buildDietFoodGroups, stripDietFoodGroupFields } from '../utils/lifestyleDiet';
 
 const Screening = () => {
   const { tabId } = useParams();
@@ -301,8 +303,8 @@ const Screening = () => {
           anemia: data.anemia,
           diabetesMelitus: data.diabetesMelitus,
           chronicHypertension: data.chronicHypertension,
-          gravida: (() => { const p = String(data.gravidaParity || '0+0').split('+'); return parseInt(p[0]) || 0; })(),
-          parity: (() => { const p = String(data.gravidaParity || '0+0').split('+'); return parseInt(p[1]) || 0; })(),
+          gravida: Number(data.gravida) || 0,
+          ...toParityStorage(String(data.parityNotation || '0+0')),
           miscarriage: data.miscarriage,
           csection: data.csection,
           preeclampsiaHistory: data.preeclampsiaHistory,
@@ -317,7 +319,7 @@ const Screening = () => {
           famSickleCell: data.famSickleCell,
           famThalassemia: data.famThalassemia,
           maleAge: data.maleAge != null && data.maleAge !== '' ? Number(data.maleAge) : 0,
-          malePreeclampsiaPrevHistory: data.malePreeclampsiaPrevHistory,
+          malePreeclampsiaPrevHistory: data.malePreeclampsiaPrevHistory || 'no',
           liver: data.liver,
           thyroid: data.thyroid || 'no',
           hyperthyroidism: data.hyperthyroidism,
@@ -483,7 +485,10 @@ const Screening = () => {
             gestationalDiabetesHistory: latestHistory?.gestationalDiabetesHistory || "No",
 
             // Obstetric Stats
-            parity: parseObstetric(latestHistory?.parity) || 0,
+            parity: (() => {
+              const { viable, loss } = readParityFromRecord(latestHistory ?? {});
+              return formatParityNotation(viable, loss);
+            })(),
             gravida: parseObstetric(latestHistory?.gravida) || 0,
             interval: latestHistory?.interval,
             miscarriage: latestHistory?.miscarriage || "No",
@@ -632,17 +637,21 @@ const Screening = () => {
 
       case 'Lifestyle':
         structuredData = {
-          patientId: data.patientId, // This will be the actual patient ID
+          patientId: data.patientId,
           editor: data.editor,
           date: data.date,
           smoking: data.smoking,
           diet: data.diet,
+          mealsPerDay: data.mealsPerDay != null && data.mealsPerDay !== '' ? Number(data.mealsPerDay) : null,
+          dietFoodKinds: data.dietFoodKinds || '',
+          dietFoodGroups: buildDietFoodGroups(data),
           exercise: data.exercise,
           alcoholConsumption: data.alcoholConsumption,
           caffeine: data.caffeine,
           caffeineQuantity: data.caffeineQuantity,
           sugarDrink: data.sugarDrink,
         };
+        stripDietFoodGroupFields(structuredData);
 
         try {
           const response = await patientService.createRecord('patientLifestyle', structuredData);
@@ -690,7 +699,7 @@ const Screening = () => {
           date: data.date,
           gestationWeek: data.gestationWeek,
           amniotic: data.amniotic,
-          imageUrl: data.imageUrl
+          imageUrl: data.imageUrl || '',
         };
 
         try {

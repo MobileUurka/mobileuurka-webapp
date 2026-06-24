@@ -5,6 +5,8 @@ import { patientService } from '../services/patientServices';
 import { SCREENING_FORMS, EDIT_RECORD_TYPES } from '../constants/screeningForms';
 import PatientSelector from '../components/PatientSelector';
 import ScreeningForm from '../components/ScreeningForm';
+import { formatParityNotation, readParityFromRecord, toParityStorage } from '../utils/gravidaParity';
+import { buildDietFoodGroups, flattenDietFoodGroups, stripDietFoodGroupFields } from '../utils/lifestyleDiet';
 
 // Small inline spinner (matches the one in ScreeningForm)
 const MiniSpinner = () => (
@@ -42,18 +44,31 @@ const flattenIntake = (raw: Record<string, any>): Record<string, any> => ({
 });
 
 // ── Helper: flatten history data ──────────────────────────────────────────────
-const flattenHistory = (raw: Record<string, any>): Record<string, any> => ({
+const flattenHistory = (raw: Record<string, any>): Record<string, any> => {
+  const { viable, loss } = readParityFromRecord(raw);
+  const partnerHadPreviousPartner =
+    raw.malePreeclampsiaPrevHistory === 'yes' || raw.malePreeclampsiaPrevHistory === 'unknown'
+      ? 'yes'
+      : 'no';
+
+  return {
+    ...raw,
+    gravida: raw.gravida ?? '',
+    parityNotation: formatParityNotation(viable, loss),
+    partnerHadPreviousPartner,
+  };
+};
+
+const flattenLifestyle = (raw: Record<string, any>): Record<string, any> => ({
   ...raw,
-  gravidaParity:
-    raw.gravida != null && raw.parity != null
-      ? `${raw.gravida}+${raw.parity}`
-      : raw.gravidaParity ?? '',
+  ...flattenDietFoodGroups(raw),
 });
 
 // ── Map tableName → flatten fn ────────────────────────────────────────────────
 const FLATTEN: Record<string, (r: Record<string, any>) => Record<string, any>> = {
   patients: flattenIntake,
   patientHistory: flattenHistory,
+  patientLifestyle: flattenLifestyle,
 };
 
 // ── Build a display label for a record row ────────────────────────────────────
@@ -200,17 +215,25 @@ const EditRecord = () => {
         }
       } else {
         // Dynamic table record → PUT /patients/data/:tableName/:recordId
-        // For patientHistory, split gravidaParity back out
+        // For patientHistory, map gravida + parity notation to storage fields
         const payload = { ...data };
-        if (type.tableName === 'patientHistory' && typeof payload.gravidaParity === 'string') {
-          const parts = payload.gravidaParity.split('+');
-          payload.gravida = parseInt(parts[0], 10) || 0;
-          payload.parity = parseInt(parts[1], 10) || 0;
-          delete payload.gravidaParity;
-        }
-        // maleAge must be an integer — coerce blank/null to 0
         if (type.tableName === 'patientHistory') {
+          if (payload.gravida != null) {
+            payload.gravida = Number(payload.gravida) || 0;
+          }
+          if (typeof payload.parityNotation === 'string') {
+            Object.assign(payload, toParityStorage(payload.parityNotation));
+            delete payload.parityNotation;
+          }
           payload.maleAge = payload.maleAge != null && payload.maleAge !== '' ? Number(payload.maleAge) : 0;
+          payload.malePreeclampsiaPrevHistory = payload.malePreeclampsiaPrevHistory || 'no';
+        }
+        if (type.tableName === 'patientLifestyle') {
+          if (payload.mealsPerDay != null && payload.mealsPerDay !== '') {
+            payload.mealsPerDay = Number(payload.mealsPerDay);
+          }
+          payload.dietFoodGroups = buildDietFoodGroups(payload);
+          stripDietFoodGroupFields(payload);
         }
         // Strip frontend-only meta fields
         delete payload.patientName;
