@@ -6,7 +6,7 @@ import SearchContainer from '../components/SearchContainer';
 import ScreeningForm from '../components/ScreeningForm';
 import EditRecord from './EditRecord';
 import { patientService } from '../services/patientServices';
-import { formatParityNotation, readParityFromRecord, toParityStorage } from '../utils/gravidaParity';
+import {  readParityFromRecord, toParityStorage } from '../utils/gravidaParity';
 import { buildDietFoodGroups, stripDietFoodGroupFields } from '../utils/lifestyleDiet';
 
 const Screening = () => {
