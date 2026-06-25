@@ -486,8 +486,8 @@ const Screening = () => {
 
             // Obstetric Stats
             parity: (() => {
-              const { viable, loss } = readParityFromRecord(latestHistory ?? {});
-              return formatParityNotation(viable, loss);
+              const { viable } = readParityFromRecord(latestHistory ?? {});
+              return viable;
             })(),
             gravida: parseObstetric(latestHistory?.gravida) || 0,
             interval: latestHistory?.interval,

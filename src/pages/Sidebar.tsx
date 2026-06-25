@@ -42,6 +42,7 @@ const Sidebar = ({ activeItem, setActiveItem, setSideBarActive, sideBarActive }:
     const unreadCount = useAppSelector(s =>
         s.notifications.data.filter(n => !n.readAt).length
     );
+
     const feedbackUnreadCount = useAppSelector(s => s.feedback.totalUnread);
 
     const ClientItems = [

@@ -81,6 +81,11 @@ function UnreadReplyBadge({ count }: { count: number }) {
     );
 }
 
+function isCommentFeedback(entry: FeedbackEntry) {
+    const page = entry.page?.toLowerCase?.() ?? '';
+    return page === 'symptom report' || page.includes('symptom report') || page.includes('sbr');
+}
+
 function useMarkFeedbackReadOnOpen() {
     const dispatch = useAppDispatch();
     return useCallback((feedbackId: string) => {
@@ -92,11 +97,7 @@ function useMarkFeedbackReadOnOpen() {
 // ─── Performance panel ────────────────────────────────────────────────────────
 
 function PerformancePanel({ onClose }: { onClose: () => void }) {
-    const [metrics, setMetrics] = useState<PerfMetric[]>([]);
-
-    useEffect(() => {
-        setMetrics(getAllMetrics().reverse()); // newest first
-    }, []);
+    const [metrics, setMetrics] = useState<PerfMetric[]>(() => getAllMetrics().reverse());
 
     // Group by action for averages
     const grouped: Record<string, number[]> = {};
@@ -675,7 +676,7 @@ function UserFeedbackView() {
     const [loading, setLoading] = useState(true);
     const [selected, setSelected] = useState<FeedbackEntry | null>(null);
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState<'mine' | 'assigned'>('mine');
+    const [activeTab, setActiveTab] = useState<'all' | 'comments' | 'assigned'>('all');
 
     const { user } = useAuth();
     const currentUserId = user?.id ?? '';
@@ -697,6 +698,12 @@ function UserFeedbackView() {
 
     useEffect(() => { load(); }, [load]);
 
+    useEffect(() => {
+        const onFeedbackDataUpdated = () => load();
+        window.addEventListener('feedback-data-updated', onFeedbackDataUpdated);
+        return () => window.removeEventListener('feedback-data-updated', onFeedbackDataUpdated);
+    }, [load]);
+
     const handleStatusChange = (id: string, newStatus: string) => {
         setEntries(prev => prev.map(e =>
             e.id === id ? { ...e, status: newStatus as FeedbackEntry['status'] } : e
@@ -711,11 +718,15 @@ function UserFeedbackView() {
         setSelected(prev => prev?.id === id ? { ...prev, replies } : prev);
     };
 
-    const mySubmissions = entries.filter(e => e.userId === currentUserId);
     const assignedToMe  = entries.filter(e =>
         Array.isArray(e.assignedTo) && e.assignedTo.some(a => a.id === currentUserId)
     );
-    const visibleEntries = activeTab === 'mine' ? mySubmissions : assignedToMe;
+    const commentEntries = entries.filter(isCommentFeedback);
+    const nonCommentEntries = entries.filter(e => !isCommentFeedback(e));
+    const visibleEntries =
+        activeTab === 'all' ? nonCommentEntries
+        : activeTab === 'comments' ? commentEntries
+        : assignedToMe;
 
     return (
         <div className="w-full h-full flex flex-col pt-4 px-4 sm:pt-6 sm:px-6 bg-white overflow-hidden">
@@ -736,9 +747,10 @@ function UserFeedbackView() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 mb-4 border-b border-gray-100 shrink-0">
+            <div className="flex gap-1 mb-2 border-b border-gray-100 shrink-0">
                 {([
-                    { key: 'mine',     label: `Submitted (${mySubmissions.length})` },
+                    { key: 'all',      label: `All feedback (${nonCommentEntries.length})` },
+                    { key: 'comments', label: `Comments (${commentEntries.length})` },
                     { key: 'assigned', label: `Assigned to me (${assignedToMe.length})` },
                 ] as const).map(t => (
                     <button
@@ -759,7 +771,6 @@ function UserFeedbackView() {
                     </button>
                 ))}
             </div>
-
             {error && (
                 <div className="mb-4 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg px-4 py-3 shrink-0">
                     {error}
@@ -778,9 +789,11 @@ function UserFeedbackView() {
                         <div className="flex-1 flex flex-col items-center justify-center text-gray-400 py-16 gap-3">
                             <MdOutlineFeedback size={40} className="opacity-30" />
                             <p className="text-sm">
-                                {activeTab === 'mine'
-                                    ? "You haven't submitted any feedback yet."
-                                    : "No feedback has been assigned to you yet."}
+                                {activeTab === 'assigned'
+                                    ? 'No feedback has been assigned to you yet.'
+                                    : activeTab === 'comments'
+                                        ? 'No comment feedback found.'
+                                        : "No feedback available yet."}
                             </p>
                         </div>
                     )}
@@ -806,7 +819,14 @@ function UserFeedbackView() {
                                     <span className="text-[10px] text-gray-400 ml-auto">{timeAgo(entry.createdAt)}</span>
                                 </div>
                                 <p className="text-sm text-gray-700 truncate mt-1">{entry.message}</p>
-                                <p className="text-[10px] text-gray-400 mt-0.5">{entry.page}</p>
+                                <div className="flex flex-wrap items-center gap-2 mt-1">
+                                    <span className="text-[10px] text-gray-400">{entry.page}</span>
+                                    {isCommentFeedback(entry) && (
+                                        <span className="text-[10px] font-semibold text-[#984815] bg-[#f8ebe1] px-2 py-0.5 rounded-full">
+                                            Comment
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     ))}
@@ -839,7 +859,7 @@ function AdminFeedbackView() {
     const [entries, setEntries] = useState<FeedbackEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<StatusFilter>('all');
-    const [activeTab, setActiveTab] = useState<'all' | 'assigned'>('all');
+    const [activeTab, setActiveTab] = useState<'all' | 'comments' | 'assigned'>('all');
     const [selected, setSelected] = useState<FeedbackEntry | null>(null);
     const [showPerf, setShowPerf] = useState(false);
     const [error, setError] = useState('');
@@ -859,6 +879,12 @@ function AdminFeedbackView() {
 
     useEffect(() => { load(); }, [load]);
 
+    useEffect(() => {
+        const onFeedbackDataUpdated = () => load();
+        window.addEventListener('feedback-data-updated', onFeedbackDataUpdated);
+        return () => window.removeEventListener('feedback-data-updated', onFeedbackDataUpdated);
+    }, [load]);
+
     const handleStatusChange = (id: string, status: string, updatedEntry?: Partial<FeedbackEntry>) => {
         setEntries(prev => prev.map(e =>
             e.id === id ? { ...e, status: status as FeedbackEntry['status'], ...updatedEntry } : e
@@ -868,6 +894,7 @@ function AdminFeedbackView() {
         );
     };
 
+    console.log(entries)
     const handleDelete = async (id: string) => {
         try {
             await feedbackService.deleteEntry(id);
@@ -880,11 +907,16 @@ function AdminFeedbackView() {
     const assignedToMe = entries.filter(e =>
         Array.isArray(e.assignedTo) && e.assignedTo.some(a => a.id === currentUserId)
     );
-    const sourceEntries = activeTab === 'assigned' ? assignedToMe : entries;
+    const commentEntries = entries.filter(isCommentFeedback);
+    const nonCommentEntries = entries.filter(e => !isCommentFeedback(e));
+    const sourceEntries =
+        activeTab === 'all' ? nonCommentEntries
+        : activeTab === 'comments' ? commentEntries
+        : assignedToMe;
     const filtered = sourceEntries.filter(e => filter === 'all' || e.status === filter);
 
     const counts = {
-        all: entries.length,
+        all: nonCommentEntries.length,
         pending: entries.filter(e => e.status === 'pending').length,
         reviewed: entries.filter(e => e.status === 'reviewed').length,
         resolved: entries.filter(e => e.status === 'resolved').length,
@@ -896,6 +928,7 @@ function AdminFeedbackView() {
         { key: 'reviewed', label: `Reviewed (${sourceEntries.filter(e => e.status === 'reviewed').length})` },
         { key: 'resolved', label: `Resolved (${sourceEntries.filter(e => e.status === 'resolved').length})` },
     ];
+
 
     return (
         <div className="w-full h-full flex flex-col pt-4 px-4 sm:pt-6 sm:px-6 bg-white overflow-hidden">
@@ -929,28 +962,27 @@ function AdminFeedbackView() {
                 </div>
             </div>
 
-            {/* Top-level tabs: All Feedback / Assigned to Me */}
-            <div className="flex gap-1 mb-0 border-b border-gray-100 shrink-0">
-                <button
-                    onClick={() => { setActiveTab('all'); setSelected(null); }}
-                    className={`px-3 py-2 text-xs font-medium rounded-t-lg transition border-b-2 -mb-px ${activeTab === 'all' ? 'border-[#984815] text-[#984815]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                >
-                    All feedback
-                </button>
-                <button
-                    onClick={() => { setActiveTab('assigned'); setSelected(null); }}
-                    className={`px-3 py-2 text-xs font-medium rounded-t-lg transition border-b-2 -mb-px flex items-center gap-1.5 ${activeTab === 'assigned' ? 'border-[#984815] text-[#984815]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                >
-                    <FiUserCheck size={11} />
-                    Assigned to me
-                    {assignedToMe.length > 0 && (
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${activeTab === 'assigned' ? 'bg-[#984815] text-white' : 'bg-gray-200 text-gray-600'}`}>
-                            {assignedToMe.length}
-                        </span>
-                    )}
-                </button>
+            {/* Top-level tabs: All Feedback / Comments / Assigned to Me */}
+            <div className="flex gap-1 mb-2 border-b border-gray-100 shrink-0">
+                {([
+                    { key: 'all',      label: `All feedback (${nonCommentEntries.length})` },
+                    { key: 'comments', label: `Comments (${commentEntries.length})` },
+                    { key: 'assigned', label: `Assigned to me (${assignedToMe.length})` },
+                ] as const).map(t => (
+                    <button
+                        key={t.key}
+                        onClick={() => { setActiveTab(t.key); setSelected(null); }}
+                        className={`px-3 py-2 text-xs font-medium rounded-t-lg transition border-b-2 -mb-px ${
+                            activeTab === t.key
+                                ? 'border-[#984815] text-[#984815]'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                        {t.label}
+                      
+                    </button>
+                ))}
             </div>
-
             {/* Status filter sub-tabs */}
             <div className="flex gap-1 mb-4 border-b border-gray-50 pb-0 shrink-0 mt-1">
                 {FILTERS.map(f => (
@@ -1008,8 +1040,13 @@ function AdminFeedbackView() {
                                     <StatusBadge status={entry.status} />
                                 </div>
                                 <p className="text-xs text-gray-500 truncate mt-0.5">{entry.message}</p>
-                                <div className="flex items-center gap-2 mt-1">
+                                <div className="flex items-center gap-2 mt-1 flex-wrap">
                                     <span className="text-[10px] text-gray-400">{entry.page}</span>
+                                    {isCommentFeedback(entry) && (
+                                        <span className="text-[10px] font-semibold text-[#984815] bg-[#f8ebe1] px-2 py-0.5 rounded-full">
+                                            Comment
+                                        </span>
+                                    )}
                                     <span className="text-[10px] text-gray-300">·</span>
                                     <span className="text-[10px] text-gray-400">{timeAgo(entry.createdAt)}</span>
                                     {Array.isArray(entry.assignedTo) && entry.assignedTo.length > 0 && (

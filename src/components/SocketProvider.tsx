@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { socketService, SOCKET_EVENTS } from '../services/socketService';
+import { type Hospital } from '../services/hospitalServices';
+import { type User } from '../services/userServices';
+import { type Notification } from '../services/notificationService';
 import { useAppDispatch } from '../store/hooks';
 import { invalidatePatients, patientRemoved } from '../store/patientsSlice';
 import { hospitalLinked, hospitalUnlinked, patientCountChanged } from '../store/hospitalsSlice';
@@ -10,6 +13,44 @@ import { incrementFeedbackUnread } from '../store/feedbackSlice';
 import { useToast } from '../contexts/ToastContext';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+
+type SocketPayload = Record<string, unknown>;
+
+type FeedbackSocketPayload = {
+    feedbackId?: string;
+    feedbackPage?: string;
+    feedbackMessage?: string;
+    senderId?: string;
+    senderName?: string;
+    reply?: {
+        senderId?: string;
+        senderName?: string;
+        message?: string;
+    };
+};
+
+const asSocketPayload = (payload: unknown): SocketPayload =>
+    typeof payload === 'object' && payload !== null ? payload as SocketPayload : {};
+
+const isHospital = (value: unknown): value is Hospital =>
+    typeof value === 'object' && value !== null &&
+    typeof (value as any).id === 'string' &&
+    typeof (value as any).name === 'string';
+
+const isUser = (value: unknown): value is User =>
+    typeof value === 'object' && value !== null &&
+    typeof (value as any).id === 'string' &&
+    typeof (value as any).email === 'string' &&
+    typeof (value as any).firstName === 'string' &&
+    typeof (value as any).lastName === 'string' &&
+    typeof (value as any).role === 'string';
+
+const isNotification = (value: unknown): value is Notification =>
+    typeof value === 'object' && value !== null &&
+    typeof (value as any).id === 'string' &&
+    typeof (value as any).title === 'string' &&
+    typeof (value as any).message === 'string' &&
+    typeof (value as any).type === 'string';
 
 /**
  * Mounts once inside the authenticated layout.
@@ -40,75 +81,108 @@ export default function SocketProvider() {
             console.log('🔌 [socket] patient:created received');
             dispatch(invalidatePatients());
         };
-        const onPatientUpdated = (data: any) => {
-            console.log('🔌 [socket] patient:updated received', data?.patient?.id);
+        const onPatientUpdated = (data: unknown) => {
+            const payload = asSocketPayload(data);
+            const patient = payload.patient as { id?: string } | undefined;
+            console.log('🔌 [socket] patient:updated received', patient?.id);
             dispatch(invalidatePatients());
-            if (data?.patient?.id) {
-                dispatch(profileUpdated({ patientId: data.patient.id, data: data.patient }));
+            if (patient?.id) {
+                dispatch(profileUpdated({ patientId: patient.id, data: patient }));
             }
         };
-        const onPatientDeleted = (data: any) => {
-            console.log('🔌 [socket] patient:deleted received', data?.patientId);
-            if (data?.patientId) {
-                dispatch(patientRemoved(data.patientId));
-                dispatch(profileEvicted(data.patientId));
-                if (data?.patient?.hospital) {
-                    dispatch(patientCountChanged({ hospitalName: data.patient.hospital, delta: -1 }));
+        const onPatientDeleted = (data: unknown) => {
+            const payload = asSocketPayload(data);
+            const patient = payload.patient as { hospital?: string } | undefined;
+            const patientId = typeof payload.patientId === 'string' ? payload.patientId : undefined;
+            console.log('🔌 [socket] patient:deleted received', patientId);
+            if (patientId) {
+                dispatch(patientRemoved(patientId));
+                dispatch(profileEvicted(patientId));
+                if (patient?.hospital) {
+                    dispatch(patientCountChanged({ hospitalName: patient.hospital, delta: -1 }));
                 }
             }
         };
 
         // --- Patient Records (visits, labwork, triage, medications, etc.) ---
         // Record mutations affect riskLevel/diagnosis on the list too, so invalidate both.
-        const onRecordMutated = (data: any) => {
-            console.log('🔌 [socket] patient:record:* received', data);
+        const onRecordMutated = (data: unknown) => {
+            const payload = asSocketPayload(data);
+            console.log('🔌 [socket] patient:record:* received', payload);
             dispatch(invalidatePatients());
-            if (data?.patientId) {
-                console.log(`🔌 [socket] invalidating profile for patient: ${data.patientId}`);
-                dispatch(invalidateProfile(data.patientId));
+            if (typeof payload.patientId === 'string') {
+                console.log(`🔌 [socket] invalidating profile for patient: ${payload.patientId}`);
+                dispatch(invalidateProfile(payload.patientId));
             }
         };
 
         // --- Hospitals ---
-        const onHospitalLinked = (data: any) => {
-            if (data?.hospital) dispatch(hospitalLinked(data.hospital));
+        const onHospitalLinked = (data: unknown) => {
+            const payload = asSocketPayload(data);
+            if (isHospital(payload.hospital)) dispatch(hospitalLinked(payload.hospital));
         };
-        const onHospitalUnlinked = (data: any) => {
-            if (data?.hospitalId) dispatch(hospitalUnlinked(data.hospitalId));
+        const onHospitalUnlinked = (data: unknown) => {
+            const payload = asSocketPayload(data);
+            if (typeof payload.hospitalId === 'string') dispatch(hospitalUnlinked(payload.hospitalId));
         };
 
         // --- Staff ---
-        const onStaffAdded = (data: any) => {
-            if (data?.user) dispatch(staffMemberAdded(data.user));
+        const onStaffAdded = (data: unknown) => {
+            const payload = asSocketPayload(data);
+            if (isUser(payload.user)) dispatch(staffMemberAdded(payload.user));
         };
-        const onStaffUpdated = (data: any) => {
-            if (data?.user) dispatch(staffMemberUpdated(data.user));
+        const onStaffUpdated = (data: unknown) => {
+            const payload = asSocketPayload(data);
+            if (isUser(payload.user)) dispatch(staffMemberUpdated(payload.user));
         };
-        const onStaffDeleted = (data: any) => {
-            if (data?.userId) dispatch(staffMemberRemoved(data.userId));
+        const onStaffDeleted = (data: unknown) => {
+            const payload = asSocketPayload(data);
+            if (typeof payload.userId === 'string') dispatch(staffMemberRemoved(payload.userId));
         };
 
         // --- Notifications ---
-        const onNotificationNew = (data: any) => {
-            console.log('🔌 [socket] notification:new received', data);
-            if (data) dispatch(addNotification(data));
+        const onNotificationNew = (data: unknown) => {
+            const payload = asSocketPayload(data);
+            console.log('🔌 [socket] notification:new received', payload);
+            if (isNotification(payload)) dispatch(addNotification(payload));
         };
 
         // --- Feedback replies ---
-        const onFeedbackReply = (data: any) => {
-            console.log('🔔 [socket] feedback:reply received', data);
-            if (!data) return;
-            if (data.reply?.senderId && data.reply.senderId !== userIdRef.current && data.feedbackId) {
-                dispatch(incrementFeedbackUnread(data.feedbackId));
+        const onFeedbackReply = (data: unknown) => {
+            const payload = asSocketPayload(data) as FeedbackSocketPayload;
+            console.log('🔔 [socket] feedback:reply received', payload);
+            if (!payload) return;
+            if (payload.reply?.senderId && payload.reply.senderId !== userIdRef.current && payload.feedbackId) {
+                dispatch(incrementFeedbackUnread(payload.feedbackId));
             }
-            const sender = data.reply?.senderName ?? 'Someone';
-            const page   = data.feedbackPage ?? 'feedback';
+            const sender = payload.reply?.senderName ?? 'Someone';
+            const page   = payload.feedbackPage ?? 'feedback';
             showToastRef.current({
                 type: 'reply',
                 title: `New reply from ${sender}`,
-                message: `On "${page}" feedback: ${data.reply?.message?.slice(0, 60) ?? ''}${(data.reply?.message?.length ?? 0) > 60 ? '…' : ''}`,
+                message: `On "${page}" feedback: ${payload.reply?.message?.slice(0, 60) ?? ''}${(payload.reply?.message?.length ?? 0) > 60 ? '…' : ''}`,
                 onClick: () => navigateRef.current('/Feedback'),
             });
+            window.dispatchEvent(new Event('feedback-data-updated'));
+        };
+
+        // --- New Feedback ---
+        const onFeedbackNew = (data: unknown) => {
+            const payload = asSocketPayload(data) as FeedbackSocketPayload;
+            console.log('🔔 [socket] feedback:new received', payload);
+            if (!payload) return;
+            if (payload.senderId && payload.senderId !== userIdRef.current && payload.feedbackId) {
+                dispatch(incrementFeedbackUnread(payload.feedbackId));
+            }
+            const sender = payload.senderName ?? 'Someone';
+            const page   = payload.feedbackPage ?? 'feedback';
+            showToastRef.current({
+                type: 'reply',
+                title: `New feedback from ${sender}`,
+                message: `On "${page}": ${payload.feedbackMessage?.slice(0, 60) ?? ''}${(payload.feedbackMessage?.length ?? 0) > 60 ? '…' : ''}`,
+                onClick: () => navigateRef.current('/Feedback'),
+            });
+            window.dispatchEvent(new Event('feedback-data-updated'));
         };
 
         sock.on(SOCKET_EVENTS.PATIENT_CREATED, onPatientCreated);
@@ -123,6 +197,7 @@ export default function SocketProvider() {
         sock.on(SOCKET_EVENTS.STAFF_UPDATED, onStaffUpdated);
         sock.on(SOCKET_EVENTS.STAFF_DELETED, onStaffDeleted);
         sock.on(SOCKET_EVENTS.NOTIFICATION_NEW, onNotificationNew);
+        sock.on(SOCKET_EVENTS.FEEDBACK_NEW, onFeedbackNew);
         sock.on(SOCKET_EVENTS.FEEDBACK_REPLY, onFeedbackReply);
 
         return () => {
@@ -138,6 +213,7 @@ export default function SocketProvider() {
             sock.off(SOCKET_EVENTS.STAFF_UPDATED, onStaffUpdated);
             sock.off(SOCKET_EVENTS.STAFF_DELETED, onStaffDeleted);
             sock.off(SOCKET_EVENTS.NOTIFICATION_NEW, onNotificationNew);
+            sock.off(SOCKET_EVENTS.FEEDBACK_NEW, onFeedbackNew);
             sock.off(SOCKET_EVENTS.FEEDBACK_REPLY, onFeedbackReply);
         };
     }, [dispatch]);

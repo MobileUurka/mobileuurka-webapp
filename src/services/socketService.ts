@@ -81,11 +81,11 @@ export const socketService = {
         return socket;
     },
 
-    on(event: string, handler: (...args: any[]) => void) {
+    on(event: string, handler: (...args: unknown[]) => void) {
         socket?.on(event, handler);
     },
 
-    off(event: string, handler?: (...args: any[]) => void) {
+    off(event: string, handler?: (...args: unknown[]) => void) {
         if (handler) {
             socket?.off(event, handler);
         } else {
@@ -109,5 +109,6 @@ export const SOCKET_EVENTS = {
     STAFF_UPDATED: 'staff:updated',
     STAFF_DELETED: 'staff:deleted',
     NOTIFICATION_NEW: 'notification:new',
+    FEEDBACK_NEW: 'feedback:new',
     FEEDBACK_REPLY: 'feedback:reply',
 } as const;
