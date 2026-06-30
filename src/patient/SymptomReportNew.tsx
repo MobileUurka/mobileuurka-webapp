@@ -14,6 +14,10 @@ import RiskFactorBreakdown from './RiskFactorBreakdown';
 import CommentsPanel, { type CommentPayload } from '../components/CommentsPanel';
 import NotesDrawer from '../components/NotesDrawer';
 import { patientService } from '../services/patientServices';
+import DiagnosisVerificationDialog, { type VerificationData } from '../components/DiagnosisVerificationDialog';
+import VerificationStatusBar from '../components/VerificationStatusBar';
+import { diagnosisVerificationService } from '../services/diagnosisVerificationService';
+import { useClinicalVerification } from '../hooks/useClinicalVerification';
 
 interface SymptomReportProps {
   report: any;
@@ -328,16 +332,21 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
   const [commentIds, setCommentIds] = useState<(string | undefined)[]>([]);
   const [notesDrawerOpen, setNotesDrawerOpen] = useState(false);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [isVerificationDialogOpen, setIsVerificationDialogOpen] = useState(false);
   const toggle = useCallback((key: string) => setChecked(p => ({ ...p, [key]: !p[key] })), []);
 
+  const documentId: string = report?.id ?? report?.historyId ?? '';
 
-  console.log(report)
+  const { latestVerification, loading: verificationLoading, addVerification } = useClinicalVerification(
+    patient?.id,
+    'symptom_report',
+    documentId || null,
+  );
 
   // Stores the exact DOM Range at the moment the user clicks "Add comment"
   // so we can use surroundContents() for precise single-occurrence highlighting.
   const pendingRangeRef = useRef<Range | null>(null);
   const menu = useSelectionMenu(printRef, menuRef);
-  const documentId: string = report?.id ?? report?.historyId ?? '';
 
   // ── Load existing comments from DB on mount ──────────────────────────────
   useEffect(() => {
@@ -482,6 +491,39 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
     setActiveComment(text);
   };
 
+  const handleVerificationSubmit = async (verificationData: VerificationData) => {
+    const summaryParts = [
+      `Risk: ${riskLevel} (${riskScore.toFixed(2)})`,
+      keyRiskFactors.length > 0 ? `Factors: ${keyRiskFactors.slice(0, 2).join('; ')}` : '',
+      primaryConcerns.length > 0 ? `Concerns: ${primaryConcerns.slice(0, 2).join('; ')}` : '',
+    ].filter(Boolean).join(' | ');
+
+    const res = await diagnosisVerificationService.submit({
+      patientId: verificationData.patientId,
+      patientName: verificationData.patientName,
+      diagnosisText: summaryParts || verificationData.diagnosisText,
+      riskLevel: verificationData.riskLevel,
+      isAccurate: verificationData.isAccurate,
+      obgynNotes: verificationData.obgynNotes,
+      sourceType: verificationData.sourceType,
+      sourceId: documentId || undefined,
+    });
+    if (res.data?.verification) addVerification(res.data.verification);
+    return res.data?.verification;
+  };
+
+  const verificationFindings = [
+    { label: 'Risk Score', value: riskScore.toFixed(2) },
+    { label: 'Gestation', value: `${gestationWeeks} of ${gestationTotal} weeks` },
+    { label: 'Report Date', value: generatedDate },
+  ];
+
+  const verificationBullets = [
+    ...(keyRiskFactors.length > 0 ? [{ title: 'Key Risk Factors', items: keyRiskFactors }] : []),
+    ...(primaryConcerns.length > 0 ? [{ title: 'Primary Concerns', items: primaryConcerns }] : []),
+    ...(immediateActions.length > 0 ? [{ title: 'Immediate Actions', items: immediateActions }] : []),
+  ];
+
 
 
   return (
@@ -489,7 +531,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
       <SelectionMenu ref={menuRef} menu={menu} onComment={handleComment} />
 
       {/* Screen-only controls */}
-      <div className="print:hidden mb-3 flex items-center gap-2">
+      <div className="print:hidden mb-3 flex items-center gap-2 flex-wrap">
         {onBack && (
           <button
             onClick={onBack}
@@ -524,6 +566,16 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
             </span>
           </button>
         )}
+      </div>
+
+      {/* Clinical verification status */}
+      <div className="print:hidden mb-4">
+        <VerificationStatusBar
+          verification={latestVerification}
+          loading={verificationLoading}
+          onReview={() => setIsVerificationDialogOpen(true)}
+          subjectLabel="analysis"
+        />
       </div>
 
       {/* Panel tabs */}
@@ -929,6 +981,22 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
         }
         @page { size: A4; margin: 20mm; }
       `}</style>
+
+      {/* Verification Dialog */}
+      <DiagnosisVerificationDialog
+        isOpen={isVerificationDialogOpen}
+        onClose={() => setIsVerificationDialogOpen(false)}
+        onSubmit={handleVerificationSubmit}
+        diagnosisText={`${riskLevel} risk · score ${riskScore.toFixed(2)}`}
+        riskLevel={riskLevel}
+        sourceType="symptom_report"
+        patientId={patient?.id || ''}
+        patientName={patient?.name}
+        findings={verificationFindings}
+        bulletSections={verificationBullets}
+        recordDate={generatedDate}
+        existingVerification={latestVerification}
+      />
     </>
   );
 };

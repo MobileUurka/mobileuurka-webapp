@@ -328,9 +328,17 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         patternMessage: 'Parity format: viable+loss (e.g. 0+1 for miscarriage, 1+0 if current pregnancy ≥28 weeks)',
       },
 
-      { name: 'interval', label: 'Pregnancy Interval (months)', type: 'number' },
+      {
+        name: 'isFirstPregnancy',
+        label: 'Is this your first pregnancy?',
+        type: 'select',
+        required: true,
+        options: ['yes', 'no'],
+      },
 
-      { name: 'prevChildWeight', label: 'Previous Child Weight (grams)', type: 'number' },
+      { name: 'interval', label: 'Pregnancy Interval (months)', type: 'number', dependsOn: { field: 'isFirstPregnancy', value: 'no' } },
+
+      { name: 'prevChildWeight', label: 'Previous Child Weight (grams)', type: 'number', dependsOn: { field: 'isFirstPregnancy', value: 'no' } },
 
       { name: 'lastPeriodDate', label: 'Last Menstrual Period', type: 'date', max: new Date().toISOString().split('T')[0] },
 
@@ -575,6 +583,7 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
         name: 'multifetalgestation',
         label: 'Multiple Fetal Gestation',
         type: 'select',
+        required:true,
         options: ['yes', 'no', 'unknown']
       },
 

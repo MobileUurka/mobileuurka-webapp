@@ -1,26 +1,37 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { IoIosWarning } from "react-icons/io";
 import { MdBubbleChart } from "react-icons/md";
 import { FaChartSimple } from "react-icons/fa6";
+import { LuShieldCheck } from "react-icons/lu";
 import type { PatientData, TabType } from '../types/patient';
+import DiagnosisVerificationDialog, { type VerificationData } from '../components/DiagnosisVerificationDialog';
+import VerificationStatusBar from '../components/VerificationStatusBar';
+import { diagnosisVerificationService } from '../services/diagnosisVerificationService';
+import { useClinicalVerification } from '../hooks/useClinicalVerification';
 
 interface PredispositionProps {
   patient: PatientData;
-  setActiveTab: (tab: TabType) => void;
+  setActiveTab?: (tab: TabType) => void;
 }
 
-const Predisposition: React.FC<PredispositionProps> = ({ patient, setActiveTab }) => {
+const RISK_STYLES: Record<string, { bg: string; text: string }> = {
+  CRITICAL: { bg: '#fef2f2', text: '#dc2626' },
+  HIGH: { bg: '#fff7ed', text: '#ea580c' },
+  MODERATE: { bg: '#fefce8', text: '#ca8a04' },
+  LOW: { bg: '#f0fdf4', text: '#16a34a' },
+};
 
-  // 1. Diagnosis Parsing Logic
+const Predisposition: React.FC<PredispositionProps> = ({ patient }) => {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
   const parseDiagnosis = (raw: string | undefined): string => {
     if (!raw) return "No diagnosis records";
 
-    const parsePostgresArray = (str: string) => {
-      return str
+    const parsePostgresArray = (str: string) =>
+      str
         .replace(/^{|}$/g, "")
         .split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/)
         .map((item) => item.replace(/^"(.*)"$/, "$1").trim());
-    };
 
     const isNegativeResult = (s: string) =>
       /^no\b/i.test(s) ||
@@ -50,7 +61,6 @@ const Predisposition: React.FC<PredispositionProps> = ({ patient, setActiveTab }
     return `Suspected to have ${positive.join(" & ")}`;
   };
 
-  // 2. Risk Assessment Logic
   const checkPredisposition = (riskAssessment: any): string => {
     if (!riskAssessment) return "";
 
@@ -89,65 +99,132 @@ const Predisposition: React.FC<PredispositionProps> = ({ patient, setActiveTab }
   const latestLab = patient?.labwork?.[patient.labwork.length - 1];
   const latestExplanation = patient?.explanation?.[patient.explanation.length - 1];
 
+  const diagnosisText = parseDiagnosis(latestLab?.diagnosis);
+  const predispositionSummary = checkPredisposition(latestRisk?.riskassessment);
+  const riskLevel = latestExplanation?.risklevel;
+  const sourceId = latestLab?.id ?? null;
+
+  const { latestVerification, loading, addVerification } = useClinicalVerification(
+    patient?.id,
+    'predisposition',
+    sourceId,
+  );
+
+  const riskStyle = RISK_STYLES[(riskLevel ?? '').toUpperCase()] ?? { bg: '#f3f4f6', text: '#6b7280' };
+
+  const recordDate = useMemo(() => {
+    const d = latestLab?.date ?? latestExplanation?.date;
+    if (!d) return undefined;
+    try {
+      return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return undefined;
+    }
+  }, [latestLab?.date, latestExplanation?.date]);
+
+  const verificationFindings = useMemo(() => [
+    { label: 'Lab Diagnosis', value: diagnosisText, wide: true },
+    { label: 'Predisposition', value: predispositionSummary || '—', wide: true },
+    ...(latestExplanation?.risklevel
+      ? [{ label: 'Risk Level', value: String(latestExplanation.risklevel).toUpperCase() }]
+      : []),
+    ...(latestLab?.gestationweek != null
+      ? [{ label: 'Gestation', value: `${latestLab.gestationweek} weeks` }]
+      : []),
+  ], [diagnosisText, predispositionSummary, latestExplanation?.risklevel, latestLab?.gestationweek]);
+
+  const handleVerificationSubmit = async (verificationData: VerificationData) => {
+    const res = await diagnosisVerificationService.submit({
+      patientId: verificationData.patientId,
+      patientName: verificationData.patientName,
+      diagnosisText: verificationData.diagnosisText,
+      riskLevel: verificationData.riskLevel,
+      isAccurate: verificationData.isAccurate,
+      obgynNotes: verificationData.obgynNotes,
+      sourceType: verificationData.sourceType,
+      sourceId: sourceId ?? undefined,
+    });
+    if (res.data?.verification) addVerification(res.data.verification);
+    return res.data?.verification;
+  };
+
+  const hasData = latestRisk?.riskassessment || latestLab?.diagnosis;
+
   return (
-    <div className="w-full h-full p-4 flex flex-col justify-center items-center">
-      <div className="w-full max-w-md flex flex-col gap-4">
+    <div className="w-full h-full p-3 flex flex-col">
+      <div className="w-full flex flex-col gap-3">
 
-        {/* Warning Banner */}
-        <div className="flex items-start gap-3">
-          <div className="text-yellow-500 text-2xl mt-1 shrink-0">
-            <IoIosWarning />
+
+        {!hasData ? (
+          <div className="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center">
+            <p className="text-xs text-gray-500">No predisposition data available yet.</p>
+            <p className="text-[10px] text-gray-400 mt-1">Complete lab work and risk assessment first.</p>
           </div>
-          <p className="text-xs text-gray-600 leading-relaxed font-medium">
-            {!latestRisk?.riskassessment
-              ? "No risk assessment records available"
-              : "Patient exhibits "}
-            <span className="text-gray-900 font-semibold">
-              {checkPredisposition(latestRisk?.riskassessment)}
-            </span>
-          </p>
-        </div>
-
-        {/* Results Grid */}
-        <div className="flex flex-col gap-4 py-4 border-y border-gray-100">
-
-          {/* Diagnosis Row */}
-          <div className="flex items-center gap-4">
-            {/* FIX: Added shrink-0 to prevent the circle from distorting */}
-            <div className="w-10 h-10 rounded-full bg-blue-200/50 flex items-center justify-center text-blue-500 text-xl shrink-0">
-              <FaChartSimple />
+        ) : (
+          <>
+            {/* Summary banner */}
+            <div className="flex items-start gap-2.5 rounded-lg px-3 py-2.5" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
+              <IoIosWarning className="text-amber-500 text-lg shrink-0 mt-0.5" />
+              <p className="text-[11px] text-gray-700 leading-relaxed">
+                Patient exhibits{' '}
+                <span className="font-semibold text-gray-900">{predispositionSummary}</span>
+              </p>
             </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Diagnosis</span>
-              <span className="text-xs text-gray-700 font-medium">
-                {parseDiagnosis(latestLab?.diagnosis)}
-              </span>
-            </div>
-          </div>
 
-          {/* Risk Level Row */}
-          <div className="flex items-center gap-4">
-            {/* FIX: Added shrink-0 here as well to protect the orange circle */}
-            <div className="w-10 h-10 rounded-full bg-orange-200/50 flex items-center justify-center text-orange-500 text-xl shrink-0">
-              <MdBubbleChart />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Risk Level</span>
-              <span className="text-xs text-gray-700 font-medium capitalize">
-                Patient risk: {latestExplanation?.risklevel || "unavailable"}
-              </span>
-            </div>
-          </div>
-        </div>
+            {/* Findings cards */}
+            <div className="grid grid-cols-1 gap-2">
+              <div className="flex items-start gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2.5">
+                <div className="w-8 h-8 rounded-full bg-blue-100/80 flex items-center justify-center text-blue-600 shrink-0">
+                  <FaChartSimple size={14} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">AI Lab Diagnosis</p>
+                  <p className="text-[11px] text-gray-800 font-medium leading-snug">{diagnosisText}</p>
+                </div>
+              </div>
 
-        {/* Action Button */}
-        <button
-          onClick={() => setActiveTab("documents")}
-          className="cursor-pointer w-full py-3 bg-[#ffc187] text-white rounded-xl font-semibold text-xs transition-colors active:scale-95 duration-200"
-        >
-          View Documents
-        </button>
+              <div className="flex items-center gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2.5">
+                <div className="w-8 h-8 rounded-full bg-orange-100/80 flex items-center justify-center text-orange-600 shrink-0">
+                  <MdBubbleChart size={16} />
+                </div>
+                <div className="w-[95%] min-w-0 flex flex-row items-center justify-between">
+                  <p className="text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">Risk Level</p>
+                  <span
+                    className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase"
+                    style={{ background: riskStyle.bg, color: riskStyle.text }}
+                  >
+                    <span className="w-1 h-1 rounded-full" style={{ background: riskStyle.text }} />
+                    {riskLevel || 'unavailable'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Verification status */}
+            <VerificationStatusBar
+              verification={latestVerification}
+              loading={loading}
+              onReview={() => setIsDialogOpen(true)}
+              subjectLabel="diagnosis"
+              compact
+            />
+          </>
+        )}
       </div>
+
+      <DiagnosisVerificationDialog
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        onSubmit={handleVerificationSubmit}
+        diagnosisText={diagnosisText}
+        riskLevel={riskLevel}
+        sourceType="predisposition"
+        patientId={patient.id}
+        patientName={patient.name}
+        findings={verificationFindings}
+        recordDate={recordDate}
+        existingVerification={latestVerification}
+      />
     </div>
   );
 };

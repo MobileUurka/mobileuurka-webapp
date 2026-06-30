@@ -11,6 +11,11 @@ import { usePerformanceTimer } from '../hooks/usePerformanceTimer';
 import { useAuth } from '../contexts/AuthContext';
 import { LIFESTYLE_FIELD_INFO } from '../constants/screeningForms';
 import { validateGravidaParity } from '../utils/gravidaParity';
+import {
+  calculateGestationWeek,
+  resolveGestationForPatient,
+  type GestationSource,
+} from '../utils/gestationWeek';
 import { uploadService } from '../services/uploadService';
 
 // Simple loading spinner component
@@ -48,22 +53,6 @@ const calculateBMI = (weight: number, height: number): number => {
 const calculateMAP = (systolic: number, diastolic: number): number => {
   if (!systolic || !diastolic || systolic <= 0 || diastolic <= 0) return 0;
   return Math.round(((2 * diastolic) + systolic) / 3);
-};
-
-const calculateGestationWeek = (lastVisitDate: string, lastGestationWeek: number): number => {
-  if (!lastVisitDate || !lastGestationWeek) return 0;
-
-  try {
-    const lastVisit = new Date(lastVisitDate);
-    const today = new Date();
-    const daysDifference = Math.floor((today.getTime() - lastVisit.getTime()) / (1000 * 60 * 60 * 24));
-    const weeksDifference = Math.floor(daysDifference / 7);
-
-    return Math.max(0, lastGestationWeek + weeksDifference);
-  } catch (error) {
-    console.error('Error calculating gestation week:', error);
-    return 0;
-  }
 };
 
 // ── Chip state: unset (= uncertain by default) → yes → no → unset
@@ -329,60 +318,61 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
     currentWeek: number;
     lastVisitDate: string;
     lastGestationWeek: number;
-    visitNumber: number;
+    visitNumber?: number;
+    source: GestationSource;
+    sourceLabel: string;
   } | null>(null);
+
+  const hasGestationField = fields.some(
+    f => f.name === 'gestationWeek' || f.name === 'gestationweek'
+  );
 
   // Handle patient selection and auto-fill gestation week
   const handlePatientSelection = async (patientId: string, patientName: string) => {
     handleInputChange('patientId', patientId);
     setFormData(prev => ({ ...prev, patientName }));
 
-    // Auto-fill gestation week based on last visit
-    if (patientId) {
-      setIsAutoFilling(true);
-      setLastVisitData(null);
+    if (!patientId || !hasGestationField) return;
 
-      try {
-        // Get complete patient profile to access visit history
-        const response = await patientService.getPatientCompleteProfile(patientId);
-        if (response.success && response.data?.visits && response.data.visits.length > 0) {
-          // Find the most recent visit
-          const visits = response.data.visits.sort((a: any, b: any) =>
-            new Date(b.date).getTime() - new Date(a.date).getTime()
-          );
-          const lastVisit = visits[0];
+    setIsAutoFilling(true);
+    setLastVisitData(null);
 
-          setLastVisitData({
-            visitNumber: lastVisit.visitNumber,
-            gestationWeek: lastVisit.gestationWeek
-          });
+    try {
+      const resolved = await resolveGestationForPatient(patientId, tabId);
 
-          if (lastVisit.gestationWeek && lastVisit.date) {
-            const currentGestationWeek = calculateGestationWeek(lastVisit.date, lastVisit.gestationWeek);
-            if (currentGestationWeek > 0) {
-              setIsAutoFilling(false);
-              setCalculatedGestation({
-                currentWeek: currentGestationWeek,
-                lastVisitDate: lastVisit.date,
-                lastGestationWeek: lastVisit.gestationWeek,
-                visitNumber: lastVisit.visitNumber
-              });
-              setShowGestationModal(true);
-            }
-          }
-        }
-        else {
-          setIsAutoFilling(false)
-          setFormData(prev => ({
-            ...prev,
-            gestationWeek: 1,
-            visitNumber: 1,
-            gestationweek: 1// Handle both naming conventions
-          }));
-        }
-      } catch (error) {
-        console.error('Failed to fetch patient visit history:', error);
+      if (resolved?.visitNumber != null) {
+        setLastVisitData({
+          visitNumber: resolved.visitNumber,
+          gestationWeek: resolved.gestationWeek,
+        });
       }
+
+      if (resolved) {
+        const currentGestationWeek = calculateGestationWeek(resolved.date, resolved.gestationWeek);
+        if (currentGestationWeek > 0) {
+          setCalculatedGestation({
+            currentWeek: currentGestationWeek,
+            lastVisitDate: resolved.date,
+            lastGestationWeek: resolved.gestationWeek,
+            visitNumber: resolved.visitNumber,
+            source: resolved.source,
+            sourceLabel: resolved.sourceLabel,
+          });
+          setShowGestationModal(true);
+          return;
+        }
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        gestationWeek: 1,
+        visitNumber: 1,
+        gestationweek: 1,
+      }));
+    } catch (error) {
+      console.error('Failed to resolve gestation week:', error);
+    } finally {
+      setIsAutoFilling(false);
     }
   };
 
@@ -1333,7 +1323,9 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
 
             <div className="p-6">
               <p className="text-gray-600 text-sm mb-5 leading-relaxed">
-                Based on the patient's last visit, we have calculated the current gestation week. Please select how you want to proceed.
+                {calculatedGestation.source === 'screening'
+                  ? `Based on the patient's last ${calculatedGestation.sourceLabel} record, we have calculated the current gestation week. Please select how you want to proceed.`
+                  : 'No gestation week was found on the previous screening record, so we used the last visit instead. Please select how you want to proceed.'}
               </p>
 
               {/* Data Rows */}
@@ -1341,7 +1333,9 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
 
                 <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-200">
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-widest text-gray-400 mb-0.5">Last visit</p>
+                    <p className="text-[11px] font-medium uppercase tracking-widest text-gray-400 mb-0.5">
+                      Last {calculatedGestation.sourceLabel}
+                    </p>
                     <p className="text-sm font-medium text-gray-800">
                       {friendlyDate(new Date(calculatedGestation.lastVisitDate))}
                     </p>
@@ -1375,8 +1369,10 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
                     setFormData(prev => ({
                       ...prev,
                       gestationWeek: calculatedGestation.lastGestationWeek,
-                      visitNumber: calculatedGestation.visitNumber,
-                      gestationweek: calculatedGestation.lastGestationWeek
+                      ...(calculatedGestation.visitNumber != null
+                        ? { visitNumber: calculatedGestation.visitNumber }
+                        : {}),
+                      gestationweek: calculatedGestation.lastGestationWeek,
                     }));
                   }}
                   className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-600 font-medium rounded-lg hover:bg-gray-50 transition-colors focus:ring-2 focus:ring-gray-200 outline-none"
@@ -1388,8 +1384,10 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
                     setFormData(prev => ({
                       ...prev,
                       gestationWeek: calculatedGestation.currentWeek,
-                      visitNumber: calculatedGestation.visitNumber,
-                      gestationweek: calculatedGestation.currentWeek
+                      ...(calculatedGestation.visitNumber != null
+                        ? { visitNumber: calculatedGestation.visitNumber }
+                        : {}),
+                      gestationweek: calculatedGestation.currentWeek,
                     }));
                     setShowGestationModal(false);
                   }}
