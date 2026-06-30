@@ -7,6 +7,7 @@ import DiagnosisVerificationDialog, { type VerificationData } from '../component
 import VerificationStatusBar from '../components/VerificationStatusBar';
 import { diagnosisVerificationService } from '../services/diagnosisVerificationService';
 import { useClinicalVerification } from '../hooks/useClinicalVerification';
+import OverviewEmptyState from "../components/OverviewEmptyState";
 
 interface PredispositionProps {
   patient: PatientData;
@@ -149,10 +150,13 @@ const Predisposition: React.FC<PredispositionProps> = ({ patient }) => {
 
 
         {!hasData ? (
-          <div className="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center">
-            <p className="text-xs text-gray-500">No predisposition data available yet.</p>
-            <p className="text-[10px] text-gray-400 mt-1">Complete lab work and risk assessment first.</p>
-          </div>
+          <OverviewEmptyState
+            title="No predisposition data available yet."
+            description="Complete lab work and Patient Journey first."
+            screeningTab="Journey"
+            patientId={patient?.id ?? ''}
+            patientName={patient?.name}
+          />
         ) : (
           <>
             {/* Summary banner */}
