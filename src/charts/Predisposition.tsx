@@ -2,7 +2,6 @@ import React, { useMemo, useState } from "react";
 import { IoIosWarning } from "react-icons/io";
 import { MdBubbleChart } from "react-icons/md";
 import { FaChartSimple } from "react-icons/fa6";
-import { LuShieldCheck } from "react-icons/lu";
 import type { PatientData, TabType } from '../types/patient';
 import DiagnosisVerificationDialog, { type VerificationData } from '../components/DiagnosisVerificationDialog';
 import VerificationStatusBar from '../components/VerificationStatusBar';
@@ -14,12 +13,7 @@ interface PredispositionProps {
   setActiveTab?: (tab: TabType) => void;
 }
 
-const RISK_STYLES: Record<string, { bg: string; text: string }> = {
-  CRITICAL: { bg: '#fef2f2', text: '#dc2626' },
-  HIGH: { bg: '#fff7ed', text: '#ea580c' },
-  MODERATE: { bg: '#fefce8', text: '#ca8a04' },
-  LOW: { bg: '#f0fdf4', text: '#16a34a' },
-};
+
 
 const Predisposition: React.FC<PredispositionProps> = ({ patient }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -110,7 +104,6 @@ const Predisposition: React.FC<PredispositionProps> = ({ patient }) => {
     sourceId,
   );
 
-  const riskStyle = RISK_STYLES[(riskLevel ?? '').toUpperCase()] ?? { bg: '#f3f4f6', text: '#6b7280' };
 
   const recordDate = useMemo(() => {
     const d = latestLab?.date ?? latestExplanation?.date;
@@ -163,9 +156,9 @@ const Predisposition: React.FC<PredispositionProps> = ({ patient }) => {
         ) : (
           <>
             {/* Summary banner */}
-            <div className="flex items-start gap-2.5 rounded-lg px-3 py-2.5" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
-              <IoIosWarning className="text-amber-500 text-lg shrink-0 mt-0.5" />
-              <p className="text-[11px] text-gray-700 leading-relaxed">
+            <div className="flex items-start gap-2.5 rounded-lg px-3 py-2.5">
+              <IoIosWarning className="text-yellow-500 text-2xl mt-1 shrink-0" />
+              <p className="text-xs text-gray-600 leading-relaxed font-medium">
                 Patient exhibits{' '}
                 <span className="font-semibold text-gray-900">{predispositionSummary}</span>
               </p>
@@ -173,28 +166,24 @@ const Predisposition: React.FC<PredispositionProps> = ({ patient }) => {
 
             {/* Findings cards */}
             <div className="grid grid-cols-1 gap-2">
-              <div className="flex items-start gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2.5">
-                <div className="w-8 h-8 rounded-full bg-blue-100/80 flex items-center justify-center text-blue-600 shrink-0">
+              <div className="flex items-start gap-3 rounded-lg px-3 py-2.5">
+                <div className="w-10 h-10 rounded-full bg-blue-200/50 flex items-center justify-center text-blue-500 text-xl shrink-0">
                   <FaChartSimple size={14} />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">AI Lab Diagnosis</p>
-                  <p className="text-[11px] text-gray-800 font-medium leading-snug">{diagnosisText}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">AI Lab Diagnosis</p>
+                  <p className="text-xs text-gray-700 font-medium">{diagnosisText}</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2.5">
-                <div className="w-8 h-8 rounded-full bg-orange-100/80 flex items-center justify-center text-orange-600 shrink-0">
+              <div className="flex items-center gap-3 rounded-lg px-3 py-2.5">
+                <div className="w-10 h-10 rounded-full bg-orange-200/50 flex items-center justify-center text-orange-500 text-xl shrink-0">
                   <MdBubbleChart size={16} />
                 </div>
-                <div className="w-[95%] min-w-0 flex flex-row items-center justify-between">
-                  <p className="text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">Risk Level</p>
-                  <span
-                    className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase"
-                    style={{ background: riskStyle.bg, color: riskStyle.text }}
-                  >
-                    <span className="w-1 h-1 rounded-full" style={{ background: riskStyle.text }} />
-                    {riskLevel || 'unavailable'}
+                <div className="w-[95%] min-w-0 flex flex-col">
+                  <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Risk Level</p>
+                  <span className="text-xs text-gray-700 font-medium capitalize">
+                    Patient Risk : {riskLevel || 'unavailable'}
                   </span>
                 </div>
               </div>

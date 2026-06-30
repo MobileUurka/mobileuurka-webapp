@@ -14,7 +14,6 @@ const VerificationStatusBar = ({
   verification,
   loading,
   onReview,
-  subjectLabel,
   compact = false,
 }: VerificationStatusBarProps) => {
   if (loading) {
@@ -31,9 +30,8 @@ const VerificationStatusBar = ({
       <button
         type="button"
         onClick={onReview}
-        className={`w-full text-left rounded-lg border transition-colors hover:border-amber-300 hover:bg-amber-50/60 ${
-          compact ? 'px-3 py-2' : 'px-4 py-3'
-        }`}
+        className={`w-full text-left rounded-lg border transition-colors hover:border-amber-300 hover:bg-amber-50/60 ${compact ? 'px-3 py-2' : 'px-4 py-3'
+          }`}
         style={{ borderColor: '#fde68a', background: '#fffbeb' }}
       >
         <div className="flex items-start gap-2.5">
@@ -47,9 +45,8 @@ const VerificationStatusBar = ({
             </p> */}
           </div>
           <span
-            className={`shrink-0 font-semibold text-white rounded-md bg-amber-500 hover:bg-amber-600 transition-colors ${
-              compact ? 'text-[10px] px-2 py-1' : 'text-[11px] px-2.5 py-1.5'
-            }`}
+            className={`shrink-0 font-semibold text-white rounded-md bg-amber-500 hover:bg-amber-600 transition-colors ${compact ? 'text-[10px] px-2 py-1' : 'text-[11px] px-2.5 py-1.5'
+              }`}
           >
             Review
           </span>
@@ -109,9 +106,8 @@ const VerificationStatusBar = ({
         <button
           type="button"
           onClick={onReview}
-          className={`shrink-0 flex items-center gap-1 font-medium rounded-md border transition-colors hover:bg-white/80 ${
-            compact ? 'text-[10px] px-2 py-1' : 'text-[11px] px-2.5 py-1.5'
-          }`}
+          className={`shrink-0 flex items-center gap-1 font-medium rounded-md border transition-colors hover:bg-white/80 ${compact ? 'text-[10px] px-2 py-1' : 'text-[11px] px-2.5 py-1.5'
+            }`}
           style={{
             borderColor: accurate ? '#86efac' : '#fca5a5',
             color: accurate ? '#166534' : '#991b1b',

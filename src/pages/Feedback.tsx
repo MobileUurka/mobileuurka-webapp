@@ -44,21 +44,21 @@ function formatMs(ms: number) {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-    pending:  'bg-amber-50 text-amber-600 border-amber-200',
+    pending: 'bg-amber-50 text-amber-600 border-amber-200',
     reviewed: 'bg-blue-50 text-blue-600 border-blue-200',
     resolved: 'bg-green-50 text-green-600 border-green-200',
 };
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
-    pending:  <FiLoader size={11} />,
+    pending: <FiLoader size={11} />,
     reviewed: <FiAlertCircle size={11} />,
     resolved: <FiCheckCircle size={11} />,
 };
 
 const USER_TYPE_LABEL: Record<string, string> = {
-    mobileuurka:        'MobileUurka',
+    mobileuurka: 'MobileUurka',
     organization_admin: 'Org Admin',
-    organization_user:  'Staff',
+    organization_user: 'Staff',
 };
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ function useMarkFeedbackReadOnOpen() {
     const dispatch = useAppDispatch();
     return useCallback((feedbackId: string) => {
         dispatch(markFeedbackRead(feedbackId));
-        feedbackService.markRead(feedbackId).catch(() => {});
+        feedbackService.markRead(feedbackId).catch(() => { });
     }, [dispatch]);
 }
 
@@ -363,7 +363,7 @@ function FeedbackDetail({
             label: 'Conversation',
             badge: (Array.isArray(entry.replies) ? entry.replies.length : 0) || undefined,
         },
-        { key: 'notes',    label: 'Internal notes' },
+        { key: 'notes', label: 'Internal notes' },
         {
             key: 'assigned',
             label: 'Assigned',
@@ -411,11 +411,11 @@ function FeedbackDetail({
                         <span className="text-[10px] text-gray-400 font-medium">{entry.page}</span>
                         {entry.pageUrl && (
                             <><span className="text-[10px] text-gray-300">·</span>
-                            <span className="text-[10px] text-gray-400 truncate max-w-[180px]">{entry.pageUrl}</span></>
+                                <span className="text-[10px] text-gray-400 truncate max-w-[180px]">{entry.pageUrl}</span></>
                         )}
                         {entry.patientName && (
                             <><span className="text-[10px] text-gray-300">·</span>
-                            <span className="text-[10px] text-gray-400">Patient: {entry.patientName}</span></>
+                                <span className="text-[10px] text-gray-400">Patient: {entry.patientName}</span></>
                         )}
                     </div>
                 </div>
@@ -446,11 +446,10 @@ function FeedbackDetail({
                         <button
                             key={t.key}
                             onClick={() => setActiveTab(t.key)}
-                            className={`flex items-center gap-1.5 px-3 py-2 text-[11px] font-medium border-b-2 transition -mb-px ${
-                                activeTab === t.key
-                                    ? 'border-[#984815] text-[#984815]'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                            }`}
+                            className={`flex items-center gap-1.5 px-3 py-2 text-[11px] font-medium border-b-2 transition -mb-px ${activeTab === t.key
+                                ? 'border-[#984815] text-[#984815]'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                                }`}
                         >
                             {t.label}
                             {t.badge !== undefined && (
@@ -662,8 +661,8 @@ function UserFeedbackDetail({
     const nextStatus = entry.status === 'pending'
         ? 'reviewed'
         : entry.status === 'reviewed'
-        ? 'resolved'
-        : null;
+            ? 'resolved'
+            : null;
 
     const handleAdvance = async () => {
         if (!nextStatus) return;
@@ -784,12 +783,14 @@ function UserFeedbackView() {
         return () => window.removeEventListener('feedback-data-updated', onFeedbackDataUpdated);
     }, [load]);
 
-    const handleStatusChange = (id: string, newStatus: string) => {
+    const handleStatusChange = (id: string, status: string, updatedEntry?: Partial<FeedbackEntry>) => {
         setEntries(prev => prev.map(e =>
-            e.id === id ? { ...e, status: newStatus as FeedbackEntry['status'] } : e
+            e.id === id ? { ...e, status: status as FeedbackEntry['status'], ...updatedEntry } : e
         ));
         setSelected(prev =>
-            prev?.id === id ? { ...prev, status: newStatus as FeedbackEntry['status'] } : prev
+            prev && prev.id === id && !('isAccurate' in prev)
+                ? { ...prev, status: status as FeedbackEntry['status'], ...updatedEntry }
+                : prev
         );
     };
 
@@ -798,7 +799,7 @@ function UserFeedbackView() {
         setSelected(prev => prev?.id === id ? { ...prev, replies } : prev);
     };
 
-    const assignedToMe  = entries.filter(e =>
+    const assignedToMe = entries.filter(e =>
         Array.isArray(e.assignedTo) && e.assignedTo.some(a => a.id === currentUserId)
     );
     const commentEntries = entries.filter(isCommentFeedback);
@@ -807,9 +808,9 @@ function UserFeedbackView() {
 
     const visibleEntries =
         activeTab === 'all' ? nonCommentEntries
-        : activeTab === 'comments' ? commentEntries
-        : activeTab === 'assigned' ? assignedToMe
-        : myVerifications;
+            : activeTab === 'comments' ? commentEntries
+                : activeTab === 'assigned' ? assignedToMe
+                    : myVerifications;
 
     return (
         <div className="w-full h-full flex flex-col pt-4 px-4 sm:pt-6 sm:px-6 bg-white overflow-hidden">
@@ -832,7 +833,7 @@ function UserFeedbackView() {
             {/* Tabs */}
             <div className="flex gap-1 mb-2 border-b border-gray-100 shrink-0">
                 {([
-                    { key: 'all',      label: `All feedback (${nonCommentEntries.length})` },
+                    { key: 'all', label: `All feedback (${nonCommentEntries.length})` },
                     { key: 'comments', label: `Comments (${commentEntries.length})` },
                     { key: 'assigned', label: `Assigned to me (${assignedToMe.length})` },
                     { key: 'ai-feedback', label: `AI Feedback (${myVerifications.length})` },
@@ -840,11 +841,10 @@ function UserFeedbackView() {
                     <button
                         key={t.key}
                         onClick={() => { setActiveTab(t.key); setSelected(null); }}
-                        className={`px-3 py-2 text-xs font-medium rounded-t-lg transition border-b-2 -mb-px ${
-                            activeTab === t.key
-                                ? 'border-[#984815] text-[#984815]'
-                                : 'border-transparent text-gray-500 hover:text-gray-700'
-                        }`}
+                        className={`px-3 py-2 text-xs font-medium rounded-t-lg transition border-b-2 -mb-px ${activeTab === t.key
+                            ? 'border-[#984815] text-[#984815]'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                            }`}
                     >
                         {t.label}
                         {t.key === 'assigned' && assignedToMe.length > 0 && (
@@ -886,63 +886,63 @@ function UserFeedbackView() {
                     {!loading && visibleEntries.map(entry => {
                         const isVerification = 'isAccurate' in entry;
                         return (
-                        <div
-                            key={entry.id}
-                            onClick={() => {
-                                setSelected(entry);
-                                if (!isVerification) markReadOnOpen(entry.id);
-                            }}
-                            className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-50 hover:bg-gray-50 transition ${selected?.id === entry.id ? 'bg-[#984815]/5' : ''}`}
-                        >
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    {isVerification ? (
-                                        <>
-                                            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${entry.isAccurate ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
-                                                <FiCheck size={9} />
-                                                {entry.isAccurate ? 'Accurate' : 'Not Accurate'}
-                                            </span>
-                                            <span className="text-[10px] text-gray-400">{entry.sourceType === 'predisposition' ? 'Predisposition' : 'Symptom Report'}</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <StatusBadge status={entry.status} />
-                                            {activeTab === 'assigned' && (
-                                                <span className="inline-flex items-center gap-0.5 text-[10px] text-[#984815] font-medium">
-                                                    <FiUserCheck size={9} /> from {entry.userName ?? entry.userEmail}
+                            <div
+                                key={entry.id}
+                                onClick={() => {
+                                    setSelected(entry);
+                                    if (!isVerification) markReadOnOpen(entry.id);
+                                }}
+                                className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-50 hover:bg-gray-50 transition ${selected?.id === entry.id ? 'bg-[#984815]/5' : ''}`}
+                            >
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        {isVerification ? (
+                                            <>
+                                                <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${entry.isAccurate ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                                                    <FiCheck size={9} />
+                                                    {entry.isAccurate ? 'Accurate' : 'Not Accurate'}
                                                 </span>
-                                            )}
-                                            <UnreadReplyBadge count={unreadByFeedbackId[entry.id] ?? 0} />
-                                        </>
-                                    )}
-                                    <span className="text-[10px] text-gray-400 ml-auto">{timeAgo(entry.createdAt)}</span>
-                                </div>
-                                <p className="text-sm text-gray-700 truncate mt-1">
-                                    {isVerification ? entry.diagnosisText : entry.message}
-                                </p>
-                                <div className="flex flex-wrap items-center gap-2 mt-1">
-                                    {isVerification ? (
-                                        <>
-                                            <span className="text-[10px] text-gray-400">Patient: {entry.patientName || entry.patientId}</span>
-                                            {entry.riskLevel && (
-                                                <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
-                                                    {entry.riskLevel}
-                                                </span>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span className="text-[10px] text-gray-400">{entry.page}</span>
-                                            {isCommentFeedback(entry) && (
-                                                <span className="text-[10px] font-semibold text-[#984815] bg-[#f8ebe1] px-2 py-0.5 rounded-full">
-                                                    Comment
-                                                </span>
-                                            )}
-                                        </>
-                                    )}
+                                                <span className="text-[10px] text-gray-400">{entry.sourceType === 'predisposition' ? 'Predisposition' : 'Symptom Report'}</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <StatusBadge status={entry.status} />
+                                                {activeTab === 'assigned' && (
+                                                    <span className="inline-flex items-center gap-0.5 text-[10px] text-[#984815] font-medium">
+                                                        <FiUserCheck size={9} /> from {entry.userName ?? entry.userEmail}
+                                                    </span>
+                                                )}
+                                                <UnreadReplyBadge count={unreadByFeedbackId[entry.id] ?? 0} />
+                                            </>
+                                        )}
+                                        <span className="text-[10px] text-gray-400 ml-auto">{timeAgo(entry.createdAt)}</span>
+                                    </div>
+                                    <p className="text-sm text-gray-700 truncate mt-1">
+                                        {isVerification ? entry.diagnosisText : entry.message}
+                                    </p>
+                                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                                        {isVerification ? (
+                                            <>
+                                                <span className="text-[10px] text-gray-400">Patient: {entry.patientName || entry.patientId}</span>
+                                                {entry.riskLevel && (
+                                                    <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
+                                                        {entry.riskLevel}
+                                                    </span>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="text-[10px] text-gray-400">{entry.page}</span>
+                                                {isCommentFeedback(entry) && (
+                                                    <span className="text-[10px] font-semibold text-[#984815] bg-[#f8ebe1] px-2 py-0.5 rounded-full">
+                                                        Comment
+                                                    </span>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
                         );
                     })}
                 </div>
@@ -1016,9 +1016,15 @@ function AdminFeedbackView() {
         setEntries(prev => prev.map(e =>
             e.id === id ? { ...e, status: status as FeedbackEntry['status'], ...updatedEntry } : e
         ));
-        setSelected(prev =>
-            prev?.id === id ? { ...prev, status: status as FeedbackEntry['status'], ...updatedEntry } : prev
-        );
+        setSelected(prev => {
+            if (!prev || prev.id !== id) return prev;
+            if ('isAccurate' in prev) return prev; // it's a VerificationEntry, leave untouched
+            return {
+                ...prev,
+                status: status as FeedbackEntry['status'],
+                ...updatedEntry,
+            } as FeedbackEntry;
+        });
     };
 
     console.log(entries)
@@ -1036,12 +1042,16 @@ function AdminFeedbackView() {
     );
     const commentEntries = entries.filter(isCommentFeedback);
     const nonCommentEntries = entries.filter(e => !isCommentFeedback(e));
-    const sourceEntries =
+    const sourceEntries: FeedbackEntry[] =
         activeTab === 'all' ? nonCommentEntries
-        : activeTab === 'comments' ? commentEntries
-        : activeTab === 'assigned' ? assignedToMe
-        : verifications;
-    const filtered = activeTab === 'ai-feedback' ? verifications : sourceEntries.filter(e => filter === 'all' || e.status === filter);
+            : activeTab === 'comments' ? commentEntries
+                : activeTab === 'assigned' ? assignedToMe
+                    : []; // ai-feedback tab doesn't use sourceEntries for filtering
+
+    const filtered: (FeedbackEntry | VerificationEntry)[] =
+        activeTab === 'ai-feedback'
+            ? verifications
+            : sourceEntries.filter(e => filter === 'all' || e.status === filter);
 
     const counts = {
         all: nonCommentEntries.length,
@@ -1051,8 +1061,8 @@ function AdminFeedbackView() {
     };
 
     const FILTERS: { key: StatusFilter; label: string }[] = [
-        { key: 'all',      label: `All (${sourceEntries.length})` },
-        { key: 'pending',  label: `Pending (${sourceEntries.filter(e => e.status === 'pending').length})` },
+        { key: 'all', label: `All (${sourceEntries.length})` },
+        { key: 'pending', label: `Pending (${sourceEntries.filter(e => e.status === 'pending').length})` },
         { key: 'reviewed', label: `Reviewed (${sourceEntries.filter(e => e.status === 'reviewed').length})` },
         { key: 'resolved', label: `Resolved (${sourceEntries.filter(e => e.status === 'resolved').length})` },
     ];
@@ -1093,7 +1103,7 @@ function AdminFeedbackView() {
             {/* Top-level tabs: All Feedback / Comments / Assigned to Me */}
             <div className="flex gap-1 mb-2 border-b border-gray-100 shrink-0">
                 {([
-                    { key: 'all',      label: `All feedback (${nonCommentEntries.length})` },
+                    { key: 'all', label: `All feedback (${nonCommentEntries.length})` },
                     { key: 'comments', label: `Comments (${commentEntries.length})` },
                     { key: 'assigned', label: `Assigned to me (${assignedToMe.length})` },
                     { key: 'ai-feedback', label: `AI Feedback (${verifications.length})` },
@@ -1101,11 +1111,10 @@ function AdminFeedbackView() {
                     <button
                         key={t.key}
                         onClick={() => { setActiveTab(t.key); setSelected(null); }}
-                        className={`px-3 py-2 text-xs font-medium rounded-t-lg transition border-b-2 -mb-px ${
-                            activeTab === t.key
-                                ? 'border-[#984815] text-[#984815]'
-                                : 'border-transparent text-gray-500 hover:text-gray-700'
-                        }`}
+                        className={`px-3 py-2 text-xs font-medium rounded-t-lg transition border-b-2 -mb-px ${activeTab === t.key
+                            ? 'border-[#984815] text-[#984815]'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                            }`}
                     >
                         {t.label}
 
@@ -1156,98 +1165,98 @@ function AdminFeedbackView() {
                     {!loading && filtered.map(entry => {
                         const isVerification = 'isAccurate' in entry;
                         return (
-                        <div
-                            key={entry.id}
-                            onClick={() => {
-                                setSelected(entry);
-                                if (!isVerification) markReadOnOpen(entry.id);
-                            }}
-                            className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-50 hover:bg-gray-50 transition group ${selected?.id === entry.id ? 'bg-[#984815]/5' : ''}`}
-                        >
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5 ${isVerification ? 'bg-blue-100 text-blue-600' : 'bg-[#984815]/10 text-[#984815]'}`}>
-                                {isVerification
-                                    ? (entry.verifiedByName ?? entry.verifiedBy).charAt(0).toUpperCase()
-                                    : (entry.userName ?? entry.userEmail).charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    {isVerification ? (
-                                        <>
-                                            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${entry.isAccurate ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
-                                                <FiCheck size={9} />
-                                                {entry.isAccurate ? 'Accurate' : 'Not Accurate'}
-                                            </span>
-                                            <span className="text-[10px] text-gray-400">{entry.sourceType === 'predisposition' ? 'Predisposition' : 'Symptom Report'}</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span className="text-sm font-medium text-gray-800 truncate">
-                                                {entry.userName ?? entry.userEmail}
-                                            </span>
-                                            <StatusBadge status={entry.status} />
-                                        </>
-                                    )}
-                                    <span className="text-[10px] text-gray-300">·</span>
-                                    <span className="text-[10px] text-gray-400">{timeAgo(entry.createdAt)}</span>
+                            <div
+                                key={entry.id}
+                                onClick={() => {
+                                    setSelected(entry);
+                                    if (!isVerification) markReadOnOpen(entry.id);
+                                }}
+                                className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-50 hover:bg-gray-50 transition group ${selected?.id === entry.id ? 'bg-[#984815]/5' : ''}`}
+                            >
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5 ${isVerification ? 'bg-blue-100 text-blue-600' : 'bg-[#984815]/10 text-[#984815]'}`}>
+                                    {isVerification
+                                        ? (entry.verifiedByName ?? entry.verifiedBy).charAt(0).toUpperCase()
+                                        : (entry.userName ?? entry.userEmail).charAt(0).toUpperCase()}
                                 </div>
-                                <p className="text-xs text-gray-500 truncate mt-0.5">
-                                    {isVerification ? entry.diagnosisText : entry.message}
-                                </p>
-                                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                    {isVerification ? (
-                                        <>
-                                            <span className="text-[10px] text-gray-400">Patient: {entry.patientName || entry.patientId}</span>
-                                            {entry.riskLevel && (
-                                                <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
-                                                    {entry.riskLevel}
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        {isVerification ? (
+                                            <>
+                                                <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${entry.isAccurate ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                                                    <FiCheck size={9} />
+                                                    {entry.isAccurate ? 'Accurate' : 'Not Accurate'}
                                                 </span>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span className="text-[10px] text-gray-400">{entry.page}</span>
-                                            {isCommentFeedback(entry) && (
-                                                <span className="text-[10px] font-semibold text-[#984815] bg-[#f8ebe1] px-2 py-0.5 rounded-full">
-                                                    Comment
+                                                <span className="text-[10px] text-gray-400">{entry.sourceType === 'predisposition' ? 'Predisposition' : 'Symptom Report'}</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="text-sm font-medium text-gray-800 truncate">
+                                                    {entry.userName ?? entry.userEmail}
                                                 </span>
-                                            )}
-                                            {Array.isArray(entry.assignedTo) && entry.assignedTo.length > 0 && (
-                                                <>
-                                                    <span className="text-[10px] text-gray-300">·</span>
-                                                    <span className="inline-flex items-center gap-0.5 text-[10px] text-[#984815]">
-                                                        <FiUserCheck size={9} />
-                                                        {entry.assignedTo.map(a => a.name.split(' ')[0]).join(', ')}
+                                                <StatusBadge status={entry.status} />
+                                            </>
+                                        )}
+                                        <span className="text-[10px] text-gray-300">·</span>
+                                        <span className="text-[10px] text-gray-400">{timeAgo(entry.createdAt)}</span>
+                                    </div>
+                                    <p className="text-xs text-gray-500 truncate mt-0.5">
+                                        {isVerification ? entry.diagnosisText : entry.message}
+                                    </p>
+                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                        {isVerification ? (
+                                            <>
+                                                <span className="text-[10px] text-gray-400">Patient: {entry.patientName || entry.patientId}</span>
+                                                {entry.riskLevel && (
+                                                    <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
+                                                        {entry.riskLevel}
                                                     </span>
-                                                </>
-                                            )}
-                                            {Array.isArray(entry.replies) && entry.replies.length > 0 && (
-                                                <>
-                                                    <span className="text-[10px] text-gray-300">·</span>
-                                                    <span className="inline-flex items-center gap-0.5 text-[10px] text-gray-400">
-                                                        <FiMessageSquare size={9} />
-                                                        {entry.replies.length}
+                                                )}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="text-[10px] text-gray-400">{entry.page}</span>
+                                                {isCommentFeedback(entry) && (
+                                                    <span className="text-[10px] font-semibold text-[#984815] bg-[#f8ebe1] px-2 py-0.5 rounded-full">
+                                                        Comment
                                                     </span>
-                                                </>
-                                            )}
-                                            {(unreadByFeedbackId[entry.id] ?? 0) > 0 && (
-                                                <>
-                                                    <span className="text-[10px] text-gray-300">·</span>
-                                                    <UnreadReplyBadge count={unreadByFeedbackId[entry.id]} />
-                                                </>
-                                            )}
-                                        </>
-                                    )}
+                                                )}
+                                                {Array.isArray(entry.assignedTo) && entry.assignedTo.length > 0 && (
+                                                    <>
+                                                        <span className="text-[10px] text-gray-300">·</span>
+                                                        <span className="inline-flex items-center gap-0.5 text-[10px] text-[#984815]">
+                                                            <FiUserCheck size={9} />
+                                                            {entry.assignedTo.map(a => a.name.split(' ')[0]).join(', ')}
+                                                        </span>
+                                                    </>
+                                                )}
+                                                {Array.isArray(entry.replies) && entry.replies.length > 0 && (
+                                                    <>
+                                                        <span className="text-[10px] text-gray-300">·</span>
+                                                        <span className="inline-flex items-center gap-0.5 text-[10px] text-gray-400">
+                                                            <FiMessageSquare size={9} />
+                                                            {entry.replies.length}
+                                                        </span>
+                                                    </>
+                                                )}
+                                                {(unreadByFeedbackId[entry.id] ?? 0) > 0 && (
+                                                    <>
+                                                        <span className="text-[10px] text-gray-300">·</span>
+                                                        <UnreadReplyBadge count={unreadByFeedbackId[entry.id]} />
+                                                    </>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
+                                {!isVerification && (
+                                    <button
+                                        onClick={e => { e.stopPropagation(); handleDelete(entry.id); }}
+                                        className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition shrink-0 mt-1"
+                                    >
+                                        <FiTrash2 size={13} />
+                                    </button>
+                                )}
                             </div>
-                            {!isVerification && (
-                                <button
-                                    onClick={e => { e.stopPropagation(); handleDelete(entry.id); }}
-                                    className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition shrink-0 mt-1"
-                                >
-                                    <FiTrash2 size={13} />
-                                </button>
-                            )}
-                        </div>
                         );
                     })}
                 </div>
