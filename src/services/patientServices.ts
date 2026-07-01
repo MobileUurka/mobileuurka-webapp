@@ -91,8 +91,13 @@ export const patientService = {
         return api.post(`/patients/${patientId}/comments`, payload);
     },
 
-    async getComments(patientId: string, documentId: string) {
-        return api.get(`/patients/${patientId}/comments?documentId=${encodeURIComponent(documentId)}`);
+    async getComments(patientId: string, documentId: string, relatedDocumentIds: string[] = []) {
+        const params = new URLSearchParams({ documentId });
+        const extraIds = relatedDocumentIds.filter((id) => id && id !== documentId);
+        if (extraIds.length > 0) {
+            params.set('documentIds', extraIds.join(','));
+        }
+        return api.get(`/patients/${patientId}/comments?${params.toString()}`);
     },
 
     async deleteComment(patientId: string, commentId: string) {

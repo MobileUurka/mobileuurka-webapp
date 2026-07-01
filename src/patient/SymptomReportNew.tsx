@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { IoArrowBackOutline } from 'react-icons/io5';
 import { HiOutlineDownload } from 'react-icons/hi';
 import { LuActivity, LuListChecks, LuCircleCheck, LuCircle, LuMessageSquare } from 'react-icons/lu';
@@ -12,12 +12,16 @@ import useSelectionMenu from "../hooks/useSelectionMenu";
 import SelectionMenu from "../components/SelectionMenu"
 import RiskFactorBreakdown from './RiskFactorBreakdown';
 import CommentsPanel, { type CommentPayload } from '../components/CommentsPanel';
-import NotesDrawer from '../components/NotesDrawer';
+import NotesDrawer, { type VersionedComment } from '../components/NotesDrawer';
+import ReportVersionPicker from '../components/ReportVersionPicker';
 import { patientService } from '../services/patientServices';
 import DiagnosisVerificationDialog, { type VerificationData } from '../components/DiagnosisVerificationDialog';
 import VerificationStatusBar from '../components/VerificationStatusBar';
 import { diagnosisVerificationService } from '../services/diagnosisVerificationService';
 import { useClinicalVerification } from '../hooks/useClinicalVerification';
+import { resolveSymptomReportDocumentId } from '../utils/symptomReportDocumentId';
+import { applyCommentHighlights } from '../utils/commentHighlights';
+import { buildSymptomReportVersions, getVersionShortLabel } from '../utils/symptomReportVersions';
 
 interface SymptomReportProps {
   report: any;
@@ -321,6 +325,23 @@ const ClinicalReasoningBlock: React.FC<{ text: string }> = ({ text }) => {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+const EMPTY_COMMENTS: any[] = [];
+
+function mapCommentRows(rows: any[]): { notes: CommentPayload[]; ids: (string | undefined)[] } {
+  const sorted = [...rows].sort(
+    (a, b) => new Date(a.createdAt ?? a.date ?? 0).getTime() - new Date(b.createdAt ?? b.date ?? 0).getTime(),
+  );
+  return {
+    notes: sorted.map((r) => ({
+      quotedText: r.selection,
+      note: r.text,
+      editedBy: r.editorName ?? r.editor ?? 'Clinician',
+      savedAt: r.createdAt ?? r.date ?? new Date().toISOString(),
+    })),
+    ids: sorted.map((r) => r.id),
+  };
+}
+
 const SymptomReportNew: React.FC<SymptomReportProps> = ({
   report, patient, onBack, reportHistory = [], onEscalate, onSaveComment
 }) => {
@@ -331,11 +352,103 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
   const [savedNotes, setSavedNotes] = useState<CommentPayload[]>([]);
   const [commentIds, setCommentIds] = useState<(string | undefined)[]>([]);
   const [notesDrawerOpen, setNotesDrawerOpen] = useState(false);
+  const [allVersionNotes, setAllVersionNotes] = useState<VersionedComment[]>([]);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [isVerificationDialogOpen, setIsVerificationDialogOpen] = useState(false);
+  const [selectedVersionId, setSelectedVersionId] = useState('');
   const toggle = useCallback((key: string) => setChecked(p => ({ ...p, [key]: !p[key] })), []);
 
-  const documentId: string = report?.id ?? report?.historyId ?? '';
+  const versions = useMemo(
+    () => (report ? buildSymptomReportVersions(report, reportHistory) : []),
+    [report, reportHistory],
+  );
+  const latestVersionId = versions.find((v) => v.isLatest)?.id ?? versions[0]?.id ?? '';
+  const activeVersion = versions.find((v) => v.id === selectedVersionId) ?? versions[0];
+  const activeReport = activeVersion?.data ?? report;
+  const isViewingLatest = activeVersion?.isLatest ?? true;
+
+  useEffect(() => {
+    if (latestVersionId && (!selectedVersionId || !versions.some((v) => v.id === selectedVersionId))) {
+      setSelectedVersionId(latestVersionId);
+    }
+  }, [latestVersionId, selectedVersionId, versions]);
+
+  const profileComments = (patient as { comments?: any[] } | undefined)?.comments ?? EMPTY_COMMENTS;
+  const versionIds = useMemo(() => versions.map((v) => v.id), [versions]);
+
+  const commentCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const id of versionIds) counts.set(id, 0);
+
+    const source = allVersionNotes.length > 0 ? allVersionNotes : profileComments;
+    for (const item of source) {
+      const docId = String(item.documentId ?? '');
+      if (counts.has(docId)) counts.set(docId, (counts.get(docId) ?? 0) + 1);
+    }
+    return counts;
+  }, [versionIds, profileComments, allVersionNotes]);
+
+  const totalCommentCount = useMemo(() => {
+    let total = 0;
+    commentCounts.forEach((count) => { total += count; });
+    return total;
+  }, [commentCounts]);
+
+  const documentId = selectedVersionId || resolveSymptomReportDocumentId(activeReport, patient?.id);
+
+  const toVersionedNotes = useCallback((rows: any[]): VersionedComment[] => {
+    const sorted = [...rows].sort(
+      (a, b) => new Date(b.createdAt ?? b.date ?? 0).getTime() - new Date(a.createdAt ?? a.date ?? 0).getTime(),
+    );
+    return sorted.map((row) => {
+      const docId = String(row.documentId);
+      const versionIndex = versions.findIndex((v) => v.id === docId);
+      const version = versionIndex >= 0 ? versions[versionIndex] : null;
+      return {
+        quotedText: row.selection,
+        note: row.text,
+        editedBy: row.editorName ?? row.editor ?? 'Clinician',
+        savedAt: row.createdAt ?? row.date ?? new Date().toISOString(),
+        commentId: row.id,
+        documentId: docId,
+        versionLabel: version
+          ? getVersionShortLabel(version, versionIndex, versions.length)
+          : 'Report',
+        isCurrentVersion: docId === selectedVersionId,
+      };
+    });
+  }, [versions, selectedVersionId]);
+
+  // Load all comments across every report version (for badges + notes drawer)
+  useEffect(() => {
+    if (!patient?.id || versionIds.length === 0) {
+      setAllVersionNotes([]);
+      return;
+    }
+    let cancelled = false;
+
+    const versionIdSet = new Set(versionIds);
+    const fromProfile = profileComments.filter((c) => versionIdSet.has(String(c.documentId)));
+    const primaryId = versionIds[0];
+    const extraIds = versionIds.slice(1);
+
+    patientService.getComments(patient.id, primaryId, extraIds)
+      .then((res: any) => {
+        if (cancelled) return;
+        const merged = new Map<string, any>();
+        for (const row of [...fromProfile, ...(res?.data?.comments ?? [])]) {
+          if (row?.id && versionIdSet.has(String(row.documentId))) {
+            merged.set(row.id, row);
+          }
+        }
+        setAllVersionNotes(toVersionedNotes([...merged.values()]));
+      })
+      .catch(() => {
+        if (!cancelled) setAllVersionNotes(toVersionedNotes(fromProfile));
+      });
+
+    return () => { cancelled = true; };
+  }, [patient?.id, versionIds, profileComments, toVersionedNotes]);
 
   const { latestVerification, loading: verificationLoading, addVerification } = useClinicalVerification(
     patient?.id,
@@ -346,126 +459,112 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
   // Stores the exact DOM Range at the moment the user clicks "Add comment"
   // so we can use surroundContents() for precise single-occurrence highlighting.
   const pendingRangeRef = useRef<Range | null>(null);
+  const rangeHighlightedIndices = useRef<Set<number>>(new Set());
   const menu = useSelectionMenu(printRef, menuRef);
 
-  // ── Load existing comments from DB on mount ──────────────────────────────
+  // ── Load comments for the selected report version ─────────────────────────
   useEffect(() => {
     if (!patient?.id || !documentId) return;
-    patientService.getComments(patient.id, documentId)
-      .then((res: any) => {
-        const rows: any[] = res?.data?.comments ?? [];
-        setSavedNotes(rows.map(r => ({
-          quotedText: r.selection,
-          note: r.text,
-          editedBy: r.editorName,
-          savedAt: r.createdAt ?? r.date ?? new Date().toISOString(),
-        })));
-        setCommentIds(rows.map(r => r.id));
-      })
-      .catch(() => { /* silently ignore */ });
-  }, [patient?.id, documentId]);
+    let cancelled = false;
 
-  // Track which comment indices were highlighted via surroundContents (not text-search)
-  const rangeHighlightedIndices = useRef<Set<number>>(new Set());
-
-  useEffect(() => {
-    if (!printRef.current || savedNotes.length === 0) return;
-
-    // Only process notes that weren't already highlighted via surroundContents
-    const phrases = savedNotes
-      .map((n, i) => ({ text: n.quotedText, index: i }))
-      .filter(p => p.text && !rangeHighlightedIndices.current.has(p.index));
-
-    // Remove only marks for text-search indices (leave surroundContents marks alone)
-    printRef.current.querySelectorAll('mark[data-comment-highlight]').forEach(m => {
-      const idx = Number(m.getAttribute('data-comment-index'));
-      if (rangeHighlightedIndices.current.has(idx)) return;
-      const parent = m.parentNode;
-      if (parent) {
-        parent.replaceChild(document.createTextNode(m.textContent ?? ''), m);
-        parent.normalize();
-      }
-    });
-
-    if (phrases.length === 0) return;
-
-    const walker = document.createTreeWalker(
-      printRef.current,
-      NodeFilter.SHOW_TEXT,
-      {
-        acceptNode: (node) => {
-          if ((node.parentElement as HTMLElement)?.closest('mark[data-comment-highlight]')) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          return NodeFilter.FILTER_ACCEPT;
-        }
-      }
+    const profileMatches = profileComments.filter(
+      (c) => String(c.documentId) === String(documentId),
     );
 
-    const textNodes: Text[] = [];
-    let node: Node | null;
-    while ((node = walker.nextNode())) textNodes.push(node as Text);
+    const applyRows = (rows: any[]) => {
+      if (cancelled) return;
+      const { notes, ids } = mapCommentRows(rows);
+      setSavedNotes(notes);
+      setCommentIds(ids);
+      rangeHighlightedIndices.current = new Set();
+    };
 
-    const matched = new Set<number>();
+    applyRows(profileMatches);
 
-    for (const textNode of textNodes) {
-      const text = textNode.textContent ?? '';
-      for (const { text: phrase, index } of phrases) {
-        if (matched.has(index)) continue;
-        const idx = text.indexOf(phrase);
-        if (idx === -1) continue;
+    patientService.getComments(patient.id, documentId)
+      .then((res: any) => {
+        const apiRows: any[] = res?.data?.comments ?? [];
+        const merged = new Map<string, any>();
+        for (const row of [...profileMatches, ...apiRows]) {
+          if (row?.id && String(row.documentId) === String(documentId)) {
+            merged.set(row.id, row);
+          }
+        }
+        applyRows([...merged.values()]);
+        setAllVersionNotes((prev) => {
+          const others = prev.filter((n) => n.documentId !== documentId);
+          const current = toVersionedNotes([...merged.values()]);
+          return [...others, ...current].sort(
+            (a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime(),
+          );
+        });
+      })
+      .catch((err) => {
+        console.error('Failed to load report comments:', err);
+        if (!cancelled) applyRows(profileMatches);
+      });
 
-        matched.add(index);
+    return () => { cancelled = true; };
+  }, [patient?.id, documentId, profileComments, toVersionedNotes]);
 
-        const before = text.slice(0, idx);
-        const after = text.slice(idx + phrase.length);
+  useEffect(() => {
+    setAllVersionNotes((prev) =>
+      prev.map((note) => ({ ...note, isCurrentVersion: note.documentId === selectedVersionId })),
+    );
+  }, [selectedVersionId]);
 
-        const mark = document.createElement('mark');
-        mark.setAttribute('data-comment-highlight', 'true');
-        mark.setAttribute('data-comment-index', String(index));
-        mark.style.cssText = 'background:#fef08a;border-radius:2px;padding:0 1px;';
-        mark.textContent = phrase;
+  useEffect(() => {
+    if (!printRef.current || savedNotes.length === 0 || activePanel !== 'report') return;
 
-        const frag = document.createDocumentFragment();
-        if (before) frag.appendChild(document.createTextNode(before));
-        frag.appendChild(mark);
-        if (after) frag.appendChild(document.createTextNode(after));
+    const applyHighlights = () => {
+      if (!printRef.current) return;
+      const phrases = savedNotes
+        .map((n, i) => ({ text: n.quotedText, index: i }))
+        .filter((p) => p.text);
+      applyCommentHighlights(printRef.current, phrases, rangeHighlightedIndices.current);
+    };
 
-        textNode.parentNode?.replaceChild(frag, textNode);
-        break;
-      }
-    }
-  }, [savedNotes, activePanel]);
-  if (!report) return null;
+    applyHighlights();
+    const frameId = requestAnimationFrame(applyHighlights);
+    const timeoutId = window.setTimeout(applyHighlights, 150);
+    return () => {
+      cancelAnimationFrame(frameId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [savedNotes, activePanel, activeReport, documentId]);
+  if (!report || !activeReport) return null;
 
-  const previousReport = reportHistory.length > 1 ? reportHistory[1] : null;
+  const versionIndex = versions.findIndex((v) => v.id === selectedVersionId);
+  const previousReport = versionIndex >= 0 && versionIndex < versions.length - 1
+    ? versions[versionIndex + 1].data
+    : null;
 
-  const medical = report?.medicalReasoning ?? report?.medical_reasoning ?? {};
-  const riskLevel = (report?.riskLevel ?? report?.risk_level ?? 'UNKNOWN').toUpperCase();
-  const riskScore = parseFloat(report?.riskScore ?? report?.risk_score ?? 0);
+  const medical = activeReport?.medicalReasoning ?? activeReport?.medical_reasoning ?? {};
+  const riskLevel = (activeReport?.riskLevel ?? activeReport?.risk_level ?? 'UNKNOWN').toUpperCase();
+  const riskScore = parseFloat(activeReport?.riskScore ?? activeReport?.risk_score ?? 0);
   const riskColor = RISK_COLORS[riskLevel] || RISK_COLORS.MODERATE;
 
-  const keyRiskFactors = parseList(medical?.key_risk_factors ?? report?.keyRiskFactors, 'keyRiskFactors');
-  const primaryConcerns = parseList(medical?.primary_concerns ?? report?.primaryConcerns, 'primaryConcerns');
-  const recommendations = parseList(report?.recommendations ?? medical?.recommendations, 'recommendations');
-  const monitoring = parseList(medical?.monitoring_requirements ?? report?.monitoringRequirements, 'monitoring');
-  const immediateActions = parseList(medical?.immediate_actions ?? report?.immediateActions, 'immediateActions');
+  const keyRiskFactors = parseList(medical?.key_risk_factors ?? activeReport?.keyRiskFactors, 'keyRiskFactors');
+  const primaryConcerns = parseList(medical?.primary_concerns ?? activeReport?.primaryConcerns, 'primaryConcerns');
+  const recommendations = parseList(activeReport?.recommendations ?? medical?.recommendations, 'recommendations');
+  const monitoring = parseList(medical?.monitoring_requirements ?? activeReport?.monitoringRequirements, 'monitoring');
+  const immediateActions = parseList(medical?.immediate_actions ?? activeReport?.immediateActions, 'immediateActions');
 
-  const clinicalReasoning = medical?.clinical_reasoning ?? report?.clinicalReasoning ?? '';
-  const vitalSigns = medical?.vital_signs_assessment ?? report?.vitalSignsAssessment ?? '';
-  const labInterpretation = medical?.laboratory_interpretation ?? report?.laboratoryInterpretation ?? '';
-  const historicalFactors = medical?.historical_risk_factors ?? report?.historicalRiskFactors ?? '';
-  const followUpTiming = medical?.follow_up_timing ?? report?.followUpTiming ?? '';
+  const clinicalReasoning = medical?.clinical_reasoning ?? activeReport?.clinicalReasoning ?? '';
+  const vitalSigns = medical?.vital_signs_assessment ?? activeReport?.vitalSignsAssessment ?? '';
+  const labInterpretation = medical?.laboratory_interpretation ?? activeReport?.laboratoryInterpretation ?? '';
+  const historicalFactors = medical?.historical_risk_factors ?? activeReport?.historicalRiskFactors ?? '';
+  const followUpTiming = medical?.follow_up_timing ?? activeReport?.followUpTiming ?? '';
 
-  const gestationWeeks = report?.gestationWeeksInt ?? 0;
-  const gestationTotal = report?.gestationWeeksTotal ?? 40;
-  const generatedDate = formatDate(report?.createdAt ?? report?.updatedAt, 'long');
+  const gestationWeeks = activeReport?.gestationWeeksInt ?? 0;
+  const gestationTotal = activeReport?.gestationWeeksTotal ?? 40;
+  const generatedDate = formatDate(activeReport?.createdAt ?? activeReport?.updatedAt, 'long');
 
   const handleDownloadPDF = async () => {
     if (!printRef.current) return;
     try {
       const patientName = patient?.name?.replace(/\s+/g, ' ').trim() || 'Patient';
-      const dateStr = formatDate(report?.createdAt ?? report?.updatedAt, 'short').replace(/\//g, '-');
+      const dateStr = formatDate(activeReport?.createdAt ?? activeReport?.updatedAt, 'short').replace(/\//g, '-');
       const filename = `AI Analysis - ${patientName} - ${dateStr}.pdf`;
 
       const canvas = await html2canvas(printRef.current, {
@@ -528,7 +627,9 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
 
   return (
     <>
-      <SelectionMenu ref={menuRef} menu={menu} onComment={handleComment} />
+      {isViewingLatest && (
+        <SelectionMenu ref={menuRef} menu={menu} onComment={handleComment} />
+      )}
 
       {/* Screen-only controls */}
       <div className="print:hidden mb-3 flex items-center gap-2 flex-wrap">
@@ -549,26 +650,71 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
           Download PDF
         </button>
 
-        {savedNotes.length > 0 && (
-          <button
-            onClick={() => setNotesDrawerOpen(true)}
-            className="px-3 py-1.5 rounded text-[13px] font-medium transition-colors flex items-center gap-1.5"
-            style={{ background: "#f0fdf4", color: "#008540", border: "1px solid #bbf7d0" }}
-          >
-            <LuMessageSquare size={14} />
-            Notes
+        {versions.length > 1 && (
+          <ReportVersionPicker
+            versions={versions}
+            selectedVersionId={selectedVersionId}
+            commentCounts={commentCounts}
+            onSelect={(id) => {
+              setSelectedVersionId(id);
+              setActivePanel('report');
+              setChecked({});
+            }}
+          />
+        )}
+
+        <button
+          onClick={() => setNotesDrawerOpen(true)}
+          className="px-3 py-1.5 rounded text-[13px] font-medium transition-colors flex items-center gap-1.5"
+          style={{
+            background: totalCommentCount > 0 ? "#f0fdf4" : "#f9fafb",
+            color: totalCommentCount > 0 ? "#008540" : "#6b7280",
+            border: `1px solid ${totalCommentCount > 0 ? "#bbf7d0" : "#e5e7eb"}`,
+          }}
+        >
+          <LuMessageSquare size={14} />
+          Notes
+          {totalCommentCount > 0 && (
             <span style={{
               background: "#008540", color: "#fff",
               borderRadius: 10, fontSize: 10, fontWeight: 700,
               padding: "0 5px", lineHeight: "16px",
             }}>
-              {savedNotes.length}
+              {totalCommentCount}
             </span>
-          </button>
-        )}
+          )}
+        </button>
       </div>
 
+      {!isViewingLatest && activeVersion && (
+        <div
+          className="print:hidden mb-3 flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg border text-[13px]"
+          style={{ background: '#fffbeb', borderColor: '#fde68a', color: '#92400e' }}
+        >
+          <span>
+            Viewing an older analysis from{' '}
+            <strong>
+              {new Date(activeVersion.createdAt).toLocaleString('en-GB', {
+                day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+              })}
+            </strong>
+            . Comments and highlights match this version.
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedVersionId(latestVersionId);
+              setActivePanel('report');
+            }}
+            className="shrink-0 px-2.5 py-1 rounded bg-white border border-amber-200 text-amber-800 font-medium hover:bg-amber-50"
+          >
+            Back to latest
+          </button>
+        </div>
+      )}
+
       {/* Clinical verification status */}
+      {isViewingLatest && (
       <div className="print:hidden mb-4">
         <VerificationStatusBar
           verification={latestVerification}
@@ -577,6 +723,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
           subjectLabel="analysis"
         />
       </div>
+      )}
 
       {/* Panel tabs */}
       <div className="print:hidden flex gap-2 mb-4 flex-wrap">
@@ -697,7 +844,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
       {/* Diff panel */}
       {activePanel === 'diff' && previousReport && (
         <div className="print:hidden mb-4 p-4 rounded-lg border border-gray-200 bg-white">
-          <ReasoningDiff current={report} previous={previousReport} />
+          <ReasoningDiff current={activeReport} previous={previousReport} />
         </div>
       )}
 
@@ -875,8 +1022,8 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
               This document is confidential and contains protected health information.
             </p>
             <p className="text-[10px] text-center" style={{ color: '#9ca3af' }}>
-              Generated on {formatDate(report?.createdAt ?? report?.updatedAt, 'short')} at{' '}
-              {new Date(report?.createdAt ?? report?.updatedAt).toLocaleTimeString('en-US', {
+              Generated on {formatDate(activeReport?.createdAt ?? activeReport?.updatedAt, 'short')} at{' '}
+              {new Date(activeReport?.createdAt ?? activeReport?.updatedAt).toLocaleTimeString('en-US', {
                 hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
               }).replace(/:/g, '')}
             </p>
@@ -893,42 +1040,77 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
             setActiveComment(null);
           }}
           onSave={async (payload) => {
+            const noteIndex = savedNotes.length;
+            let highlightApplied = false;
+
             // 1. Highlight the EXACT selection using the stored Range
-            //    surroundContents() wraps only the selected nodes — no text search,
-            //    no repeated matches anywhere else in the document.
             if (pendingRangeRef.current) {
               try {
                 const mark = document.createElement('mark');
                 mark.setAttribute('data-comment-highlight', 'true');
-                mark.setAttribute('data-comment-index', String(savedNotes.length));
+                mark.setAttribute('data-comment-index', String(noteIndex));
                 mark.style.cssText = 'background:#fef08a;border-radius:2px;padding:0 1px;';
                 pendingRangeRef.current.surroundContents(mark);
-                rangeHighlightedIndices.current.add(savedNotes.length); // ← add this line
+                rangeHighlightedIndices.current.add(noteIndex);
+                highlightApplied = true;
               } catch {
                 // surroundContents throws if the selection crosses element boundaries.
-                // In that case we skip the highlight silently — the comment is still saved.
               }
               pendingRangeRef.current = null;
             }
 
-            // 2. Save to DB
-            let newId: string | undefined;
-            if (patient?.id && documentId) {
-              try {
-                const res: any = await patientService.createComment(patient.id, {
-                  documentId,
-                  selection: payload.quotedText,
-                  text: payload.note,
-                });
-                newId = res?.data?.comment?.id;
-              } catch (err) {
-                console.error('Failed to persist comment:', err);
+            // 2. Save to DB — required so all clinicians see the comment
+            if (!patient?.id || !documentId) {
+              if (highlightApplied) {
+                const mark = printRef.current?.querySelector(`mark[data-comment-index="${noteIndex}"]`);
+                if (mark?.parentNode) {
+                  mark.parentNode.replaceChild(document.createTextNode(mark.textContent ?? ''), mark);
+                  mark.parentNode.normalize();
+                }
+                rangeHighlightedIndices.current.delete(noteIndex);
               }
+              alert('Could not save comment: report is missing a document identifier.');
+              return;
             }
 
-            // 3. Update local state
+            let newId: string | undefined;
+            try {
+              const res: any = await patientService.createComment(patient.id, {
+                documentId,
+                selection: payload.quotedText,
+                text: payload.note,
+              });
+              newId = res?.data?.comment?.id;
+              if (!newId) throw new Error('Comment was not persisted');
+            } catch (err) {
+              console.error('Failed to persist comment:', err);
+              if (highlightApplied) {
+                const mark = printRef.current?.querySelector(`mark[data-comment-index="${noteIndex}"]`);
+                if (mark?.parentNode) {
+                  mark.parentNode.replaceChild(document.createTextNode(mark.textContent ?? ''), mark);
+                  mark.parentNode.normalize();
+                }
+                rangeHighlightedIndices.current.delete(noteIndex);
+              }
+              alert('Failed to save comment. Please try again.');
+              return;
+            }
+
+            // 3. Update local state only after successful persistence
             setSavedNotes(prev => [...prev, payload]);
             setCommentIds(prev => [...prev, newId]);
+            setAllVersionNotes((prev) => [
+              {
+                ...payload,
+                commentId: newId,
+                documentId,
+                versionLabel: activeVersion
+                  ? getVersionShortLabel(activeVersion, versions.findIndex((v) => v.id === selectedVersionId), versions.length)
+                  : 'Latest',
+                isCurrentVersion: true,
+              },
+              ...prev,
+            ]);
             await onSaveComment?.(payload);
             setActiveComment(null);
           }}
@@ -938,33 +1120,35 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
       {/* Notes drawer */}
       {notesDrawerOpen && (
         <NotesDrawer
-          notes={savedNotes}
+          notes={allVersionNotes}
           onClose={() => setNotesDrawerOpen(false)}
-          onDelete={async (i) => {
-
-            rangeHighlightedIndices.current.delete(i); // ← add this line
-            const mark = printRef.current?.querySelector(`mark[data-comment-index="${i}"]`);
-            // ... rest unchanged
-            // Remove the highlight mark from the DOM by index
-            if (mark) {
-              const parent = mark.parentNode;
-              if (parent) {
-                parent.replaceChild(document.createTextNode(mark.textContent ?? ''), mark);
-                parent.normalize();
+          onGoToVersion={(docId) => {
+            setSelectedVersionId(docId);
+            setActivePanel('report');
+            setNotesDrawerOpen(false);
+          }}
+          onDelete={async (commentId) => {
+            const noteIndex = commentIds.findIndex((id) => id === commentId);
+            if (noteIndex >= 0) {
+              rangeHighlightedIndices.current.delete(noteIndex);
+              const mark = printRef.current?.querySelector(`mark[data-comment-index="${noteIndex}"]`);
+              if (mark?.parentNode) {
+                mark.parentNode.replaceChild(document.createTextNode(mark.textContent ?? ''), mark);
+                mark.parentNode.normalize();
               }
+              setSavedNotes((prev) => prev.filter((_, idx) => idx !== noteIndex));
+              setCommentIds((prev) => prev.filter((_, idx) => idx !== noteIndex));
             }
 
-            // Delete from DB
-            const id = commentIds[i];
-            if (id && patient?.id) {
+            if (patient?.id) {
               try {
-                await patientService.deleteComment(patient.id, id);
+                await patientService.deleteComment(patient.id, commentId);
               } catch (err) {
                 console.error('Failed to delete comment from DB:', err);
               }
             }
-            setSavedNotes(prev => prev.filter((_, idx) => idx !== i));
-            setCommentIds(prev => prev.filter((_, idx) => idx !== i));
+
+            setAllVersionNotes((prev) => prev.filter((n) => n.commentId !== commentId));
           }}
         />
       )}
@@ -983,6 +1167,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
       `}</style>
 
       {/* Verification Dialog */}
+      {isViewingLatest && (
       <DiagnosisVerificationDialog
         isOpen={isVerificationDialogOpen}
         onClose={() => setIsVerificationDialogOpen(false)}
@@ -997,6 +1182,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
         recordDate={generatedDate}
         existingVerification={latestVerification}
       />
+      )}
     </>
   );
 };

@@ -154,6 +154,15 @@ const Patient: React.FC = () => {
       .catch(err => console.warn('[Patient.tsx] symptom-history fetch failed:', err));
   }, [id, patient?.id]);
 
+  useEffect(() => {
+    if (!id || activeTab !== 'symptomReport') return;
+    api.get(`/patients/${id}/symptom-history?limit=50`)
+      .then((data: any) => {
+        if (data?.success && Array.isArray(data.data?.history)) setSymptomHistory(data.data.history);
+      })
+      .catch(() => { /* non-blocking refresh */ });
+  }, [id, activeTab]);
+
   // --- Handlers ---
   const handleEscalate = async (message: string) => {
     if (!id) return;
