@@ -246,7 +246,6 @@ const renderFormattedText = (text: string) => {
     </>
   );
 };
-s
 
 
 function parseSectionBody(bodyText: string): BodyItem[] {
