@@ -1,14 +1,18 @@
 import { api } from './apiClient';
+import type { RubricScores } from '../constants/clinicalReasoningRubric';
 
 export interface VerificationPayload {
     patientId: string;
     patientName?: string;
     diagnosisText: string;
     riskLevel?: string;
-    isAccurate: boolean;
+    isAccurate?: boolean;
     obgynNotes?: string;
     sourceType: 'predisposition' | 'symptom_report';
     sourceId?: string;
+    rubricScores?: RubricScores;
+    totalScore?: number;
+    scoreCategory?: string;
 }
 
 export interface VerificationEntry {
@@ -19,6 +23,9 @@ export interface VerificationEntry {
     riskLevel: string | null;
     isAccurate: boolean;
     obgynNotes: string | null;
+    rubricScores: RubricScores | null;
+    totalScore: number | null;
+    scoreCategory: string | null;
     verifiedBy: string;
     verifiedByName: string | null;
     verifiedByRole: string | null;

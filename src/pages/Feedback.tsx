@@ -13,6 +13,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { feedbackService, type FeedbackEntry, type FeedbackReply } from '../services/feedbackService';
 import { diagnosisVerificationService, type VerificationEntry } from '../services/diagnosisVerificationService';
+import {
+    CLINICAL_REASONING_RUBRIC,
+    RUBRIC_TOTAL_POINTS,
+    getScoreCategory,
+    getSectionScore,
+} from '../constants/clinicalReasoningRubric';
 import { getAllMetrics, clearMetrics, type PerfMetric } from '../hooks/usePerformanceTimer';
 import {
     FiTrash2, FiRefreshCw, FiClock, FiBarChart2,
@@ -572,16 +578,28 @@ function VerificationDetail({
     entry: VerificationEntry;
     onClose: () => void;
 }) {
+    const hasRubric = entry.totalScore != null && entry.rubricScores;
+    const category = hasRubric ? getScoreCategory(entry.totalScore!) : null;
+
     return (
         <div className="flex flex-col h-full">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
                 <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition text-sm flex items-center gap-1">
                     ← Back
                 </button>
-                <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${entry.isAccurate ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
-                    <FiCheck size={11} />
-                    {entry.isAccurate ? 'Accurate' : 'Not Accurate'}
-                </span>
+                {hasRubric ? (
+                    <span
+                        className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full border"
+                        style={{ color: category!.color, background: category!.bg, borderColor: category!.border }}
+                    >
+                        {entry.totalScore}/{RUBRIC_TOTAL_POINTS} · {entry.scoreCategory ?? category!.label}
+                    </span>
+                ) : (
+                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${entry.isAccurate ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                        <FiCheck size={11} />
+                        {entry.isAccurate ? 'Accurate' : 'Not Accurate'}
+                    </span>
+                )}
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
@@ -593,9 +611,30 @@ function VerificationDetail({
                     <span className="ml-auto">{timeAgo(entry.createdAt)}</span>
                 </div>
 
+                {/* Rubric breakdown */}
+                {hasRubric && entry.rubricScores && (
+                    <div>
+                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Rubric Breakdown</p>
+                        <div className="space-y-2">
+                            {CLINICAL_REASONING_RUBRIC.map((section) => {
+                                const sectionScore = getSectionScore(section, entry.rubricScores!);
+                                return (
+                                    <div key={section.id} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
+                                        <span className="text-gray-700">{section.title}</span>
+                                        <span className="font-semibold text-gray-800">{sectionScore}/{section.maxPoints}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        {category && (
+                            <p className="text-[11px] text-gray-500 mt-2">{category.supervision}</p>
+                        )}
+                    </div>
+                )}
+
                 {/* Diagnosis */}
                 <div>
-                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">AI Diagnosis</p>
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">AI Analysis Summary</p>
                     <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-[#f5f5f5] rounded-lg px-4 py-3">{entry.diagnosisText}</p>
                 </div>
 
@@ -612,7 +651,7 @@ function VerificationDetail({
                 {/* Notes */}
                 {entry.obgynNotes && (
                     <div>
-                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">OB/GYN Notes</p>
+                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Clinical Notes</p>
                         <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
                             {entry.obgynNotes}
                         </p>
@@ -898,10 +937,16 @@ function UserFeedbackView() {
                                     <div className="flex items-center gap-2 flex-wrap">
                                         {isVerification ? (
                                             <>
-                                                <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${entry.isAccurate ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
-                                                    <FiCheck size={9} />
-                                                    {entry.isAccurate ? 'Accurate' : 'Not Accurate'}
-                                                </span>
+                                                {entry.totalScore != null ? (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#f0fdf4] text-green-700 border border-green-200">
+                                                        {entry.totalScore}/100
+                                                    </span>
+                                                ) : (
+                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${entry.isAccurate ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                                                        <FiCheck size={9} />
+                                                        {entry.isAccurate ? 'Accurate' : 'Not Accurate'}
+                                                    </span>
+                                                )}
                                                 <span className="text-[10px] text-gray-400">{entry.sourceType === 'predisposition' ? 'Predisposition' : 'Symptom Report'}</span>
                                             </>
                                         ) : (
@@ -1182,10 +1227,16 @@ function AdminFeedbackView() {
                                     <div className="flex items-center gap-2 flex-wrap">
                                         {isVerification ? (
                                             <>
-                                                <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${entry.isAccurate ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
-                                                    <FiCheck size={9} />
-                                                    {entry.isAccurate ? 'Accurate' : 'Not Accurate'}
-                                                </span>
+                                                {entry.totalScore != null ? (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#f0fdf4] text-green-700 border border-green-200">
+                                                        {entry.totalScore}/100
+                                                    </span>
+                                                ) : (
+                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${entry.isAccurate ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                                                        <FiCheck size={9} />
+                                                        {entry.isAccurate ? 'Accurate' : 'Not Accurate'}
+                                                    </span>
+                                                )}
                                                 <span className="text-[10px] text-gray-400">{entry.sourceType === 'predisposition' ? 'Predisposition' : 'Symptom Report'}</span>
                                             </>
                                         ) : (

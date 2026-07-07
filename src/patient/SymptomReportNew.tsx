@@ -15,10 +15,14 @@ import CommentsPanel, { type CommentPayload } from '../components/CommentsPanel'
 import NotesDrawer, { type VersionedComment } from '../components/NotesDrawer';
 import ReportVersionPicker from '../components/ReportVersionPicker';
 import { patientService } from '../services/patientServices';
-import DiagnosisVerificationDialog, { type VerificationData } from '../components/DiagnosisVerificationDialog';
+import ClinicalReasoningVerificationDialog, {
+  type RubricVerificationData,
+  type ReportSectionPreview,
+} from '../components/ClinicalReasoningVerificationDialog';
 import VerificationStatusBar from '../components/VerificationStatusBar';
 import { diagnosisVerificationService } from '../services/diagnosisVerificationService';
 import { useClinicalVerification } from '../hooks/useClinicalVerification';
+import { isScoreAcceptable } from '../constants/clinicalReasoningRubric';
 import { resolveSymptomReportDocumentId } from '../utils/symptomReportDocumentId';
 import { applyCommentHighlights } from '../utils/commentHighlights';
 import { buildSymptomReportVersions, getVersionShortLabel } from '../utils/symptomReportVersions';
@@ -140,28 +144,54 @@ interface ReasoningSection {
   body: string;
 }
 
-const cleanMarkdown = (text = "") =>
+const sanitizeClinicalText = (text = "") =>
   text
-    .replace(/\*\*(.*?)\*\*/g, "$1")
-    .replace(/\*(.*?)\*/g, "$1")
-    .replace(/__(.*?)__/g, "$1")
-    .replace(/_(.*?)_/g, "$1")
-    .replace(/`(.*?)`/g, "$1")
     .replace(/\r/g, "")
+    .replace(/\[(?:LOCALIZED_CONTEXT|\d+)\]/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
+
+const cleanMarkdown = (text = "") =>
+  sanitizeClinicalText(
+    text
+      .replace(/\*\*(.*?)\*\*/g, "$1")
+      .replace(/\*(.*?)\*/g, "$1")
+      .replace(/__(.*?)__/g, "$1")
+      .replace(/_(.*?)_/g, "$1")
+      .replace(/`(.*?)`/g, "$1"),
+  );
 
 function parseClinicalReasoning(raw: string): ReasoningSection[] {
   if (!raw) return [];
 
-  raw = raw.replace(/\r/g, "").trim();
+  const normalized = cleanMarkdown(raw);
 
-  // Match ANY "Title:" line
+  // Support markdown-inline section headers like "**Overview:** details..."
+  if (/\*\*[A-Za-z0-9 &/()\-]+:\*\*/.test(normalized)) {
+    const regex = /\*\*([A-Za-z0-9 &/()\-]+):\*\*/g;
+    const found: Array<{ title: string; start: number; end: number }> = [];
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(normalized)) !== null) {
+      found.push({ title: match[1].trim(), start: match.index, end: regex.lastIndex });
+    }
+
+    const sections = found.map((curr, i) => {
+      const nextStart = i + 1 < found.length ? found[i + 1].start : normalized.length;
+      return {
+        title: curr.title,
+        body: normalized.slice(curr.end, nextStart).trim(),
+      };
+    });
+    return sections.filter((s) => s.body.length > 0);
+  }
+
   const headerRegex = /^([A-Za-z0-9 &/()\-]+):\s*$/gm;
-
   const matches: { title: string; index: number }[] = [];
 
   let match;
-  while ((match = headerRegex.exec(raw)) !== null) {
+  while ((match = headerRegex.exec(normalized)) !== null) {
     matches.push({
       title: match[1].trim(),
       index: match.index,
@@ -169,31 +199,30 @@ function parseClinicalReasoning(raw: string): ReasoningSection[] {
   }
 
   if (!matches.length) {
-    return [{ title: "Overview", body: raw }];
+    return [{ title: "Overview", body: normalized }];
   }
 
   const sections: ReasoningSection[] = [];
 
-  // pre-header text
   if (matches[0].index > 0) {
     sections.push({
       title: "Overview",
-      body: raw.slice(0, matches[0].index).trim(),
+      body: normalized.slice(0, matches[0].index).trim(),
     });
   }
 
   for (let i = 0; i < matches.length; i++) {
     const start = matches[i].index;
     const end =
-      i + 1 < matches.length ? matches[i + 1].index : raw.length;
+      i + 1 < matches.length ? matches[i + 1].index : normalized.length;
 
     const title = matches[i].title;
-    const body = raw.slice(start + title.length + 1, end).trim();
+    const body = normalized.slice(start + title.length + 1, end).trim();
 
     sections.push({ title, body });
   }
 
-  return sections;
+  return sections.filter((s) => s.body.length > 0);
 }
 
 interface BodyItem {
@@ -241,7 +270,7 @@ const renderFormattedText = (text: string) => {
             </strong>
           );
         }
-        return part;
+        return sanitizeClinicalText(part);
       })}
     </>
   );
@@ -366,7 +395,6 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
   const activeVersion = versions.find((v) => v.id === selectedVersionId) ?? versions[0];
   const activeReport = activeVersion?.data ?? report;
   const isViewingLatest = activeVersion?.isLatest ?? true;
-
   useEffect(() => {
     if (latestVersionId && (!selectedVersionId || !versions.some((v) => v.id === selectedVersionId))) {
       setSelectedVersionId(latestVersionId);
@@ -453,7 +481,6 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
   const { latestVerification, loading: verificationLoading, addVerification } = useClinicalVerification(
     patient?.id,
     'symptom_report',
-    documentId || null,
   );
 
   // Stores the exact DOM Range at the moment the user clicks "Add comment"
@@ -590,9 +617,10 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
     setActiveComment(text);
   };
 
-  const handleVerificationSubmit = async (verificationData: VerificationData) => {
+  const handleVerificationSubmit = async (verificationData: RubricVerificationData) => {
     const summaryParts = [
       `Risk: ${riskLevel} (${riskScore.toFixed(2)})`,
+      `Rubric: ${verificationData.totalScore}/100 · ${verificationData.scoreCategory}`,
       keyRiskFactors.length > 0 ? `Factors: ${keyRiskFactors.slice(0, 2).join('; ')}` : '',
       primaryConcerns.length > 0 ? `Concerns: ${primaryConcerns.slice(0, 2).join('; ')}` : '',
     ].filter(Boolean).join(' | ');
@@ -602,25 +630,29 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
       patientName: verificationData.patientName,
       diagnosisText: summaryParts || verificationData.diagnosisText,
       riskLevel: verificationData.riskLevel,
-      isAccurate: verificationData.isAccurate,
+      isAccurate: isScoreAcceptable(verificationData.totalScore),
       obgynNotes: verificationData.obgynNotes,
       sourceType: verificationData.sourceType,
       sourceId: documentId || undefined,
+      rubricScores: verificationData.rubricScores,
+      totalScore: verificationData.totalScore,
+      scoreCategory: verificationData.scoreCategory,
     });
     if (res.data?.verification) addVerification(res.data.verification);
     return res.data?.verification;
   };
 
-  const verificationFindings = [
-    { label: 'Risk Score', value: riskScore.toFixed(2) },
-    { label: 'Gestation', value: `${gestationWeeks} of ${gestationTotal} weeks` },
-    { label: 'Report Date', value: generatedDate },
-  ];
-
-  const verificationBullets = [
-    ...(keyRiskFactors.length > 0 ? [{ title: 'Key Risk Factors', items: keyRiskFactors }] : []),
-    ...(primaryConcerns.length > 0 ? [{ title: 'Primary Concerns', items: primaryConcerns }] : []),
-    ...(immediateActions.length > 0 ? [{ title: 'Immediate Actions', items: immediateActions }] : []),
+  const verificationReportSections: ReportSectionPreview[] = [
+    { title: 'Key Risk Factors', content: keyRiskFactors.join('\n• '), hasContent: keyRiskFactors.length > 0 },
+    { title: 'Primary Concerns', content: primaryConcerns.join('\n• '), hasContent: primaryConcerns.length > 0 },
+    { title: 'Clinical Reasoning', content: clinicalReasoning, hasContent: !!clinicalReasoning.trim() },
+    { title: 'Vital Signs', content: vitalSigns, hasContent: !!vitalSigns.trim() },
+    { title: 'Laboratory', content: labInterpretation, hasContent: !!labInterpretation.trim() },
+    { title: 'Historical Risk', content: historicalFactors, hasContent: !!historicalFactors.trim() },
+    { title: 'Follow-Up Timing', content: followUpTiming, hasContent: !!followUpTiming.trim() },
+    { title: 'Immediate Actions', content: immediateActions.join('\n• '), hasContent: immediateActions.length > 0 },
+    { title: 'Monitoring', content: monitoring.join('\n• '), hasContent: monitoring.length > 0 },
+    { title: 'Recommendations', content: recommendations.join('\n• '), hasContent: recommendations.length > 0 },
   ];
 
 
@@ -1166,19 +1198,17 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
         @page { size: A4; margin: 20mm; }
       `}</style>
 
-      {/* Verification Dialog */}
+      {/* Clinical Reasoning Evaluation Dialog */}
       {isViewingLatest && (
-      <DiagnosisVerificationDialog
+      <ClinicalReasoningVerificationDialog
         isOpen={isVerificationDialogOpen}
         onClose={() => setIsVerificationDialogOpen(false)}
         onSubmit={handleVerificationSubmit}
-        diagnosisText={`${riskLevel} risk · score ${riskScore.toFixed(2)}`}
+        diagnosisText={`${riskLevel} risk · score ${riskScore.toFixed(2)} · ${gestationWeeks}/${gestationTotal} wks`}
         riskLevel={riskLevel}
-        sourceType="symptom_report"
         patientId={patient?.id || ''}
         patientName={patient?.name}
-        findings={verificationFindings}
-        bulletSections={verificationBullets}
+        reportSections={verificationReportSections}
         recordDate={generatedDate}
         existingVerification={latestVerification}
       />
