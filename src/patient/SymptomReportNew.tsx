@@ -246,15 +246,8 @@ const renderFormattedText = (text: string) => {
     </>
   );
 };
+s
 
-function splitDenseText(line: string): string[] {
-  const bySentence = line.split(/(?<=[.!?])\s+(?=[A-Z])/);
-  const result: string[] = [];
-  for (const sentence of bySentence) {
-    result.push(...sentence.split(/;\s+(?=[A-Z])/));
-  }
-  return result.map(s => s.trim()).filter(Boolean);
-}
 
 function parseSectionBody(bodyText: string): BodyItem[] {
   const rawLines = bodyText.split('\n').map(l => l.trim()).filter(Boolean);
