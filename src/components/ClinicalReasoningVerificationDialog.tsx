@@ -610,7 +610,7 @@ const ClinicalReasoningVerificationDialog = ({
             </p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col min-h-0 overflow-hidden">
+          <form onSubmit={handleSubmit} className="flex flex-col min-h-0 overflow-hidden min-w-2xl">
             {/* Score summary bar */}
             <div
               className="px-4 py-2.5 border-b shrink-0"

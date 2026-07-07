@@ -94,16 +94,20 @@ const parseList = (raw: any, field: ParseListField = 'default'): string[] => {
 
   // primaryConcerns: backend sends semicolon-separated
   // e.g. "Concern one; Concern two; Concern three"
-  if (field === 'primaryConcerns') {
+if (field === 'primaryConcerns') {
     const bySemicolon = str.split(/;\s+/).map(s => s.trim()).filter(Boolean);
     if (bySemicolon.length > 1) return bySemicolon;
+
+    // fallback: comma + space followed by a capital letter = new item
+    const byCommaCapital = str.split(/,\s+(?=[A-Z])/).map(s => s.trim()).filter(Boolean);
+    if (byCommaCapital.length > 1) return byCommaCapital;
 
     // fallback: newline
     const byNewline = str.split(/\n+/).map(s => s.trim()).filter(Boolean);
     if (byNewline.length > 1) return byNewline;
 
     return [str];
-  }
+}
 
   // immediateActions / monitoring / recommendations:
   // backend sends "., " (period-comma-space) as item boundary
@@ -162,99 +166,66 @@ const cleanMarkdown = (text = "") =>
       .replace(/`(.*?)`/g, "$1"),
   );
 
-function parseClinicalReasoning(raw: string): ReasoningSection[] {
-  if (!raw) return [];
-
-  const normalized = cleanMarkdown(raw);
-
-  // Support markdown-inline section headers like "**Overview:** details..."
-  if (/\*\*[A-Za-z0-9 &/()\-]+:\*\*/.test(normalized)) {
-    const regex = /\*\*([A-Za-z0-9 &/()\-]+):\*\*/g;
-    const found: Array<{ title: string; start: number; end: number }> = [];
-    let match: RegExpExecArray | null;
-
-    while ((match = regex.exec(normalized)) !== null) {
-      found.push({ title: match[1].trim(), start: match.index, end: regex.lastIndex });
+  function parseClinicalReasoning(raw: string): ReasoningSection[] {
+    if (!raw) return [];
+  
+    // Strip citation markers / normalize whitespace but KEEP ** markers intact —
+    // we need them to detect section headers before any bold-stripping happens.
+    const normalized = sanitizeClinicalText(raw);
+  
+    if (/\*\*[A-Za-z0-9 &/()\-]+:\*\*/.test(normalized)) {
+      const regex = /\*\*([A-Za-z0-9 &/()\-]+):\*\*/g;
+      const found: Array<{ title: string; start: number; end: number }> = [];
+      let match: RegExpExecArray | null;
+  
+      while ((match = regex.exec(normalized)) !== null) {
+        found.push({ title: match[1].trim(), start: match.index, end: regex.lastIndex });
+      }
+  
+      const sections = found.map((curr, i) => {
+        const nextStart = i + 1 < found.length ? found[i + 1].start : normalized.length;
+        return {
+          title: curr.title,
+          body: normalized.slice(curr.end, nextStart).trim(),
+        };
+      });
+      return sections.filter((s) => s.body.length > 0);
     }
-
-    const sections = found.map((curr, i) => {
-      const nextStart = i + 1 < found.length ? found[i + 1].start : normalized.length;
-      return {
-        title: curr.title,
-        body: normalized.slice(curr.end, nextStart).trim(),
-      };
-    });
+  
+    // Fallback: headers on their own line, e.g. "Overview:\n"
+    const headerRegex = /^([A-Za-z0-9 &/()\-]+):\s*$/gm;
+    const matches: { title: string; index: number }[] = [];
+  
+    let match;
+    while ((match = headerRegex.exec(normalized)) !== null) {
+      matches.push({ title: match[1].trim(), index: match.index });
+    }
+  
+    if (!matches.length) {
+      return [{ title: "Overview", body: normalized }];
+    }
+  
+    const sections: ReasoningSection[] = [];
+  
+    if (matches[0].index > 0) {
+      sections.push({ title: "Overview", body: normalized.slice(0, matches[0].index).trim() });
+    }
+  
+    for (let i = 0; i < matches.length; i++) {
+      const start = matches[i].index;
+      const end = i + 1 < matches.length ? matches[i + 1].index : normalized.length;
+      const title = matches[i].title;
+      const body = normalized.slice(start + title.length + 1, end).trim();
+      sections.push({ title, body });
+    }
+  
     return sections.filter((s) => s.body.length > 0);
   }
-
-  const headerRegex = /^([A-Za-z0-9 &/()\-]+):\s*$/gm;
-  const matches: { title: string; index: number }[] = [];
-
-  let match;
-  while ((match = headerRegex.exec(normalized)) !== null) {
-    matches.push({
-      title: match[1].trim(),
-      index: match.index,
-    });
-  }
-
-  if (!matches.length) {
-    return [{ title: "Overview", body: normalized }];
-  }
-
-  const sections: ReasoningSection[] = [];
-
-  if (matches[0].index > 0) {
-    sections.push({
-      title: "Overview",
-      body: normalized.slice(0, matches[0].index).trim(),
-    });
-  }
-
-  for (let i = 0; i < matches.length; i++) {
-    const start = matches[i].index;
-    const end =
-      i + 1 < matches.length ? matches[i + 1].index : normalized.length;
-
-    const title = matches[i].title;
-    const body = normalized.slice(start + title.length + 1, end).trim();
-
-    sections.push({ title, body });
-  }
-
-  return sections.filter((s) => s.body.length > 0);
-}
 
 interface BodyItem {
   type: 'bullet' | 'number' | 'paragraph';
   text: string;
   num?: string;
-}
-
-function parseSectionBody(bodyText: string): BodyItem[] {
-  const lines = bodyText.split('\n').map(l => l.trim()).filter(Boolean);
-  const items: BodyItem[] = [];
-
-  for (const line of lines) {
-    // Check for bullet list item
-    const bulletMatch = line.match(/^[-*•]\s+(.*)$/);
-    if (bulletMatch) {
-      items.push({ type: 'bullet', text: bulletMatch[1] });
-      continue;
-    }
-
-    // Check for numbered list item
-    const numberMatch = line.match(/^(\d+)\.\s+(.*)$/);
-    if (numberMatch) {
-      items.push({ type: 'number', text: numberMatch[2], num: numberMatch[1] });
-      continue;
-    }
-
-    // Otherwise it's a normal paragraph
-    items.push({ type: 'paragraph', text: line });
-  }
-
-  return items;
 }
 
 const renderFormattedText = (text: string) => {
@@ -276,13 +247,51 @@ const renderFormattedText = (text: string) => {
   );
 };
 
+function splitDenseText(line: string): string[] {
+  const bySentence = line.split(/(?<=[.!?])\s+(?=[A-Z])/);
+  const result: string[] = [];
+  for (const sentence of bySentence) {
+    result.push(...sentence.split(/;\s+(?=[A-Z])/));
+  }
+  return result.map(s => s.trim()).filter(Boolean);
+}
+
+function parseSectionBody(bodyText: string): BodyItem[] {
+  const rawLines = bodyText.split('\n').map(l => l.trim()).filter(Boolean);
+  const items: BodyItem[] = [];
+
+  for (const line of rawLines) {
+    // 1. Handle Numbered Lists (e.g., "1. Text")
+    const numberMatch = line.match(/^(\d+)\.\s+(.*)$/);
+    if (numberMatch) {
+      items.push({ type: 'number', text: numberMatch[2], num: numberMatch[1] });
+      continue;
+    }
+
+    // 2. Handle Existing Bullets
+    const bulletMatch = line.match(/^[-*•]\s+(.*)$/);
+    if (bulletMatch) {
+      items.push({ type: 'bullet', text: bulletMatch[1] });
+      continue;
+    }
+
+    // 3. Force Paragraphs to have a dash
+    items.push({ type: 'paragraph', text: `- ${line}` });
+  }
+  return items;
+}
+
 const formatListItemText = (text: string): string => {
   const colonIndex = text.indexOf(':');
-  if (colonIndex > 0 && colonIndex <= 35) {
+  if (colonIndex > 0) {
     const prefix = text.substring(0, colonIndex);
-    const suffix = text.substring(colonIndex + 1);
-    if (!prefix.includes('**')) {
-      return `**${prefix}:**${suffix}`;
+    const suffix = text.substring(colonIndex + 1).trim(); // Added .trim()
+    const wordCount = prefix.trim().split(/\s+/).length;
+    const looksLikeLabel = wordCount <= 8 && !/[.!?]/.test(prefix);
+
+    if (looksLikeLabel && !prefix.includes('**')) {
+      // Added space after colon:
+      return `**${prefix}:** ${suffix}`; 
     }
   }
   return text;
@@ -301,6 +310,8 @@ const ClinicalReasoningBlock: React.FC<{ text: string }> = ({ text }) => {
   const sections = parseClinicalReasoning(text);
 
   if (!sections.length) return null;
+
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -371,6 +382,7 @@ function mapCommentRows(rows: any[]): { notes: CommentPayload[]; ids: (string | 
   };
 }
 
+
 const SymptomReportNew: React.FC<SymptomReportProps> = ({
   report, patient, onBack, reportHistory = [], onEscalate, onSaveComment
 }) => {
@@ -386,6 +398,8 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
   const [isVerificationDialogOpen, setIsVerificationDialogOpen] = useState(false);
   const [selectedVersionId, setSelectedVersionId] = useState('');
   const toggle = useCallback((key: string) => setChecked(p => ({ ...p, [key]: !p[key] })), []);
+
+
 
   const versions = useMemo(
     () => (report ? buildSymptomReportVersions(report, reportHistory) : []),
@@ -996,7 +1010,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
                   {primaryConcerns.map((concern, i) => (
                     <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                       <span style={{ color: '#9ca3af', flexShrink: 0, marginTop: 6, fontSize: 5 }}>●</span>
-                      <span className="capitalize" style={{ fontSize: 13, color: '#374151', lineHeight: 1.6 }}>
+                      <span style={{ fontSize: 12, color: '#374151', lineHeight: 1.6 }}>
                         {renderFormattedText(concern)}
                       </span>
                     </div>
