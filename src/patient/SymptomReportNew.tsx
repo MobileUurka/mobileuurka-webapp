@@ -94,7 +94,7 @@ const parseList = (raw: any, field: ParseListField = 'default'): string[] => {
 
   // primaryConcerns: backend sends semicolon-separated
   // e.g. "Concern one; Concern two; Concern three"
-if (field === 'primaryConcerns') {
+  if (field === 'primaryConcerns') {
     const bySemicolon = str.split(/;\s+/).map(s => s.trim()).filter(Boolean);
     if (bySemicolon.length > 1) return bySemicolon;
 
@@ -107,7 +107,7 @@ if (field === 'primaryConcerns') {
     if (byNewline.length > 1) return byNewline;
 
     return [str];
-}
+  }
 
   // immediateActions / monitoring / recommendations:
   // backend sends "., " (period-comma-space) as item boundary
@@ -151,7 +151,18 @@ interface ReasoningSection {
 const sanitizeClinicalText = (text = "") =>
   text
     .replace(/\r/g, "")
+    // remove citation markers like [2] [4] [LOCALIZED_CONTEXT]
     .replace(/\[(?:LOCALIZED_CONTEXT|\d+)\]/g, "")
+    // remove any remaining bare "LOCALIZED_CONTEXT" mentions
+    .replace(/\bLOCALIZED_CONTEXT\b/g, "")
+    // clean up artifacts left behind, e.g. "(2018 and )" -> "(2018)"
+    .replace(/\(\s*and\s+/g, "(")
+    .replace(/\s+and\s*\)/g, ")")
+    .replace(/\(\s*\)/g, "")
+    .replace(/\s+,/g, ",")
+    .replace(/,\s*\)/g, ")")
+    .replace(/\(\s*,/g, "(")
+    .replace(/[ \t]{2,}/g, " ")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -166,61 +177,61 @@ const cleanMarkdown = (text = "") =>
       .replace(/`(.*?)`/g, "$1"),
   );
 
-  function parseClinicalReasoning(raw: string): ReasoningSection[] {
-    if (!raw) return [];
-  
-    // Strip citation markers / normalize whitespace but KEEP ** markers intact —
-    // we need them to detect section headers before any bold-stripping happens.
-    const normalized = sanitizeClinicalText(raw);
-  
-    if (/\*\*[A-Za-z0-9 &/()\-]+:\*\*/.test(normalized)) {
-      const regex = /\*\*([A-Za-z0-9 &/()\-]+):\*\*/g;
-      const found: Array<{ title: string; start: number; end: number }> = [];
-      let match: RegExpExecArray | null;
-  
-      while ((match = regex.exec(normalized)) !== null) {
-        found.push({ title: match[1].trim(), start: match.index, end: regex.lastIndex });
-      }
-  
-      const sections = found.map((curr, i) => {
-        const nextStart = i + 1 < found.length ? found[i + 1].start : normalized.length;
-        return {
-          title: curr.title,
-          body: normalized.slice(curr.end, nextStart).trim(),
-        };
-      });
-      return sections.filter((s) => s.body.length > 0);
+function parseClinicalReasoning(raw: string): ReasoningSection[] {
+  if (!raw) return [];
+
+  // Strip citation markers / normalize whitespace but KEEP ** markers intact —
+  // we need them to detect section headers before any bold-stripping happens.
+  const normalized = sanitizeClinicalText(raw);
+
+  if (/\*\*[A-Za-z0-9 &/()\-]+:\*\*/.test(normalized)) {
+    const regex = /\*\*([A-Za-z0-9 &/()\-]+):\*\*/g;
+    const found: Array<{ title: string; start: number; end: number }> = [];
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(normalized)) !== null) {
+      found.push({ title: match[1].trim(), start: match.index, end: regex.lastIndex });
     }
-  
-    // Fallback: headers on their own line, e.g. "Overview:\n"
-    const headerRegex = /^([A-Za-z0-9 &/()\-]+):\s*$/gm;
-    const matches: { title: string; index: number }[] = [];
-  
-    let match;
-    while ((match = headerRegex.exec(normalized)) !== null) {
-      matches.push({ title: match[1].trim(), index: match.index });
-    }
-  
-    if (!matches.length) {
-      return [{ title: "Overview", body: normalized }];
-    }
-  
-    const sections: ReasoningSection[] = [];
-  
-    if (matches[0].index > 0) {
-      sections.push({ title: "Overview", body: normalized.slice(0, matches[0].index).trim() });
-    }
-  
-    for (let i = 0; i < matches.length; i++) {
-      const start = matches[i].index;
-      const end = i + 1 < matches.length ? matches[i + 1].index : normalized.length;
-      const title = matches[i].title;
-      const body = normalized.slice(start + title.length + 1, end).trim();
-      sections.push({ title, body });
-    }
-  
+
+    const sections = found.map((curr, i) => {
+      const nextStart = i + 1 < found.length ? found[i + 1].start : normalized.length;
+      return {
+        title: curr.title,
+        body: normalized.slice(curr.end, nextStart).trim(),
+      };
+    });
     return sections.filter((s) => s.body.length > 0);
   }
+
+  // Fallback: headers on their own line, e.g. "Overview:\n"
+  const headerRegex = /^([A-Za-z0-9 &/()\-]+):\s*$/gm;
+  const matches: { title: string; index: number }[] = [];
+
+  let match;
+  while ((match = headerRegex.exec(normalized)) !== null) {
+    matches.push({ title: match[1].trim(), index: match.index });
+  }
+
+  if (!matches.length) {
+    return [{ title: "Overview", body: normalized }];
+  }
+
+  const sections: ReasoningSection[] = [];
+
+  if (matches[0].index > 0) {
+    sections.push({ title: "Overview", body: normalized.slice(0, matches[0].index).trim() });
+  }
+
+  for (let i = 0; i < matches.length; i++) {
+    const start = matches[i].index;
+    const end = i + 1 < matches.length ? matches[i + 1].index : normalized.length;
+    const title = matches[i].title;
+    const body = normalized.slice(start + title.length + 1, end).trim();
+    sections.push({ title, body });
+  }
+
+  return sections.filter((s) => s.body.length > 0);
+}
 
 interface BodyItem {
   type: 'bullet' | 'number' | 'paragraph';
@@ -248,42 +259,58 @@ const renderFormattedText = (text: string) => {
 };
 
 
+const splitIntoSentences = (line: string): string[] => {
+  // Split after . ! ? only when followed by whitespace + a capital letter or "("
+  // (this naturally skips decimals like "0.25/1.0" since there's no space after the dot)
+  const sentences = line
+    .split(/(?<=[.!?])\s+(?=[A-Z(])/)
+    .map(s => s.trim())
+    .filter(Boolean);
+  return sentences.length > 0 ? sentences : [line];
+};
+
 function parseSectionBody(bodyText: string): BodyItem[] {
   const rawLines = bodyText.split('\n').map(l => l.trim()).filter(Boolean);
   const items: BodyItem[] = [];
 
   for (const line of rawLines) {
-    // 1. Handle Numbered Lists (e.g., "1. Text")
+    // 1. Numbered lists (e.g., "1. Text") — keep as single item
     const numberMatch = line.match(/^(\d+)\.\s+(.*)$/);
     if (numberMatch) {
       items.push({ type: 'number', text: numberMatch[2], num: numberMatch[1] });
       continue;
     }
 
-    // 2. Handle Existing Bullets
+    // 2. Existing bullets — keep as single item
     const bulletMatch = line.match(/^[-*•]\s+(.*)$/);
     if (bulletMatch) {
       items.push({ type: 'bullet', text: bulletMatch[1] });
       continue;
     }
 
-    // 3. Force Paragraphs to have a dash
-    items.push({ type: 'paragraph', text: `- ${line}` });
+    // 3. Plain paragraph lines — break into individual sentences,
+    //    each becomes its own "-" line instead of one dash for the whole paragraph
+    for (const sentence of splitIntoSentences(line)) {
+      items.push({ type: 'paragraph', text: `- ${sentence}` });
+    }
   }
   return items;
 }
 
+const capitalizeFirst = (s: string): string =>
+  s.length > 0 ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+
 const formatListItemText = (text: string): string => {
   const colonIndex = text.indexOf(':');
   if (colonIndex > 0) {
-    const prefix = text.substring(0, colonIndex);
-    const suffix = text.substring(colonIndex + 1).trim(); // Added .trim()
-    const wordCount = prefix.trim().split(/\s+/).length;
+    const prefix = text.substring(0, colonIndex).trim();
+    const suffix = capitalizeFirst(text.substring(colonIndex + 1).trim());
+    const wordCount = prefix.split(/\s+/).length;
     const looksLikeLabel = wordCount <= 8 && !/[.!?]/.test(prefix);
 
     if (looksLikeLabel && !prefix.includes('**')) {
-      // Added space after colon:
-      return `**${prefix}:** ${suffix}`; 
+      // explicit space after the bolded label's colon, and suffix starts capitalized
+      return `**${prefix}:**\u00A0${suffix}`;
     }
   }
   return text;
@@ -390,7 +417,6 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
   const [isVerificationDialogOpen, setIsVerificationDialogOpen] = useState(false);
   const [selectedVersionId, setSelectedVersionId] = useState('');
   const toggle = useCallback((key: string) => setChecked(p => ({ ...p, [key]: !p[key] })), []);
-
 
 
   const versions = useMemo(
@@ -753,14 +779,14 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
 
       {/* Clinical verification status */}
       {isViewingLatest && (
-      <div className="print:hidden mb-4">
-        <VerificationStatusBar
-          verification={latestVerification}
-          loading={verificationLoading}
-          onReview={() => setIsVerificationDialogOpen(true)}
-          subjectLabel="analysis"
-        />
-      </div>
+        <div className="print:hidden mb-4">
+          <VerificationStatusBar
+            verification={latestVerification}
+            loading={verificationLoading}
+            onReview={() => setIsVerificationDialogOpen(true)}
+            subjectLabel="analysis"
+          />
+        </div>
       )}
 
       {/* Panel tabs */}
@@ -1206,18 +1232,18 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
 
       {/* Clinical Reasoning Evaluation Dialog */}
       {isViewingLatest && (
-      <ClinicalReasoningVerificationDialog
-        isOpen={isVerificationDialogOpen}
-        onClose={() => setIsVerificationDialogOpen(false)}
-        onSubmit={handleVerificationSubmit}
-        diagnosisText={`${riskLevel} risk · score ${riskScore.toFixed(2)} · ${gestationWeeks}/${gestationTotal} wks`}
-        riskLevel={riskLevel}
-        patientId={patient?.id || ''}
-        patientName={patient?.name}
-        reportSections={verificationReportSections}
-        recordDate={generatedDate}
-        existingVerification={latestVerification}
-      />
+        <ClinicalReasoningVerificationDialog
+          isOpen={isVerificationDialogOpen}
+          onClose={() => setIsVerificationDialogOpen(false)}
+          onSubmit={handleVerificationSubmit}
+          diagnosisText={`${riskLevel} risk · score ${riskScore.toFixed(2)} · ${gestationWeeks}/${gestationTotal} wks`}
+          riskLevel={riskLevel}
+          patientId={patient?.id || ''}
+          patientName={patient?.name}
+          reportSections={verificationReportSections}
+          recordDate={generatedDate}
+          existingVerification={latestVerification}
+        />
       )}
     </>
   );
