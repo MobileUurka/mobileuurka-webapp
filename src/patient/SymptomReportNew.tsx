@@ -625,22 +625,117 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
       const patientName = patient?.name?.replace(/\s+/g, ' ').trim() || 'Patient';
       const dateStr = formatDate(activeReport?.createdAt ?? activeReport?.updatedAt, 'short').replace(/\//g, '-');
       const filename = `AI Analysis - ${patientName} - ${dateStr}.pdf`;
-
+  
       const canvas = await html2canvas(printRef.current, {
         scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff',
       });
-
-      const imgWidth = 210;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+  
+      // ── Page geometry (mm) ──────────────────────────────────────────────
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const marginX = 12;
+      const marginBottom = 16;
+  
+      // Page 1 already has the header baked into the DOM screenshot, so it
+      // only needs a small top margin. Pages 2+ get the jsPDF-drawn header,
+      // so they need more room reserved above the content.
+      const marginTopFirst = 10;
+      const marginTopRest = 34;
+  
+      const contentWidth = pageWidth - marginX * 2;
+      const pxPerMm = canvas.width / contentWidth;
+  
+      const contentHeightFirstPx = (pageHeight - marginTopFirst - marginBottom) * pxPerMm;
+      const contentHeightRestPx = (pageHeight - marginTopRest - marginBottom) * pxPerMm;
+  
+      const totalPages =
+        canvas.height <= contentHeightFirstPx
+          ? 1
+          : 1 + Math.ceil((canvas.height - contentHeightFirstPx) / contentHeightRestPx);
+  
       const pdf = new jsPDF('p', 'mm', 'a4');
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, imgWidth, imgHeight);
+      const logoDataUrl = await loadImageAsDataURL('/images/logo.png');
+  
+      const drawHeader = () => {
+        if (logoDataUrl) pdf.addImage(logoDataUrl, 'PNG', marginX, 10, 12, 12);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(12);
+        pdf.setTextColor(17, 24, 39);
+        pdf.text('Mobileuurka', marginX + 15, 15);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(9);
+        pdf.setTextColor(75, 85, 99);
+        pdf.text('Healthcare Services', marginX + 15, 20);
+  
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(11);
+        pdf.setTextColor(17, 24, 39);
+        pdf.text('AI Analysis', pageWidth - marginX, 15, { align: 'right' });
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(9);
+        pdf.setTextColor(75, 85, 99);
+        pdf.text(`Date: ${generatedDate}`, pageWidth - marginX, 20, { align: 'right' });
+  
+        pdf.setDrawColor(229, 231, 235);
+        pdf.line(marginX, 25, pageWidth - marginX, 25);
+      };
+  
+      const drawFooter = (pageNum: number) => {
+        pdf.setDrawColor(229, 231, 235);
+        pdf.line(marginX, pageHeight - marginBottom + 4, pageWidth - marginX, pageHeight - marginBottom + 4);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8);
+        pdf.setTextColor(156, 163, 175);
+        pdf.text(
+          'This document is confidential and contains protected health information.',
+          pageWidth / 2, pageHeight - marginBottom + 9, { align: 'center' },
+        );
+        pdf.text(`Page ${pageNum} of ${totalPages}`, pageWidth / 2, pageHeight - marginBottom + 13, { align: 'center' });
+      };
+  
+      let sourceY = 0;
+      for (let page = 0; page < totalPages; page++) {
+        if (page > 0) pdf.addPage();
+  
+        const isFirst = page === 0;
+        const marginTop = isFirst ? marginTopFirst : marginTopRest;
+        const pageHeightPx = isFirst ? contentHeightFirstPx : contentHeightRestPx;
+        const sliceHeightPx = Math.min(pageHeightPx, canvas.height - sourceY);
+  
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = sliceHeightPx;
+        const ctx = sliceCanvas.getContext('2d')!;
+        ctx.drawImage(canvas, 0, sourceY, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+  
+        const sliceHeightMm = sliceHeightPx / pxPerMm;
+        pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', marginX, marginTop, contentWidth, sliceHeightMm);
+  
+        if (!isFirst) drawHeader();
+        drawFooter(page + 1);
+  
+        sourceY += sliceHeightPx;
+      }
+  
       pdf.save(filename);
     } catch (error) {
       console.error('PDF generation failed:', error);
       alert('Failed to generate PDF. Please try again.');
     }
   };
+  
+  const loadImageAsDataURL = (url: string): Promise<string | null> =>
+    fetch(url)
+      .then(res => res.blob())
+      .then(blob => new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      }))
+      .catch(() => null);
 
+      
   // Capture the exact DOM Range at the moment the user opens the comment panel
   const handleComment = (text: string) => {
     pendingRangeRef.current = menu.rangeRef.current
