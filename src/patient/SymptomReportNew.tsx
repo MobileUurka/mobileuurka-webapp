@@ -48,13 +48,14 @@ type ParseListField = 'keyRiskFactors' | 'primaryConcerns' | 'immediateActions' 
 const parseList = (raw: any, field: ParseListField = 'default'): string[] => {
   if (!raw) return [];
 
-  // Helper to optionally clean markdown based on field
+  // Helper to clean every item, regardless of field —
+  // citations/LOCALIZED_CONTEXT should never survive into the UI.
   const clean = (s: string) => {
     const str = String(s).trim();
     if (field === 'keyRiskFactors') {
-      return cleanMarkdown(str);
+      return cleanMarkdown(str); // strips citations AND markdown emphasis
     }
-    return str;
+    return sanitizeClinicalText(str); // strips citations/LOCALIZED_CONTEXT, keeps ** for bold labels
   };
 
   // Already an array — just clean it up
@@ -70,60 +71,49 @@ const parseList = (raw: any, field: ParseListField = 'default'): string[] => {
     }
   } catch { /* not valid JSON — fall through */ }
 
-  const str = (field === 'keyRiskFactors' ? cleanMarkdown(String(raw)) : String(raw)).replace(/^\[|\]$/g, '').trim();
+  const str = (
+    field === 'keyRiskFactors' ? cleanMarkdown(String(raw)) : sanitizeClinicalText(String(raw))
+  ).replace(/^\[|\]$/g, '').trim();
 
   if (field === 'keyRiskFactors') {
-    // Try newline first
     const byNewline = str.split(/\n+/).map(s => s.trim()).filter(Boolean);
     if (byNewline.length > 1) return byNewline;
 
-    // Split on ", " only when followed by a capital letter or digit
-    // This avoids splitting mid-item on things like "120.0; unit/date not documented, Platelets..."
     const byCommaCapital = str
       .split(/,\s+(?=[A-Z0-9])/)
       .map(s => s.replace(/\.$/, '').trim())
       .filter(Boolean);
     if (byCommaCapital.length > 1) return byCommaCapital;
 
-    // fallback: "., " separator
     return str
       .split(/\.,\s+/)
       .map(s => s.replace(/\.$/, '').trim())
       .filter(Boolean);
   }
 
-  // primaryConcerns: backend sends semicolon-separated
-  // e.g. "Concern one; Concern two; Concern three"
   if (field === 'primaryConcerns') {
     const bySemicolon = str.split(/;\s+/).map(s => s.trim()).filter(Boolean);
     if (bySemicolon.length > 1) return bySemicolon;
 
-    // fallback: comma + space followed by a capital letter = new item
     const byCommaCapital = str.split(/,\s+(?=[A-Z])/).map(s => s.trim()).filter(Boolean);
     if (byCommaCapital.length > 1) return byCommaCapital;
 
-    // fallback: newline
     const byNewline = str.split(/\n+/).map(s => s.trim()).filter(Boolean);
     if (byNewline.length > 1) return byNewline;
 
     return [str];
   }
 
-  // immediateActions / monitoring / recommendations:
-  // backend sends "., " (period-comma-space) as item boundary
-  // e.g. "Do X because Y., Do Z because W."
   if (field === 'immediateActions' || field === 'monitoring' || field === 'recommendations') {
     const byPeriodComma = str.split(/\.,\s+/).map(s => s.replace(/\.$/, '').trim()).filter(Boolean);
     if (byPeriodComma.length > 1) return byPeriodComma;
 
-    // fallback: newline
     const byNewline = str.split(/\n+/).map(s => s.trim()).filter(Boolean);
     if (byNewline.length > 1) return byNewline;
 
     return [str];
   }
 
-  // default: standard comma split
   return str
     .split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)
     .map(s => s.replace(/^["']|["']$/g, '').trim())
@@ -625,37 +615,37 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
       const patientName = patient?.name?.replace(/\s+/g, ' ').trim() || 'Patient';
       const dateStr = formatDate(activeReport?.createdAt ?? activeReport?.updatedAt, 'short').replace(/\//g, '-');
       const filename = `AI Analysis - ${patientName} - ${dateStr}.pdf`;
-  
+
       const canvas = await html2canvas(printRef.current, {
         scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff',
       });
-  
+
       // ── Page geometry (mm) ──────────────────────────────────────────────
       const pageWidth = 210;
       const pageHeight = 297;
       const marginX = 12;
       const marginBottom = 16;
-  
+
       // Page 1 already has the header baked into the DOM screenshot, so it
       // only needs a small top margin. Pages 2+ get the jsPDF-drawn header,
       // so they need more room reserved above the content.
       const marginTopFirst = 10;
       const marginTopRest = 34;
-  
+
       const contentWidth = pageWidth - marginX * 2;
       const pxPerMm = canvas.width / contentWidth;
-  
+
       const contentHeightFirstPx = (pageHeight - marginTopFirst - marginBottom) * pxPerMm;
       const contentHeightRestPx = (pageHeight - marginTopRest - marginBottom) * pxPerMm;
-  
+
       const totalPages =
         canvas.height <= contentHeightFirstPx
           ? 1
           : 1 + Math.ceil((canvas.height - contentHeightFirstPx) / contentHeightRestPx);
-  
+
       const pdf = new jsPDF('p', 'mm', 'a4');
       const logoDataUrl = await loadImageAsDataURL('/images/logo.png');
-  
+
       const drawHeader = () => {
         if (logoDataUrl) pdf.addImage(logoDataUrl, 'PNG', marginX, 10, 12, 12);
         pdf.setFont('helvetica', 'bold');
@@ -666,7 +656,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
         pdf.setFontSize(9);
         pdf.setTextColor(75, 85, 99);
         pdf.text('Healthcare Services', marginX + 15, 20);
-  
+
         pdf.setFont('helvetica', 'bold');
         pdf.setFontSize(11);
         pdf.setTextColor(17, 24, 39);
@@ -675,11 +665,11 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
         pdf.setFontSize(9);
         pdf.setTextColor(75, 85, 99);
         pdf.text(`Date: ${generatedDate}`, pageWidth - marginX, 20, { align: 'right' });
-  
+
         pdf.setDrawColor(229, 231, 235);
         pdf.line(marginX, 25, pageWidth - marginX, 25);
       };
-  
+
       const drawFooter = (pageNum: number) => {
         pdf.setDrawColor(229, 231, 235);
         pdf.line(marginX, pageHeight - marginBottom + 4, pageWidth - marginX, pageHeight - marginBottom + 4);
@@ -692,38 +682,38 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
         );
         pdf.text(`Page ${pageNum} of ${totalPages}`, pageWidth / 2, pageHeight - marginBottom + 13, { align: 'center' });
       };
-  
+
       let sourceY = 0;
       for (let page = 0; page < totalPages; page++) {
         if (page > 0) pdf.addPage();
-  
+
         const isFirst = page === 0;
         const marginTop = isFirst ? marginTopFirst : marginTopRest;
         const pageHeightPx = isFirst ? contentHeightFirstPx : contentHeightRestPx;
         const sliceHeightPx = Math.min(pageHeightPx, canvas.height - sourceY);
-  
+
         const sliceCanvas = document.createElement('canvas');
         sliceCanvas.width = canvas.width;
         sliceCanvas.height = sliceHeightPx;
         const ctx = sliceCanvas.getContext('2d')!;
         ctx.drawImage(canvas, 0, sourceY, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
-  
+
         const sliceHeightMm = sliceHeightPx / pxPerMm;
         pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', marginX, marginTop, contentWidth, sliceHeightMm);
-  
+
         if (!isFirst) drawHeader();
         drawFooter(page + 1);
-  
+
         sourceY += sliceHeightPx;
       }
-  
+
       pdf.save(filename);
     } catch (error) {
       console.error('PDF generation failed:', error);
       alert('Failed to generate PDF. Please try again.');
     }
   };
-  
+
   const loadImageAsDataURL = (url: string): Promise<string | null> =>
     fetch(url)
       .then(res => res.blob())
@@ -735,7 +725,7 @@ const SymptomReportNew: React.FC<SymptomReportProps> = ({
       }))
       .catch(() => null);
 
-      
+
   // Capture the exact DOM Range at the moment the user opens the comment panel
   const handleComment = (text: string) => {
     pendingRangeRef.current = menu.rangeRef.current
