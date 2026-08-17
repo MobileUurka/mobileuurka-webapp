@@ -269,7 +269,7 @@ export default function MentionTextarea({
                                             <span className="ml-1.5 text-[10px] text-gray-400 font-normal">assigned</span>
                                         )}
                                     </p>
-                                    <p className="text-[11px] text-gray-400 truncate">{staff.role} {staff.department ? `· ${staff.department}` : ''}</p>
+                                    <p className="text-[11px] text-gray-400 truncate">{staff.role} {(staff as any).hospital_id || (staff as any).hospitalId ? `· ${(staff as any).hospital_id || (staff as any).hospitalId}` : ''}</p>
                                 </div>
                             </button>
                         );

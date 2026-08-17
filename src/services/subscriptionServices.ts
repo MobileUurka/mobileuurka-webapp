@@ -33,7 +33,6 @@ async function authenticatedRequest(endpoint: string, options: any = {}) {
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...apiHeaders(),
       ...options.headers,
     },
   });
@@ -41,13 +40,6 @@ async function authenticatedRequest(endpoint: string, options: any = {}) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || "Request failed");
   return data;
-}
-
-function apiHeaders() {
-  const headers: Record<string, string> = {};
-  const key = import.meta.env.VITE_INTERNAL_API_KEY;
-  if (key) headers["x-api-key"] = key;
-  return headers;
 }
 
 /**
@@ -114,9 +106,11 @@ export const subscriptionService = {
     durationDays?: number;
   }): Promise<SubscriptionResponse> {
     try {
+      const { authService } = await import('./authServices');
+      const signupToken = authService.getSignupToken();
       const response = await publicRequest("/subscription", {
         method: "POST",
-        headers: apiHeaders(),
+        headers: signupToken ? { 'x-signup-token': signupToken } : {},
         body: JSON.stringify(payload),
       });
       return {

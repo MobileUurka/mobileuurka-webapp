@@ -20,6 +20,14 @@ function Onboarding() {
     const phone = location.state?.phone || new URLSearchParams(location.search).get('phone') || '';
     const [phoneNumber, setPhoneNumber] = useState(phone || '');
 
+    // Persist signup token from OTP step (sessionStorage survives Stripe redirect in same tab)
+    useEffect(() => {
+        const token = location.state?.signupData?.signupToken;
+        if (token) {
+            authService.setSignupToken(token);
+        }
+    }, [location.state]);
+
     // Add these
     const stepParam = new URLSearchParams(location.search).get('step');
     const planParam = new URLSearchParams(location.search).get('plan');

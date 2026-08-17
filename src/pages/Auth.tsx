@@ -5,7 +5,7 @@ import LoginForm from "../components/LoginForm";
 import { authService } from "../services/authServices";
 import { settingsService } from "../services/settingsService";
 import SignUpForm from "../components/SignUpForm";
-import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaEye, FaEyeSlash, FaCheck, FaTimes } from "react-icons/fa";
 
 interface AuthProps {
     onLoginSuccess: () => Promise<void>;
@@ -18,6 +18,49 @@ interface StaffFlowState {
     email: string;
     setPasswordToken: string;
 }
+
+// ── Password policy ───────────────────────────────────────────────────────────
+// Baseline aligned with common guidance (NIST 800-63B minimum length,
+// OWASP ASVS complexity recommendations): sufficient length + mixed
+// character classes, and no whitespace.
+const PASSWORD_MIN_LENGTH = 10;
+
+interface PasswordChecks {
+    length: boolean;
+    uppercase: boolean;
+    lowercase: boolean;
+    number: boolean;
+    symbol: boolean;
+    noSpaces: boolean;
+}
+
+function getPasswordChecks(pwd: string): PasswordChecks {
+    return {
+        length: pwd.length >= PASSWORD_MIN_LENGTH,
+        uppercase: /[A-Z]/.test(pwd),
+        lowercase: /[a-z]/.test(pwd),
+        number: /[0-9]/.test(pwd),
+        symbol: /[^A-Za-z0-9]/.test(pwd),
+        noSpaces: pwd.length > 0 && !/\s/.test(pwd),
+    };
+}
+
+function getPasswordStrengthError(checks: PasswordChecks): string | null {
+    if (!checks.length) return `Password must be at least ${PASSWORD_MIN_LENGTH} characters`;
+    if (!checks.uppercase) return 'Password must include at least one uppercase letter';
+    if (!checks.lowercase) return 'Password must include at least one lowercase letter';
+    if (!checks.number) return 'Password must include at least one number';
+    if (!checks.symbol) return 'Password must include at least one symbol (e.g. ! @ # $ %)';
+    if (!checks.noSpaces) return 'Password must not contain spaces';
+    return null;
+}
+
+const RequirementRow = ({ met, label }: { met: boolean; label: string }) => (
+    <li className={`flex items-center gap-2 text-xs ${met ? 'text-green-600' : 'text-gray-500'}`}>
+        {met ? <FaCheck className="shrink-0" /> : <FaTimes className="shrink-0 text-gray-300" />}
+        <span>{label}</span>
+    </li>
+);
 
 const Auth = ({ onLoginSuccess }: AuthProps) => {
     const [isLogin, setIsLogin] = useState<boolean>(false);
@@ -50,6 +93,11 @@ const Auth = ({ onLoginSuccess }: AuthProps) => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showNewPwd, setShowNewPwd] = useState(false);
     const [showConfirmPwd, setShowConfirmPwd] = useState(false);
+    const [pwdTouched, setPwdTouched] = useState(false);
+
+    const passwordChecks = useMemo(() => getPasswordChecks(newPassword), [newPassword]);
+    const isPasswordStrong = useMemo(() => Object.values(passwordChecks).every(Boolean), [passwordChecks]);
+    const passwordsMatch = confirmPassword.length === 0 || confirmPassword === newPassword;
 
     // Resend timer
     const [resendTimer, setResendTimer] = useState(0);
@@ -194,7 +242,10 @@ const Auth = ({ onLoginSuccess }: AuthProps) => {
     // ── Step 3: set new password ─────────────────────────────────────────────
     const handleSetPassword = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (newPassword.length < 8) { setError('Password must be at least 8 characters'); return; }
+        setPwdTouched(true);
+
+        const strengthError = getPasswordStrengthError(passwordChecks);
+        if (strengthError) { setError(strengthError); return; }
         if (newPassword !== confirmPassword) { setError('Passwords do not match'); return; }
         if (!staffFlow) return;
 
@@ -294,8 +345,10 @@ const Auth = ({ onLoginSuccess }: AuthProps) => {
                         type={showNewPwd ? 'text' : 'password'}
                         value={newPassword}
                         onChange={e => setNewPassword(e.target.value)}
+                        onBlur={() => setPwdTouched(true)}
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
-                        placeholder="At least 8 characters"
+                        placeholder={`At least ${PASSWORD_MIN_LENGTH} characters`}
+                        autoComplete="new-password"
                         required
                     />
                     <span
@@ -305,6 +358,24 @@ const Auth = ({ onLoginSuccess }: AuthProps) => {
                         {showNewPwd ? <FaEyeSlash /> : <FaEye />}
                     </span>
                 </div>
+
+                {/* Live strength requirements */}
+                {(pwdTouched || newPassword.length > 0) && (
+                    <ul className="mt-2 flex flex-col gap-1">
+                        <RequirementRow
+                            met={passwordChecks.length}
+                            label={`At least ${PASSWORD_MIN_LENGTH} characters long`}
+                        />
+                        <RequirementRow
+                            met={passwordChecks.uppercase && passwordChecks.lowercase && passwordChecks.number}
+                            label="A mix of uppercase letters, lowercase letters, and numbers"
+                        />
+                        <RequirementRow
+                            met={passwordChecks.symbol && passwordChecks.noSpaces}
+                            label="At least one symbol (e.g. ! @ # $ %) and no spaces"
+                        />
+                    </ul>
+                )}
             </div>
 
             <div className="mb-6">
@@ -314,8 +385,11 @@ const Auth = ({ onLoginSuccess }: AuthProps) => {
                         type={showConfirmPwd ? 'text' : 'password'}
                         value={confirmPassword}
                         onChange={e => setConfirmPassword(e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+                        className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary ${
+                            !passwordsMatch ? 'border-red-400' : 'border-gray-300'
+                        }`}
                         placeholder="Repeat your new password"
+                        autoComplete="new-password"
                         required
                     />
                     <span
@@ -325,13 +399,16 @@ const Auth = ({ onLoginSuccess }: AuthProps) => {
                         {showConfirmPwd ? <FaEyeSlash /> : <FaEye />}
                     </span>
                 </div>
+                {!passwordsMatch && (
+                    <p className="text-red-600 text-xs mt-1">Passwords do not match</p>
+                )}
             </div>
 
             {error && <p className="text-red-600 text-sm text-center mb-3">{error}</p>}
 
             <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || (pwdTouched && (!isPasswordStrong || !passwordsMatch))}
                 className="w-full p-4 rounded-lg bg-primary text-white font-medium disabled:opacity-50"
             >
                 {loading ? 'Saving…' : 'Set Password & Sign In'}
@@ -372,7 +449,7 @@ const Auth = ({ onLoginSuccess }: AuthProps) => {
                 {step === 'staff-set-password' && StaffSetPasswordForm}
             </div>
         ),
-        [step, loginFormData, showLoginPassword, loading, error, successMessage, otp, newPassword, confirmPassword, showNewPwd, showConfirmPwd, resendTimer]
+        [step, loginFormData, showLoginPassword, loading, error, successMessage, otp, newPassword, confirmPassword, showNewPwd, showConfirmPwd, resendTimer, pwdTouched]
     );
 
     const Left = useMemo(

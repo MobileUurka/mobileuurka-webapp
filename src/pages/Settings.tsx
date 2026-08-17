@@ -7,8 +7,9 @@ import { paymentService, type PaymentPlan } from '../services/paymentServices';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/authServices';
+import OrgAuditTrailViewer from '../components/OrgAuditTrailViewer';
 
-type Tab = 'account' | 'organization';
+type Tab = 'account' | 'organization' | 'audit';
 
 function getErrorMessage(err: unknown, fallback: string): string {
     if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: string }).message === 'string') {
@@ -318,7 +319,7 @@ function Settings() {
                     <IoLogOutOutline
                         onClick={handleLogout}
                         size={26}
-                        className="text-[#aca287] cursor-pointer"
+                        className="hidden md:flextext-[#aca287] cursor-pointer"
                     />
                 </div>
             </div>
@@ -340,350 +341,367 @@ function Settings() {
                         Organization
                     </button>
                 )}
+                {isOrgOwner && (
+                    <button
+                        onClick={() => setActiveTab('audit')}
+                        className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${activeTab === 'audit' ? 'border-[#008540] text-gray-900' : 'border-transparent text-gray-500'
+                            }`}
+                    >
+                        Audit Trail
+                    </button>
+                )}
             </div>
 
-            <div className="flex-1 overflow-y-auto max-w-2xl pb-10">
-                {activeTab === 'account' && (
-                    <div className="space-y-8">
-                        <section className="space-y-4">
-                            <h2 className="text-sm font-semibold text-gray-800">Profile</h2>
-                            <p className="text-xs text-gray-400">{user?.email}</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <label className="block">
-                                    <span className="text-xs text-gray-500">First name</span>
-                                    <input
-                                        className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#008540]"
-                                        value={profileForm.firstName}
-                                        onChange={e => setProfileForm(f => ({ ...f, firstName: e.target.value }))}
-                                    />
-                                </label>
-                                <label className="block">
-                                    <span className="text-xs text-gray-500">Last name</span>
-                                    <input
-                                        className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#008540]"
-                                        value={profileForm.lastName}
-                                        onChange={e => setProfileForm(f => ({ ...f, lastName: e.target.value }))}
-                                    />
-                                </label>
-                                <label className="block sm:col-span-2">
-                                    <span className="text-xs text-gray-500">Phone</span>
-                                    <input
-                                        className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#008540]"
-                                        value={profileForm.phone}
-                                        onChange={e => setProfileForm(f => ({ ...f, phone: e.target.value }))}
-                                    />
-                                </label>
-                            </div>
-                            <button
-                                onClick={handleSaveProfile}
-                                disabled={saving}
-                                className="px-4 py-2 bg-[#008540] text-white rounded-lg text-sm font-medium hover:bg-[#007235] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {saving ? 'Saving…' : 'Save profile'}
-                            </button>
-                        </section>
-
-                        <section className="border border-red-100 rounded-xl p-5 bg-red-50/40 space-y-3">
-                            <div className="flex items-center gap-2 text-red-700 font-medium text-sm">
-                                <FiAlertTriangle /> Danger zone
-                            </div>
-                            <p className="text-xs text-gray-600 leading-relaxed">
-                                Delete your account. You will be signed out immediately. After 30 days your
-                                personal details are anonymized — clinical records keep your saved name snapshot.
-                                {isOrgOwner && !orgDeletionPending && requiresTransfer && (
-                                    <> As the only organization owner, transfer ownership to another admin first, or schedule organization deletion.</>
-                                )}
-                                {isOrgOwner && !orgDeletionPending && !requiresTransfer && (
-                                    <> Another organization owner exists — you can delete your personal account without deleting the organization.</>
-                                )}
-                            </p>
-                            {isOrgOwner && !orgDeletionPending && requiresTransfer && (
-                                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                                    Transfer ownership to another organization owner before deleting your account,
-                                    or schedule organization deletion on the Organization tab.
-                                </p>
-                            )}
-                            {!showDeleteConfirm ? (
-                                <button
-                                    onClick={() => setShowDeleteConfirm(true)}
-                                    disabled={isOrgOwner && !orgDeletionPending && !canDeleteAccount}
-                                    className="border border-red-300 text-red-600 rounded-lg px-4 py-2 text-sm hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    Delete my account
-                                </button>
-                            ) : (
-                                <div className="space-y-3">
+            {activeTab !== "audit" &&
+                <div className="flex-1 overflow-y-auto max-w-2xl pb-10">
+                    {activeTab === 'account' && (
+                        <div className="space-y-8">
+                            <section className="space-y-4">
+                                <h2 className="text-sm font-semibold text-gray-800">Profile</h2>
+                                <p className="text-xs text-gray-400">{user?.email}</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <label className="block">
-                                        <span className="text-xs text-gray-600">Confirm with your password</span>
+                                        <span className="text-xs text-gray-500">First name</span>
                                         <input
-                                            type="password"
-                                            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                                            value={deletePassword}
-                                            onChange={e => setDeletePassword(e.target.value)}
-                                            placeholder="Your password"
+                                            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#008540]"
+                                            value={profileForm.firstName}
+                                            onChange={e => setProfileForm(f => ({ ...f, firstName: e.target.value }))}
                                         />
                                     </label>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={handleRequestDeletion}
-                                            disabled={saving}
-                                            className="bg-red-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-red-700 disabled:opacity-50"
-                                        >
-                                            {saving ? 'Scheduling…' : 'Confirm deletion'}
-                                        </button>
-                                        <button
-                                            onClick={() => { setShowDeleteConfirm(false); setDeletePassword(''); }}
-                                            className="border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-600"
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
+                                    <label className="block">
+                                        <span className="text-xs text-gray-500">Last name</span>
+                                        <input
+                                            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#008540]"
+                                            value={profileForm.lastName}
+                                            onChange={e => setProfileForm(f => ({ ...f, lastName: e.target.value }))}
+                                        />
+                                    </label>
+                                    <label className="block sm:col-span-2">
+                                        <span className="text-xs text-gray-500">Phone</span>
+                                        <input
+                                            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#008540]"
+                                            value={profileForm.phone}
+                                            onChange={e => setProfileForm(f => ({ ...f, phone: e.target.value }))}
+                                        />
+                                    </label>
                                 </div>
-                            )}
-                        </section>
-                    </div>
-                )}
+                                <button
+                                    onClick={handleSaveProfile}
+                                    disabled={saving}
+                                    className="px-4 py-2 bg-[#008540] text-white rounded-lg text-sm font-medium hover:bg-[#007235] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {saving ? 'Saving…' : 'Save profile'}
+                                </button>
+                            </section>
 
-                {activeTab === 'organization' && isOrgOwner && (
-                    <div className="space-y-8">
-                        <section className="space-y-4">
-                            <h2 className="text-sm font-semibold text-gray-800">Subscription</h2>
-                            <p className="text-xs text-gray-400">
-                                Your plan is linked to this organization (not your personal account).
-                            </p>
-                            {subscription ? (
-                                <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/50 space-y-1">
-                                    <p className="text-sm font-medium text-gray-800">
-                                        Current plan: {formatPlanName(subscription.planName)}
-                                    </p>
-                                    <p className="text-xs text-gray-500">
-                                        {subscription.currency} {subscription.amount}/month · Status: {subscription.status}
-                                    </p>
-                                    <p className="text-xs text-gray-400">
-                                        Renews {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
-                                    </p>
+                            <section className="border border-red-100 rounded-xl p-5 bg-red-50/40 space-y-3">
+                                <div className="flex items-center gap-2 text-red-700 font-medium text-sm">
+                                    <FiAlertTriangle /> Danger zone
                                 </div>
-                            ) : (
-                                <p className="text-sm text-gray-400">No subscription record found for this organization.</p>
-                            )}
-
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                {plans.map(plan => (
+                                <p className="text-xs text-gray-600 leading-relaxed">
+                                    Delete your account. You will be signed out immediately. After 30 days your
+                                    personal details are anonymized — clinical records keep your saved name snapshot.
+                                    {isOrgOwner && !orgDeletionPending && requiresTransfer && (
+                                        <> As the only organization owner, transfer ownership to another admin first, or schedule organization deletion.</>
+                                    )}
+                                    {isOrgOwner && !orgDeletionPending && !requiresTransfer && (
+                                        <> Another organization owner exists — you can delete your personal account without deleting the organization.</>
+                                    )}
+                                </p>
+                                {isOrgOwner && !orgDeletionPending && requiresTransfer && (
+                                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                                        Transfer ownership to another organization owner before deleting your account,
+                                        or schedule organization deletion on the Organization tab.
+                                    </p>
+                                )}
+                                {!showDeleteConfirm ? (
                                     <button
-                                        key={plan.id}
-                                        type="button"
-                                        onClick={() => setSelectedPlanId(plan.id)}
-                                        className={`text-left border rounded-xl p-4 transition ${selectedPlanId === plan.id
+                                        onClick={() => setShowDeleteConfirm(true)}
+                                        disabled={isOrgOwner && !orgDeletionPending && !canDeleteAccount}
+                                        className="border border-red-300 text-red-600 rounded-lg px-4 py-2 text-sm hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Delete my account
+                                    </button>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <label className="block">
+                                            <span className="text-xs text-gray-600">Confirm with your password</span>
+                                            <input
+                                                type="password"
+                                                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                                                value={deletePassword}
+                                                onChange={e => setDeletePassword(e.target.value)}
+                                                placeholder="Your password"
+                                            />
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={handleRequestDeletion}
+                                                disabled={saving}
+                                                className="bg-red-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                                            >
+                                                {saving ? 'Scheduling…' : 'Confirm deletion'}
+                                            </button>
+                                            <button
+                                                onClick={() => { setShowDeleteConfirm(false); setDeletePassword(''); }}
+                                                className="border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-600"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </section>
+                        </div>
+                    )}
+
+                    {activeTab === 'organization' && isOrgOwner && (
+                        <div className="space-y-8">
+                            <section className="space-y-4">
+                                <h2 className="text-sm font-semibold text-gray-800">Subscription</h2>
+                                <p className="text-xs text-gray-400">
+                                    Your plan is linked to this organization (not your personal account).
+                                </p>
+                                {subscription ? (
+                                    <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/50 space-y-1">
+                                        <p className="text-sm font-medium text-gray-800">
+                                            Current plan: {formatPlanName(subscription.planName)}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            {subscription.currency} {subscription.amount}/month · Status: {subscription.status}
+                                        </p>
+                                        <p className="text-xs text-gray-400">
+                                            Renews {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-gray-400">No subscription record found for this organization.</p>
+                                )}
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    {plans.map(plan => (
+                                        <button
+                                            key={plan.id}
+                                            type="button"
+                                            onClick={() => setSelectedPlanId(plan.id)}
+                                            className={`text-left border rounded-xl p-4 transition ${selectedPlanId === plan.id
                                                 ? 'border-[#008540] bg-[#008540]/5'
                                                 : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                    >
-                                        <p className="text-sm font-medium text-gray-800">{plan.name}</p>
-                                        <p className="text-xs text-gray-500 mt-1">
-                                            {plan.currency} {plan.price}/{plan.interval}
-                                        </p>
-                                        {subscription?.planName === plan.id && (
-                                            <p className="text-xs text-[#008540] mt-2">Current</p>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
+                                                }`}
+                                        >
+                                            <p className="text-sm font-medium text-gray-800">{plan.name}</p>
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                {plan.currency} {plan.price}/{plan.interval}
+                                            </p>
+                                            {subscription?.planName === plan.id && (
+                                                <p className="text-xs text-[#008540] mt-2">Current</p>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
 
-                            <div className="flex flex-wrap gap-3 items-end">
-                                <label className="block">
-                                    <span className="text-xs text-gray-500 pr-5">Payment method</span>
-                                    <select
-                                        className="mt-1 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-                                        value={paymentMethod}
-                                        onChange={e => setPaymentMethod(e.target.value as 'mpesa' | 'card')}
-                                    >
-                                        <option value="mpesa">M-Pesa</option>
-                                        <option value="card">Card</option>
-                                    </select>
-                                </label>
-                                {paymentMethod === 'mpesa' && (
-                                    <label className="block flex-1 min-w-[200px]">
-                                        <span className="text-xs text-gray-500">M-Pesa phone</span>
+                                <div className="flex flex-wrap gap-3 items-end">
+                                    <label className="block">
+                                        <span className="text-xs text-gray-500 pr-5">Payment method</span>
+                                        <select
+                                            className="mt-1 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+                                            value={paymentMethod}
+                                            onChange={e => setPaymentMethod(e.target.value as 'mpesa' | 'card')}
+                                        >
+                                            <option value="mpesa">M-Pesa</option>
+                                            <option value="card">Card</option>
+                                        </select>
+                                    </label>
+                                    {paymentMethod === 'mpesa' && (
+                                        <label className="block flex-1 min-w-[200px]">
+                                            <span className="text-xs text-gray-500">M-Pesa phone</span>
+                                            <input
+                                                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                                                value={payPhone}
+                                                onChange={e => setPayPhone(e.target.value)}
+                                                placeholder="2547XXXXXXXX"
+                                            />
+                                        </label>
+                                    )}
+                                </div>
+
+                                <button
+                                    onClick={handleChangePlan}
+                                    disabled={planChanging || !selectedPlanId || selectedPlanId === subscription?.planName}
+                                    className="px-4 py-2 bg-[#008540] text-white rounded-lg text-sm font-medium hover:bg-[#007235] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {planChanging ? 'Processing…' : 'Change plan'}
+                                </button>
+                            </section>
+
+                            <section className="space-y-4">
+                                <h2 className="text-sm font-semibold text-gray-800">Organization details</h2>
+                                <p className="text-xs text-gray-400">
+                                    Display name can be changed. Internal ID (slug): <code className="bg-gray-100 px-1 rounded">{org?.slug ?? account?.organization?.slug}</code> — cannot be renamed.
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <label className="block sm:col-span-2">
+                                        <span className="text-xs text-gray-500">Organization name</span>
                                         <input
-                                            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                                            value={payPhone}
-                                            onChange={e => setPayPhone(e.target.value)}
-                                            placeholder="2547XXXXXXXX"
+                                            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#008540]"
+                                            value={orgForm.name}
+                                            onChange={e => setOrgForm(f => ({ ...f, name: e.target.value }))}
                                         />
                                     </label>
-                                )}
-                            </div>
+                                    <label className="block">
+                                        <span className="text-xs text-gray-500">Phone</span>
+                                        <input
+                                            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                                            value={orgForm.phone}
+                                            onChange={e => setOrgForm(f => ({ ...f, phone: e.target.value }))}
+                                        />
+                                    </label>
+                                    <label className="block">
+                                        <span className="text-xs text-gray-500">Email</span>
+                                        <input
+                                            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                                            value={orgForm.email}
+                                            onChange={e => setOrgForm(f => ({ ...f, email: e.target.value }))}
+                                        />
+                                    </label>
+                                    <label className="block sm:col-span-2">
+                                        <span className="text-xs text-gray-500">Address</span>
+                                        <input
+                                            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                                            value={orgForm.address}
+                                            onChange={e => setOrgForm(f => ({ ...f, address: e.target.value }))}
+                                        />
+                                    </label>
+                                    <label className="block sm:col-span-2">
+                                        <span className="text-xs text-gray-500">License number</span>
+                                        <input
+                                            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                                            value={orgForm.licenseNumber}
+                                            onChange={e => setOrgForm(f => ({ ...f, licenseNumber: e.target.value }))}
+                                        />
+                                    </label>
+                                </div>
+                                <button
+                                    onClick={handleSaveOrg}
+                                    disabled={saving}
+                                    className="px-4 py-2 bg-[#008540] text-white rounded-lg text-sm font-medium hover:bg-[#007235] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {saving ? 'Saving…' : 'Save organization'}
+                                </button>
+                            </section>
 
-                            <button
-                                onClick={handleChangePlan}
-                                disabled={planChanging || !selectedPlanId || selectedPlanId === subscription?.planName}
-                                className="px-4 py-2 bg-[#008540] text-white rounded-lg text-sm font-medium hover:bg-[#007235] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {planChanging ? 'Processing…' : 'Change plan'}
-                            </button>
-                        </section>
-
-                        <section className="space-y-4">
-                            <h2 className="text-sm font-semibold text-gray-800">Organization details</h2>
-                            <p className="text-xs text-gray-400">
-                                Display name can be changed. Internal ID (slug): <code className="bg-gray-100 px-1 rounded">{org?.slug ?? account?.organization?.slug}</code> — cannot be renamed.
-                            </p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <label className="block sm:col-span-2">
-                                    <span className="text-xs text-gray-500">Organization name</span>
-                                    <input
-                                        className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#008540]"
-                                        value={orgForm.name}
-                                        onChange={e => setOrgForm(f => ({ ...f, name: e.target.value }))}
-                                    />
-                                </label>
-                                <label className="block">
-                                    <span className="text-xs text-gray-500">Phone</span>
-                                    <input
-                                        className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                                        value={orgForm.phone}
-                                        onChange={e => setOrgForm(f => ({ ...f, phone: e.target.value }))}
-                                    />
-                                </label>
-                                <label className="block">
-                                    <span className="text-xs text-gray-500">Email</span>
-                                    <input
-                                        className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                                        value={orgForm.email}
-                                        onChange={e => setOrgForm(f => ({ ...f, email: e.target.value }))}
-                                    />
-                                </label>
-                                <label className="block sm:col-span-2">
-                                    <span className="text-xs text-gray-500">Address</span>
-                                    <input
-                                        className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                                        value={orgForm.address}
-                                        onChange={e => setOrgForm(f => ({ ...f, address: e.target.value }))}
-                                    />
-                                </label>
-                                <label className="block sm:col-span-2">
-                                    <span className="text-xs text-gray-500">License number</span>
-                                    <input
-                                        className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                                        value={orgForm.licenseNumber}
-                                        onChange={e => setOrgForm(f => ({ ...f, licenseNumber: e.target.value }))}
-                                    />
-                                </label>
-                            </div>
-                            <button
-                                onClick={handleSaveOrg}
-                                disabled={saving}
-                                className="px-4 py-2 bg-[#008540] text-white rounded-lg text-sm font-medium hover:bg-[#007235] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {saving ? 'Saving…' : 'Save organization'}
-                            </button>
-                        </section>
-
-                        <section className="space-y-3">
-                            <h2 className="text-sm font-semibold text-gray-800">Linked hospitals</h2>
-                            <p className="text-xs text-gray-400">
-                                Remove a hospital from your organization. To add hospitals, use the Hospital page.
-                            </p>
-                            {(org?.hospitals ?? []).length === 0 ? (
-                                <p className="text-sm text-gray-400 py-4">No hospitals linked.</p>
-                            ) : (
-                                <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
-                                    {(org?.hospitals ?? []).map(h => (
-                                        <li key={h.id} className="flex items-center justify-between px-4 py-3 bg-white">
-                                            <div>
-                                                <p className="text-sm font-medium text-gray-800">{h.name}</p>
-                                                {h.city && <p className="text-xs text-gray-400">{h.city}</p>}
-                                            </div>
-                                            <button
-                                                onClick={() => handleRemoveHospital(h.id, h.name)}
-                                                className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-3 py-1.5"
-                                            >
-                                                Remove
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </section>
-
-                        <section className="border border-red-100 rounded-xl p-5 bg-red-50/40 space-y-3">
-                            <div className="flex items-center gap-2 text-red-700 font-medium text-sm">
-                                <FiAlertTriangle /> Delete organization
-                            </div>
-                            {orgDeletionPending ? (
-                                <p className="text-xs text-red-700">
-                                    This organization is <strong>paused</strong>. All staff are locked out.
-                                    Permanent deletion is scheduled for{' '}
-                                    {new Date(
-                                        account?.organization?.deletion?.scheduledPurgeAt
-                                        ?? org?.deletion?.scheduledPurgeAt
-                                        ?? '',
-                                    ).toLocaleDateString()}.
-                                    Check your email for a link to resume.
+                            <section className="space-y-3">
+                                <h2 className="text-sm font-semibold text-gray-800">Linked hospitals</h2>
+                                <p className="text-xs text-gray-400">
+                                    Remove a hospital from your organization. To add hospitals, use the Hospital page.
                                 </p>
-                            ) : (
-                                <>
-                                    <p className="text-xs text-gray-600 leading-relaxed">
-                                        Pauses the organization immediately (no one can sign in). After 30 days all
-                                        data is permanently deleted. An email is sent to you and to MobileUurka support.
-                                        You must delete the org before deleting your personal account.
+                                {(org?.hospitals ?? []).length === 0 ? (
+                                    <p className="text-sm text-gray-400 py-4">No hospitals linked.</p>
+                                ) : (
+                                    <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+                                        {(org?.hospitals ?? []).map(h => (
+                                            <li key={h.id} className="flex items-center justify-between px-4 py-3 bg-white">
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-800">{h.name}</p>
+                                                    {h.city && <p className="text-xs text-gray-400">{h.city}</p>}
+                                                </div>
+                                                <button
+                                                    onClick={() => handleRemoveHospital(h.id, h.name)}
+                                                    className="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg px-3 py-1.5"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </section>
+
+                            <section className="border border-red-100 rounded-xl p-5 bg-red-50/40 space-y-3">
+                                <div className="flex items-center gap-2 text-red-700 font-medium text-sm">
+                                    <FiAlertTriangle /> Delete organization
+                                </div>
+                                {orgDeletionPending ? (
+                                    <p className="text-xs text-red-700">
+                                        This organization is <strong>paused</strong>. All staff are locked out.
+                                        Permanent deletion is scheduled for{' '}
+                                        {new Date(
+                                            account?.organization?.deletion?.scheduledPurgeAt
+                                            ?? org?.deletion?.scheduledPurgeAt
+                                            ?? '',
+                                        ).toLocaleDateString()}.
+                                        Check your email for a link to resume.
                                     </p>
-                                    {!showOrgDeleteConfirm ? (
-                                        <button
-                                            onClick={() => setShowOrgDeleteConfirm(true)}
-                                            className="border border-red-300 text-red-600 rounded-lg px-4 py-2 text-sm hover:bg-red-50"
-                                        >
-                                            Delete organization
-                                        </button>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            <label className="block">
-                                                <span className="text-xs text-gray-600">Password</span>
-                                                <input
-                                                    type="password"
-                                                    className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                                                    value={orgDeletePassword}
-                                                    onChange={e => setOrgDeletePassword(e.target.value)}
-                                                />
-                                            </label>
-                                            <label className="block">
-                                                <span className="text-xs text-gray-600">
-                                                    Type organization name to confirm: <strong>{orgForm.name}</strong>
-                                                </span>
-                                                <input
-                                                    className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                                                    value={orgDeleteConfirm}
-                                                    onChange={e => setOrgDeleteConfirm(e.target.value)}
-                                                    placeholder={orgForm.name}
-                                                />
-                                            </label>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={handleRequestOrgDeletion}
-                                                    disabled={saving}
-                                                    className="bg-red-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-red-700 disabled:opacity-50"
-                                                >
-                                                    {saving ? 'Scheduling…' : 'Confirm org deletion'}
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setShowOrgDeleteConfirm(false);
-                                                        setOrgDeletePassword('');
-                                                        setOrgDeleteConfirm('');
-                                                    }}
-                                                    className="border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-600"
-                                                >
-                                                    Cancel
-                                                </button>
+                                ) : (
+                                    <>
+                                        <p className="text-xs text-gray-600 leading-relaxed">
+                                            Pauses the organization immediately (no one can sign in). After 30 days all
+                                            data is permanently deleted. An email is sent to you and to MobileUurka support.
+                                            You must delete the org before deleting your personal account.
+                                        </p>
+                                        {!showOrgDeleteConfirm ? (
+                                            <button
+                                                onClick={() => setShowOrgDeleteConfirm(true)}
+                                                className="border border-red-300 text-red-600 rounded-lg px-4 py-2 text-sm hover:bg-red-50"
+                                            >
+                                                Delete organization
+                                            </button>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <label className="block">
+                                                    <span className="text-xs text-gray-600">Password</span>
+                                                    <input
+                                                        type="password"
+                                                        className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                                                        value={orgDeletePassword}
+                                                        onChange={e => setOrgDeletePassword(e.target.value)}
+                                                    />
+                                                </label>
+                                                <label className="block">
+                                                    <span className="text-xs text-gray-600">
+                                                        Type organization name to confirm: <strong>{orgForm.name}</strong>
+                                                    </span>
+                                                    <input
+                                                        className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                                                        value={orgDeleteConfirm}
+                                                        onChange={e => setOrgDeleteConfirm(e.target.value)}
+                                                        placeholder={orgForm.name}
+                                                    />
+                                                </label>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={handleRequestOrgDeletion}
+                                                        disabled={saving}
+                                                        className="bg-red-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                                                    >
+                                                        {saving ? 'Scheduling…' : 'Confirm org deletion'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setShowOrgDeleteConfirm(false);
+                                                            setOrgDeletePassword('');
+                                                            setOrgDeleteConfirm('');
+                                                        }}
+                                                        className="border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-600"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                        </section>
-                    </div>
-                )}
-            </div>
+                                        )}
+                                    </>
+                                )}
+                            </section>
+                        </div>
+                    )}
+                </div>
+            }
+            {activeTab === 'audit' && isOrgOwner && (
+                <div className='w-full overflow-y-auto pb-10'>
+                    <OrgAuditTrailViewer organizationId={account?.organization?.id ?? ''} />
+                </div>
+
+            )}
         </div>
     );
 }

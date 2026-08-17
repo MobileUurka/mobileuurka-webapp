@@ -24,12 +24,15 @@ const Riskassessment: React.FC<RiskAssessmentProps> = ({ patient }) => {
   if (tooltipContent) console.log(tooltipContent);
   const isLongText = (text: string) => text && text.length > 180;
 
+  console.log(patient)
+
+
   useEffect(() => {
-    if (patient) {
+    if (patient.explanation) {
       const explanationDates =
-        patient?.explanation?.map((exp: any) => exp.date.split("T")[0]) || [];
+        patient?.explanation?.map((exp: any) => exp?.date.split("T")[0]) || [];
       const visitDates =
-        patient?.visits?.map((visit: any) => visit.date.split("T")[0]) || [];
+        patient?.visits?.map((visit: any) => visit?.date.split("T")[0]) || [];
       const lastVisit = patient?.visits?.[patient?.visits?.length - 1];
       const nextVisitDate = lastVisit?.nextVisit;
 
@@ -130,7 +133,7 @@ const Riskassessment: React.FC<RiskAssessmentProps> = ({ patient }) => {
 
               const hasExp = patient?.explanation?.some(
                 (exp: any) =>
-                  exp.date.split("T")[0] === date && exp.features
+                  exp?.date.split("T")[0] === date && exp.features
               );
 
               return (
@@ -193,12 +196,13 @@ const Riskassessment: React.FC<RiskAssessmentProps> = ({ patient }) => {
               const isNextVisitDate =
                 lastVisit?.nextVisit === selectedDate;
 
+
               const currentExp = patient?.explanation?.find(
-                (exp: any) => exp.date.split("T")[0] === selectedDate
+                (exp: any) => exp?.date.split("T")[0] === selectedDate
               );
 
               const currentVisit = patient?.visits?.find(
-                (v: any) => v.date.split("T")[0] === selectedDate
+                (v: any) => v?.date.split("T")[0] === selectedDate
               );
 
               const isScheduledOnly =

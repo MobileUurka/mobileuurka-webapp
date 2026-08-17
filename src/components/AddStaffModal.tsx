@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { MdClose, MdOutlineKeyboardArrowDown } from 'react-icons/md';
+import { useEffect } from 'react';
+import { hospitalService, type Hospital } from '../services/hospitalServices';
+import HospitalSelector from './HospitalSelector';
 
 interface AddStaffModalProps {
   isOpen: boolean;
@@ -15,51 +18,14 @@ export interface StaffFormData {
   lastName: string;
   role: string;
   phone?: string;
-  specialization?: string;
-  licenseNumber?: string;
-  department?: string;
+  hospital?: string;
 }
 
 const ROLES = [
   { value: 'admin', label: 'Administrator' },
   { value: 'doctor', label: 'Doctor' },
   { value: 'nurse', label: 'Nurse' },
-  { value: 'staff', label: 'Staff' },
-  { value: 'technician', label: 'Technician' }
-];
-
-const DEPARTMENTS = [
-  'Emergency',
-  'Cardiology',
-  'Neurology',
-  'Pediatrics',
-  'Obstetrics & Gynecology',
-  'Surgery',
-  'Internal Medicine',
-  'Radiology',
-  'Laboratory',
-  'Pharmacy',
-  'Administration',
-  'IT Support',
-  'Other'
-];
-
-const SPECIALIZATIONS = [
-  'General Practice',
-  'Cardiology',
-  'Neurology',
-  'Pediatrics',
-  'Obstetrics & Gynecology',
-  'Surgery',
-  'Internal Medicine',
-  'Radiology',
-  'Pathology',
-  'Anesthesiology',
-  'Emergency Medicine',
-  'Psychiatry',
-  'Dermatology',
-  'Orthopedics',
-  'Other'
+  { value: 'staff', label: 'Staff / Auditor' }
 ];
 
 const AddStaffModal = ({ isOpen, onClose, onSubmit }: AddStaffModalProps) => {
@@ -70,14 +36,37 @@ const AddStaffModal = ({ isOpen, onClose, onSubmit }: AddStaffModalProps) => {
     lastName: '',
     role: '',
     phone: '',
-    specialization: '',
-    licenseNumber: '',
-    department: ''
+    hospital: ''
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+
+  // Load hospitals on mount
+  useEffect(() => {
+    const loadHospitals = async () => {
+      setLoadingHospitals(true);
+      try {
+        const availableHospitals = await hospitalService.getAvailableHospitals();
+        setHospitals(availableHospitals);
+      } catch (error) {
+        console.error('Failed to load hospitals:', error);
+      } finally {
+        setLoadingHospitals(false);
+      }
+    };
+    if (isOpen) {
+      loadHospitals();
+    }
+  }, [isOpen]);
+
+  // Hospital management
+  const [hospitals, setHospitals] = useState<Hospital[]>([]);
+  const [loadingHospitals, setLoadingHospitals] = useState(false);
+  const [showHospitalSelector, setShowHospitalSelector] = useState(false);
+  const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
 
   const handleInputChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -119,7 +108,7 @@ const AddStaffModal = ({ isOpen, onClose, onSubmit }: AddStaffModalProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
 
     setIsSubmitting(true);
@@ -133,9 +122,7 @@ const AddStaffModal = ({ isOpen, onClose, onSubmit }: AddStaffModalProps) => {
         lastName: '',
         role: '',
         phone: '',
-        specialization: '',
-        licenseNumber: '',
-        department: ''
+        hospital: ''
       });
       onClose();
     } catch (error) {
@@ -186,9 +173,8 @@ const AddStaffModal = ({ isOpen, onClose, onSubmit }: AddStaffModalProps) => {
                   type="text"
                   value={formData.firstName}
                   onChange={(e) => handleInputChange('firstName', e.target.value)}
-                  className={`px-3 py-3 border rounded-lg focus:outline-none focus:ring-0 focus:ring-[#008540] ${
-                    errors.firstName ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`px-3 py-3 border rounded-lg focus:outline-none focus:ring-0 focus:ring-[#008540] ${errors.firstName ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   placeholder="Enter first name"
                   disabled={isSubmitting}
                 />
@@ -204,9 +190,8 @@ const AddStaffModal = ({ isOpen, onClose, onSubmit }: AddStaffModalProps) => {
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  className={`px-3 py-3 border rounded-lg focus:outline-none focus:ring-0 focus:ring-[#008540] ${
-                    errors.email ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`px-3 py-3 border rounded-lg focus:outline-none focus:ring-0 focus:ring-[#008540] ${errors.email ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   placeholder="Enter email address"
                   disabled={isSubmitting}
                 />
@@ -222,9 +207,8 @@ const AddStaffModal = ({ isOpen, onClose, onSubmit }: AddStaffModalProps) => {
                   <select
                     value={formData.role}
                     onChange={(e) => handleInputChange('role', e.target.value)}
-                    className={`w-full px-3 py-3 pr-10 border rounded-lg appearance-none focus:outline-none focus:ring-0 focus:ring-[#008540] ${
-                      errors.role ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-3 pr-10 border rounded-lg appearance-none focus:outline-none focus:ring-0 focus:ring-[#008540] ${errors.role ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     disabled={isSubmitting}
                   >
                     <option value="">Select Role</option>
@@ -236,28 +220,6 @@ const AddStaffModal = ({ isOpen, onClose, onSubmit }: AddStaffModalProps) => {
                 </div>
                 {errors.role && <span className="text-red-500 text-xs mt-1">{errors.role}</span>}
               </div>
-
-              {(formData.role === 'doctor' || formData.role === 'nurse') && (
-                <div className="w-[95%] flex flex-col">
-                  <label className="text-sm font-medium text-gray-700 mb-2">
-                    Specialization
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={formData.specialization}
-                      onChange={(e) => handleInputChange('specialization', e.target.value)}
-                      className="w-full px-3 py-3 pr-10 border border-gray-300 rounded-lg appearance-none focus:outline-none focus:ring-0 focus:ring-[#008540]"
-                      disabled={isSubmitting}
-                    >
-                      <option value="">Select Specialization</option>
-                      {SPECIALIZATIONS.map(spec => (
-                        <option key={spec} value={spec}>{spec}</option>
-                      ))}
-                    </select>
-                    <MdOutlineKeyboardArrowDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Right column */}
@@ -271,9 +233,8 @@ const AddStaffModal = ({ isOpen, onClose, onSubmit }: AddStaffModalProps) => {
                   type="text"
                   value={formData.lastName}
                   onChange={(e) => handleInputChange('lastName', e.target.value)}
-                  className={`px-3 py-3 border rounded-lg focus:outline-none focus:ring-0 focus:ring-[#008540] ${
-                    errors.lastName ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`px-3 py-3 border rounded-lg focus:outline-none focus:ring-0 focus:ring-[#008540] ${errors.lastName ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   placeholder="Enter last name"
                   disabled={isSubmitting}
                 />
@@ -288,9 +249,8 @@ const AddStaffModal = ({ isOpen, onClose, onSubmit }: AddStaffModalProps) => {
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
-                  className={`px-3 py-3 border rounded-lg focus:outline-none focus:ring-0 focus:ring-[#008540] ${
-                    errors.phone ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`px-3 py-3 border rounded-lg focus:outline-none focus:ring-0 focus:ring-[#008540] ${errors.phone ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   placeholder="Enter phone number"
                   disabled={isSubmitting}
                 />
@@ -299,39 +259,46 @@ const AddStaffModal = ({ isOpen, onClose, onSubmit }: AddStaffModalProps) => {
 
               <div className="w-[95%] flex flex-col">
                 <label className="text-sm font-medium text-gray-700 mb-2">
-                  Department
+                  Hospital
+                  {(formData.role === 'doctor' || formData.role === 'nurse') && <span className="text-red-500 ml-1">*</span>}
                 </label>
-                <div className="relative">
-                  <select
-                    value={formData.department}
-                    onChange={(e) => handleInputChange('department', e.target.value)}
-                    className="w-full px-3 py-3 pr-10 border border-gray-300 rounded-lg appearance-none focus:outline-none focus:ring-0 focus:ring-[#008540]"
-                    disabled={isSubmitting}
-                  >
-                    <option value="">Select Department</option>
-                    {DEPARTMENTS.map(dept => (
-                      <option key={dept} value={dept}>{dept}</option>
-                    ))}
-                  </select>
-                  <MdOutlineKeyboardArrowDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <select
+                      value={formData.hospital}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '__add_new__') {
+                          setShowHospitalSelector(true);
+                        } else {
+                          handleInputChange('hospital', value);
+                          const hospital = hospitals.find(h => h.id === value);
+                          setSelectedHospital(hospital || null);
+                        }
+                      }}
+                      className="w-full px-3 py-3 pr-10 border border-gray-300 rounded-lg appearance-none focus:outline-none focus:ring-0 focus:ring-[#008540] disabled:opacity-50"
+                      disabled={isSubmitting || loadingHospitals || (formData.role !== 'doctor' && formData.role !== 'nurse')}
+                    >
+                      <option value="">
+                        {loadingHospitals ? 'Loading hospitals...' : 'Select Hospital'}
+                      </option>
+                      {hospitals.map(hospital => (
+                        <option key={hospital.id} value={hospital.name}>
+                          {hospital.name}
+                        </option>
+                      ))}
+                      <option value="__add_new__" className="font-semibold">+ Add New Hospital</option>
+                    </select>
+                    <MdOutlineKeyboardArrowDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
+                  </div>
                 </div>
+                {selectedHospital && (
+                  <p className="text-xs text-gray-500 mt-1">{selectedHospital.address || selectedHospital.city || ''}</p>
+                )}
+                {(formData.role === 'doctor' || formData.role === 'nurse') && !formData.hospital && (
+                  <p className="text-xs text-gray-500 mt-1">Required for clinical staff</p>
+                )}
               </div>
-
-              {(formData.role === 'doctor' || formData.role === 'nurse') && (
-                <div className="w-[95%] flex flex-col">
-                  <label className="text-sm font-medium text-gray-700 mb-2">
-                    License Number
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.licenseNumber}
-                    onChange={(e) => handleInputChange('licenseNumber', e.target.value)}
-                    className="px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus:ring-[#008540]"
-                    placeholder="Enter license number"
-                    disabled={isSubmitting}
-                  />
-                </div>
-              )}
             </div>
 
             {/* Password section - full width */}
@@ -346,9 +313,8 @@ const AddStaffModal = ({ isOpen, onClose, onSubmit }: AddStaffModalProps) => {
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
                     onChange={(e) => handleInputChange('password', e.target.value)}
-                    className={`w-full px-3 py-3 border rounded-lg focus:outline-none focus:ring-0 focus:ring-[#008540] ${
-                      errors.password ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-3 border rounded-lg focus:outline-none focus:ring-0 focus:ring-[#008540] ${errors.password ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     placeholder="Enter password"
                     disabled={isSubmitting}
                   />
@@ -403,6 +369,27 @@ const AddStaffModal = ({ isOpen, onClose, onSubmit }: AddStaffModalProps) => {
             </button>
           </div>
         </form>
+
+        {/* Hospital Selector Modal */}
+        {showHospitalSelector && (
+          <HospitalSelector
+            onHospitalSelected={(hospital) => {
+              setSelectedHospital(hospital);
+              handleInputChange('hospital', hospital.name);
+              setShowHospitalSelector(false);
+              // Reload hospitals list
+              hospitalService.getAvailableHospitals()
+                .then(setHospitals)
+                .catch(console.error);
+            }}
+            onCreateNew={() => {
+              // For now, just close - hospital creation happens in separate Hospital management page
+              setShowHospitalSelector(false);
+              alert('Please create the hospital from the Hospitals management page first, then select it here.');
+            }}
+            onCancel={() => setShowHospitalSelector(false)}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,0 +1,6 @@
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.heapanalytics.com; connect-src 'self' https://*.mobileuurka.com wss://*.mobileuurka.com https://mobileuurka-server-a6ezazavhxb6b4g2.canadacentral-01.azurewebsites.net wss://mobileuurka-server-a6ezazavhxb6b4g2.canadacentral-01.azurewebsites.net http://localhost:5500 ws://localhost:5500; img-src 'self' data: https: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()

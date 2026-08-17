@@ -37,7 +37,7 @@ export const userService = {
    */
   createUser: async (userData: any, orgIdForAdmin?: string) => {
     let endpoint = '/users';
-    
+
     // If super admin is creating a user for a specific hospital
     if (authService.getUser()?.userType === 'mobileuurka' && orgIdForAdmin) {
       endpoint = `/users?orgId=${orgIdForAdmin}`;
@@ -56,9 +56,7 @@ export const userService = {
     lastName: string;
     role: string;
     phone?: string;
-    specialization?: string;
-    licenseNumber?: string;
-    department?: string;
+    hospital?: string;
   }) => {
     return await api.post(`/organizations/${organizationId}/users`, userData);
   },

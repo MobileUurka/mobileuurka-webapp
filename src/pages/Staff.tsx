@@ -5,6 +5,7 @@ import { fetchStaff, invalidateStaff } from '../store/staffSlice';
 import DataTable from '../components/DataTable';
 import SearchContainer from '../components/SearchContainer';
 import AddStaffModal, { type StaffFormData } from '../components/AddStaffModal';
+import EditStaffModal, { type EditStaffFormData } from '../components/EditStaffModal';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
 import { FiTrash2 } from 'react-icons/fi';
@@ -15,7 +16,7 @@ const STAFF_COLUMNS = [
     key: 'name',
     width: '280px',
     render: (user: User) => (
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 cursor-pointer">
         <div className="w-8 h-8 rounded-full bg-[#e5decb] flex items-center justify-center text-xs text-gray-700 shrink-0">
           {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
         </div>
@@ -27,25 +28,25 @@ const STAFF_COLUMNS = [
     label: 'Email',
     key: 'email',
     width: '250px',
-    render: (user: User) => <span className="text-gray-600 truncate">{user.email}</span>
+    render: (user: User) => <span className="text-gray-600 truncate cursor-pointer">{user.email}</span>
   },
   {
     label: 'Role',
     key: 'role',
     width: '120px',
-    render: (user: User) => <span className="text-gray-600 capitalize">{user.role}</span>
+    render: (user: User) => <span className="text-gray-600 capitalize cursor-pointer">{user.role}</span>
   },
   {
-    label: 'Department',
-    key: 'department',
-    width: '180px',
-    render: (user: User) => <span className="text-gray-600 truncate">{user.department || '—'}</span>
+    label: 'Hospital',
+    key: 'hospital',
+    width: '220px',
+    render: (user: User) => <span className="text-gray-600 truncate cursor-pointer">{(user as any).hospital || '—'}</span>
   },
   {
     label: 'Phone',
     key: 'phone',
     width: '130px',
-    render: (user: any) => <span className="text-gray-600">{user.phone || '—'}</span>
+    render: (user: any) => <span className="text-gray-600 cursor-pointer">{user.phone || '—'}</span>
   },
 ];
 
@@ -56,8 +57,12 @@ const Staff = () => {
   const status = useAppSelector(s => s.staff.status);
   const { user: currentUser } = useAuth();
 
+  console.log(users);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<User | null>(null);
 
   useEffect(() => {
     dispatch(fetchStaff());
@@ -96,7 +101,7 @@ const Staff = () => {
     }
   };
 
-  const canManageStaff = ['doctor', 'admin'].includes(
+  const canManageStaff = ['admin'].includes(
     currentUser?.role?.toLowerCase() ?? ''
   ) || currentUser?.organizationId != null;
 
@@ -114,26 +119,56 @@ const Staff = () => {
     }
   };
 
+  const handleEditStaff = (user: User) => {
+    if (user.id === currentUser?.id) {
+      showError('You cannot edit your own profile');
+      return;
+    }
+    setEditingStaff(user);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateStaff = async (updateData: EditStaffFormData) => {
+    if (!editingStaff) return;
+
+    try {
+      const response = await userService.updateUser(editingStaff.id, updateData);
+
+      if (response.success || response.status === 200) {
+        showSuccess(`${editingStaff.firstName} ${editingStaff.lastName} has been updated.`);
+        dispatch(invalidateStaff());
+        dispatch(fetchStaff());
+        setShowEditModal(false);
+        setEditingStaff(null);
+      } else {
+        throw new Error(response.message || 'Failed to update staff member');
+      }
+    } catch (error: any) {
+      showError(error.message || 'Failed to update staff member. Please try again.');
+      throw error;
+    }
+  };
+
   const staffColumns = canManageStaff
     ? [
-        ...STAFF_COLUMNS,
-        {
-          label: '',
-          key: 'actions',
-          width: '60px',
-          render: (user: User) =>
-            user.id === currentUser?.id ? null : (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); handleRemoveStaff(user); }}
-                className="text-gray-400 hover:text-red-500 p-1"
-                title="Deactivate staff"
-              >
-                <FiTrash2 size={15} />
-              </button>
-            ),
-        },
-      ]
+      ...STAFF_COLUMNS,
+      {
+        label: '',
+        key: 'actions',
+        width: '60px',
+        render: (user: User) =>
+          user.id === currentUser?.id ? null : (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleRemoveStaff(user); }}
+              className="text-gray-400 hover:text-red-500 p-1"
+              title="Deactivate staff"
+            >
+              <FiTrash2 size={15} />
+            </button>
+          ),
+      },
+    ]
     : STAFF_COLUMNS;
 
   return (
@@ -162,6 +197,7 @@ const Staff = () => {
         data={filteredUsers}
         emptyMessage={searchTerm ? `No staff found matching "${searchTerm}"` : 'No staff members found.'}
         initialItemsPerPage={10}
+        onRowClick={(user) => canManageStaff && handleEditStaff(user)}
       />
 
       <AddStaffModal
@@ -169,6 +205,16 @@ const Staff = () => {
         onClose={() => setShowAddModal(false)}
         onSubmit={handleAddStaff}
         organizationId={currentUser?.organizationId || currentUser?.id}
+      />
+
+      <EditStaffModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingStaff(null);
+        }}
+        onSubmit={handleUpdateStaff}
+        staff={editingStaff}
       />
     </div>
   );

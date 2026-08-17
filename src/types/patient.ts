@@ -28,4 +28,4 @@ export interface PatientData {
     [key: string]: any; // Fallback for other fields
   }
 
-  export type TabType = "overview" | "profile" | "medication" | "documents" | "notes" | "document" | "note" | "notepad" | "symptomReport";
+  export type TabType = "overview" | "profile" | "medication" | "documents" | "notes" | "document" | "note" | "notepad" | "symptomReport" | "audit";

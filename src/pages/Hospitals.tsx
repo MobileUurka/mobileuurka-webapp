@@ -18,7 +18,7 @@ const HOSPITAL_COLUMNS = [
     key: 'address',
     label: 'Address',
     render: (hospital: Hospital) => (
-      <div className="text-gray-600 text-sm">{hospital.address || '—'}</div>
+      <div className=" text-gray-600 text-sm">{hospital.address || '—'}</div>
     )
   },
   {

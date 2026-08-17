@@ -7,7 +7,6 @@ import React, {
 } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw";
 import { IoIosSend } from "react-icons/io";
 import { HiDotsHorizontal } from "react-icons/hi";
 import { LuStethoscope, LuMessageCircle, LuPencilLine, LuX } from "react-icons/lu";
@@ -464,7 +463,6 @@ const Chat: React.FC<ChatProps> = ({ patient, user }) => {
                 >
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
-                    rehypePlugins={[rehypeRaw]}
                     components={{
                       h3: ({ ...props }) => <h3 className="text-sm font-bold my-1" {...props} />,
                       p: ({ ...props }) => <p className="my-1 wrap-break-word" {...props} />,

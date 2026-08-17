@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { FaEye, FaEyeSlash } from 'react-icons/fa';
+import { useMemo, useState } from 'react';
+import { FaEye, FaEyeSlash, FaCheck, FaTimes } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
 interface PasswordChangeFormProps {
@@ -9,6 +9,49 @@ interface PasswordChangeFormProps {
   onPasswordChanged?: () => void;
 }
 
+// ── Password policy (kept in sync with Auth.tsx / SignUpForm.tsx) ───────────
+// Baseline aligned with common guidance (NIST 800-63B minimum length,
+// OWASP ASVS complexity recommendations): sufficient length + mixed
+// character classes, and no whitespace.
+const PASSWORD_MIN_LENGTH = 10;
+
+interface PasswordChecks {
+  length: boolean;
+  uppercase: boolean;
+  lowercase: boolean;
+  number: boolean;
+  symbol: boolean;
+  noSpaces: boolean;
+}
+
+function getPasswordChecks(pwd: string): PasswordChecks {
+  return {
+    length: pwd.length >= PASSWORD_MIN_LENGTH,
+    uppercase: /[A-Z]/.test(pwd),
+    lowercase: /[a-z]/.test(pwd),
+    number: /[0-9]/.test(pwd),
+    symbol: /[^A-Za-z0-9]/.test(pwd),
+    noSpaces: pwd.length > 0 && !/\s/.test(pwd),
+  };
+}
+
+function getPasswordStrengthError(checks: PasswordChecks): string | null {
+  if (!checks.length) return `New password must be at least ${PASSWORD_MIN_LENGTH} characters long`;
+  if (!checks.uppercase) return 'New password must include at least one uppercase letter';
+  if (!checks.lowercase) return 'New password must include at least one lowercase letter';
+  if (!checks.number) return 'New password must include at least one number';
+  if (!checks.symbol) return 'New password must include at least one symbol (e.g. ! @ # $ %)';
+  if (!checks.noSpaces) return 'New password must not contain spaces';
+  return null;
+}
+
+const RequirementRow = ({ met, label }: { met: boolean; label: string }) => (
+  <li className={`flex items-center gap-2 text-xs ${met ? 'text-green-600' : 'text-gray-500'}`}>
+    {met ? <FaCheck className="shrink-0" /> : <FaTimes className="shrink-0 text-gray-300" />}
+    <span>{label}</span>
+  </li>
+);
+
 const PasswordChangeForm = ({ email, token, mode = 'setup', onPasswordChanged }: PasswordChangeFormProps) => {
   const [formData, setFormData] = useState({
     newPassword: '',
@@ -16,12 +59,17 @@ const PasswordChangeForm = ({ email, token, mode = 'setup', onPasswordChanged }:
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pwdTouched, setPwdTouched] = useState(false);
   const [showPasswords, setShowPasswords] = useState({
     new: false,
     confirm: false
   });
 
   const navigate = useNavigate();
+
+  const passwordChecks = useMemo(() => getPasswordChecks(formData.newPassword), [formData.newPassword]);
+  const isPasswordStrong = useMemo(() => Object.values(passwordChecks).every(Boolean), [passwordChecks]);
+  const passwordsMatch = formData.confirmPassword.length === 0 || formData.confirmPassword === formData.newPassword;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -39,8 +87,9 @@ const PasswordChangeForm = ({ email, token, mode = 'setup', onPasswordChanged }:
       return false;
     }
 
-    if (formData.newPassword.length < 8) {
-      setError('New password must be at least 8 characters long');
+    const strengthError = getPasswordStrengthError(passwordChecks);
+    if (strengthError) {
+      setError(strengthError);
       return false;
     }
 
@@ -54,6 +103,7 @@ const PasswordChangeForm = ({ email, token, mode = 'setup', onPasswordChanged }:
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPwdTouched(true);
 
     if (!validateForm()) return;
 
@@ -188,8 +238,10 @@ const PasswordChangeForm = ({ email, token, mode = 'setup', onPasswordChanged }:
             name="newPassword"
             value={formData.newPassword}
             onChange={handleChange}
+            onBlur={() => setPwdTouched(true)}
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             placeholder="Enter your new password"
+            autoComplete="new-password"
             required
           />
           <span
@@ -210,9 +262,24 @@ const PasswordChangeForm = ({ email, token, mode = 'setup', onPasswordChanged }:
             )}
           </span>
         </div>
-        <p className="text-xs text-gray-500 mt-1">
-          Password must be at least 8 characters long
-        </p>
+
+        {/* Live strength requirements */}
+        {(pwdTouched || formData.newPassword.length > 0) && (
+          <ul className="mt-2 flex flex-col gap-1">
+            <RequirementRow
+              met={passwordChecks.length}
+              label={`At least ${PASSWORD_MIN_LENGTH} characters long`}
+            />
+            <RequirementRow
+              met={passwordChecks.uppercase && passwordChecks.lowercase && passwordChecks.number}
+              label="A mix of uppercase letters, lowercase letters, and numbers"
+            />
+            <RequirementRow
+              met={passwordChecks.symbol && passwordChecks.noSpaces}
+              label="At least one symbol (e.g. ! @ # $ %) and no spaces"
+            />
+          </ul>
+        )}
       </div>
 
       <div className="input-group mb-6">
@@ -226,8 +293,11 @@ const PasswordChangeForm = ({ email, token, mode = 'setup', onPasswordChanged }:
             name="confirmPassword"
             value={formData.confirmPassword}
             onChange={handleChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
+              !passwordsMatch ? 'border-red-400' : 'border-gray-300'
+            }`}
             placeholder="Confirm your new password"
+            autoComplete="new-password"
             required
           />
           <span
@@ -248,6 +318,9 @@ const PasswordChangeForm = ({ email, token, mode = 'setup', onPasswordChanged }:
             )}
           </span>
         </div>
+        {!passwordsMatch && (
+          <p className="text-red-600 text-xs mt-1">Passwords do not match</p>
+        )}
       </div>
 
       {error && (
@@ -259,7 +332,7 @@ const PasswordChangeForm = ({ email, token, mode = 'setup', onPasswordChanged }:
       <button
         type="submit"
         className="w-full p-4 rounded-lg border-0 cursor-pointer bg-primary text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-        disabled={loading}
+        disabled={loading || (pwdTouched && (!isPasswordStrong || !passwordsMatch))}
       >
         {loading ? 'Setting Password...' : mode === 'reset' ? 'Reset Password' : 'Set Password'}
       </button>

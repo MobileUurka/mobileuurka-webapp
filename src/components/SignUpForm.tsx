@@ -1,11 +1,54 @@
-import { useState } from 'react';
-import { FaEye, FaEyeSlash } from 'react-icons/fa';
+import { useMemo, useState } from 'react';
+import { FaEye, FaEyeSlash, FaCheck, FaTimes } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { authService, type SignupInitiateData } from '../services/authServices';
 
 interface SignUpFormProps {
     onSwitch: () => void;
 }
+
+// ── Password policy (kept in sync with Auth.tsx staff-set-password step) ────
+// Baseline aligned with common guidance (NIST 800-63B minimum length,
+// OWASP ASVS complexity recommendations): sufficient length + mixed
+// character classes, and no whitespace.
+const PASSWORD_MIN_LENGTH = 10;
+
+interface PasswordChecks {
+    length: boolean;
+    uppercase: boolean;
+    lowercase: boolean;
+    number: boolean;
+    symbol: boolean;
+    noSpaces: boolean;
+}
+
+function getPasswordChecks(pwd: string): PasswordChecks {
+    return {
+        length: pwd.length >= PASSWORD_MIN_LENGTH,
+        uppercase: /[A-Z]/.test(pwd),
+        lowercase: /[a-z]/.test(pwd),
+        number: /[0-9]/.test(pwd),
+        symbol: /[^A-Za-z0-9]/.test(pwd),
+        noSpaces: pwd.length > 0 && !/\s/.test(pwd),
+    };
+}
+
+function getPasswordStrengthError(checks: PasswordChecks): string | null {
+    if (!checks.length) return `Password must be at least ${PASSWORD_MIN_LENGTH} characters`;
+    if (!checks.uppercase) return 'Password must include at least one uppercase letter';
+    if (!checks.lowercase) return 'Password must include at least one lowercase letter';
+    if (!checks.number) return 'Password must include at least one number';
+    if (!checks.symbol) return 'Password must include at least one symbol (e.g. ! @ # $ %)';
+    if (!checks.noSpaces) return 'Password must not contain spaces';
+    return null;
+}
+
+const RequirementRow = ({ met, label }: { met: boolean; label: string }) => (
+    <li className={`flex items-center gap-2 text-xs ${met ? 'text-green-600' : 'text-gray-500'}`}>
+        {met ? <FaCheck className="shrink-0" /> : <FaTimes className="shrink-0 text-gray-300" />}
+        <span>{label}</span>
+    </li>
+);
 
 function SignUpForm({ onSwitch }: SignUpFormProps) {
     const [currentStep, setCurrentStep] = useState<1 | 2>(1);
@@ -21,8 +64,12 @@ function SignUpForm({ onSwitch }: SignUpFormProps) {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [pwdTouched, setPwdTouched] = useState(false);
 
     const navigate = useNavigate();
+
+    const passwordChecks = useMemo(() => getPasswordChecks(formData.password), [formData.password]);
+    const isPasswordStrong = useMemo(() => Object.values(passwordChecks).every(Boolean), [passwordChecks]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -73,8 +120,9 @@ function SignUpForm({ onSwitch }: SignUpFormProps) {
             return false;
         }
 
-        if (formData.password.length < 8) {
-            setError('Password must be at least 8 characters long');
+        const strengthError = getPasswordStrengthError(passwordChecks);
+        if (strengthError) {
+            setError(strengthError);
             return false;
         }
 
@@ -97,7 +145,7 @@ function SignUpForm({ onSwitch }: SignUpFormProps) {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log(formData)
+        setPwdTouched(true);
 
         if (!validateStep2()) return;
 
@@ -263,6 +311,7 @@ function SignUpForm({ onSwitch }: SignUpFormProps) {
                         required
                         value={formData.password}
                         onChange={handleInputChange}
+                        onBlur={() => setPwdTouched(true)}
                         autoComplete="new-password"
                         placeholder="Enter your password"
                     />
@@ -285,9 +334,24 @@ function SignUpForm({ onSwitch }: SignUpFormProps) {
                         )}
                     </span>
                 </div>
-                <small className="text-gray-500 text-xs mt-1 block">
-                    Must be at least 8 characters long
-                </small>
+
+                {/* Live strength requirements */}
+                {(pwdTouched || formData.password.length > 0) && (
+                    <ul className="mt-2 flex flex-col gap-1">
+                        <RequirementRow
+                            met={passwordChecks.length}
+                            label={`At least ${PASSWORD_MIN_LENGTH} characters long`}
+                        />
+                        <RequirementRow
+                            met={passwordChecks.uppercase && passwordChecks.lowercase && passwordChecks.number}
+                            label="A mix of uppercase letters, lowercase letters, and numbers"
+                        />
+                        <RequirementRow
+                            met={passwordChecks.symbol && passwordChecks.noSpaces}
+                            label="At least one symbol (e.g. ! @ # $ %) and no spaces"
+                        />
+                    </ul>
+                )}
             </div>
 
             {error && <p className="text-red-500 text-[0.9rem] text-center mt-2">{error}</p>}
@@ -303,7 +367,7 @@ function SignUpForm({ onSwitch }: SignUpFormProps) {
                 <button
                     type="submit"
                     className="flex-1 p-4 rounded-[8px] border-0 cursor-pointer bg-primary text-white hover:bg-primary/90"
-                    disabled={loading}
+                    disabled={loading || (pwdTouched && !isPasswordStrong)}
                 >
                     {loading ? "Creating Account..." : "Create Account"}
                 </button>

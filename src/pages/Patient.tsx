@@ -34,6 +34,7 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import type { TabType } from "../types/patient";
 import SymptomReportNew from "../patient/SymptomReportNew";
 import DocumentNew from "../patient/DocumentNew";
+import AuditTrailViewer from "../components/AuditTrailViewer";
 
 const Patient: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -313,6 +314,11 @@ const Patient: React.FC = () => {
     });
   }, [patient]);
 
+  const canManageStaff = ['admin'].includes(
+    currentUser?.role?.toLowerCase() ?? ''
+  ) || currentUser?.organizationId != null;
+
+
   const lifestyleData = useMemo(() => {
     const latest = patient?.patientLifestyle?.[patient.patientLifestyle.length - 1];
     const foodGroups = latest?.dietFoodGroups as Record<string, string> | undefined;
@@ -358,14 +364,58 @@ const Patient: React.FC = () => {
 
   // --- Early returns ---
   if (loading) return <LoadingSpinner message="Loading patient data..." size="lg" fullPage />;
-  if (error || !patient) return (
-    <div className="p-10 text-center">
-      <div className="text-red-500 mb-4">Error: {error || "Patient not found"}</div>
-      <button onClick={() => window.history.back()} className="px-4 py-2 bg-[#008540] text-white rounded-md hover:bg-[#006633]">
-        Go Back
-      </button>
-    </div>
-  );
+  if (error || !patient) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center px-6">
+        <div className="w-full max-w-md rounded-2xl  bg-white p-8 ">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-8 w-8 text-red-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v4m0 4h.01M10.29 3.86l-8 14A1 1 0 003.14 19h17.72a1 1 0 00.85-1.5l-8-14a1 1 0 00-1.72 0z"
+              />
+            </svg>
+          </div>
+
+          <div className="mt-6 text-center">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {patient ? "Something went wrong" : "Patient not found"}
+            </h2>
+
+            <p className="mt-2 text-sm text-gray-500">
+              {error
+                ? error
+                : "The patient you're looking for doesn't exist or may have been removed."}
+            </p>
+          </div>
+
+          <div className="mt-8 flex gap-3">
+            <button
+              onClick={() => window.history.back()}
+              className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            >
+              Go Back
+            </button>
+
+            <button
+              onClick={() => window.location.reload()}
+              className="flex-1 rounded-xl bg-[#008540] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#006633]"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const getStatusBorderClass = (): string => {
     if (!patient?.visits || patient.visits.length === 0) {
@@ -581,19 +631,21 @@ const Patient: React.FC = () => {
                   </button>
                   {tabDropdownOpen && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 overflow-hidden">
-                      {(["overview", "profile", "medication", "documents", "notes"] as const).map((tab) => (
-                        <button
-                          key={tab}
-                          onClick={() => {
-                            setActiveTab(tab);
-                            setTabDropdownOpen(false);
-                            if (tab === "documents") { setSelectedDocument([]); setSelectedDocumentTitle(""); }
-                          }}
-                          className={`w-full p-3 text-left text-sm hover:bg-gray-50 capitalize ${activeTab === tab ? 'bg-[#008540]/10 text-[#008540] font-medium' : 'text-gray-700'}`}
-                        >
-                          {tab}
-                        </button>
-                      ))}
+                      {(["overview", "profile", "medication", "documents", "notes", "audit"] as const)
+                        .filter((tab) => tab !== "audit" || canManageStaff)
+                        .map((tab) => (
+                          <button
+                            key={tab}
+                            onClick={() => {
+                              setActiveTab(tab);
+                              setTabDropdownOpen(false);
+                              if (tab === "documents") { setSelectedDocument([]); setSelectedDocumentTitle(""); }
+                            }}
+                            className={`w-full p-3 text-left text-sm hover:bg-gray-50 capitalize ${activeTab === tab ? 'bg-[#008540]/10 text-[#008540] font-medium' : 'text-gray-700'}`}
+                          >
+                            {tab}
+                          </button>
+                        ))}
                     </div>
                   )}
                 </div>
@@ -604,8 +656,9 @@ const Patient: React.FC = () => {
 
               {/* Desktop: tab list */}
               <ul className="hidden lg:flex my-10 list-none flex-row gap-[25px] text-[#4f4535d9] cursor-pointer">
-                {(["overview", "profile", "medication", "documents", "notes"] as const).map((tab) => (
-                  <li
+                {(["overview", "profile", "medication", "documents", "notes", "audit"] as const)
+                  .filter((tab) => tab !== "audit" || canManageStaff)
+                  .map((tab) => (<li
                     key={tab}
                     className={`relative pb-[5px] transition-all duration-300 text-sm ${activeTab === tab ? "font-semibold text-black/80 border-b border-black" : "hover:text-black/80"}`}
                     onClick={() => {
@@ -615,7 +668,7 @@ const Patient: React.FC = () => {
                   >
                     {tab.charAt(0).toUpperCase() + tab.slice(1)}
                   </li>
-                ))}
+                  ))}
               </ul>
 
               {/* Desktop: action buttons */}
@@ -675,6 +728,7 @@ const Patient: React.FC = () => {
                   onEscalate={handleEscalate}
                 />
               )}
+              {activeTab === "audit" && <AuditTrailViewer patientId={patient.id} patientName={patient.name} />}
               {activeTab === "note" && <Note note={selectedNote} user={currentUser ?? { id: '' }} onBack={() => setActiveTab("notes")} />}
               {activeTab === "notepad" && <Notepad patient={patient} user={currentUser ?? { id: '' }} />}
             </div>

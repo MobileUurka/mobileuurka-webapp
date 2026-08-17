@@ -5,7 +5,14 @@ const IS_PROD = import.meta.env.PROD;
 
 /** Auth endpoints that set/read the HttpOnly refresh cookie. */
 function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(url, { credentials: 'include', ...init });
+  return fetch(url, {
+    credentials: 'include',
+    ...init,
+    headers: {
+      'X-Client-App': 'mobileuurka-web',
+      ...init.headers,
+    },
+  });
 }
 
 export interface LoginCredentials {
@@ -121,7 +128,28 @@ export interface AuthResponse {
 let isRefreshingToken = false;
 let refreshTokenPromise: Promise<string | null> | null = null;
 
+const SIGNUP_TOKEN_KEY = 'signup_token';
+
 export const authService = {
+
+  setSignupToken(token: string) {
+    sessionStorage.setItem(SIGNUP_TOKEN_KEY, token);
+  },
+
+  getSignupToken(): string | null {
+    return sessionStorage.getItem(SIGNUP_TOKEN_KEY);
+  },
+
+  clearSignupToken() {
+    sessionStorage.removeItem(SIGNUP_TOKEN_KEY);
+  },
+
+  signupFlowHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {};
+    const signupToken = this.getSignupToken();
+    if (signupToken) headers['x-signup-token'] = signupToken;
+    return headers;
+  },
 
   // Sign in
   async signIn(credentials: LoginCredentials): Promise<AuthResponse> {
@@ -178,10 +206,14 @@ export const authService = {
       throw result;
     }
 
+    const signupToken = (result as { data?: { signupToken?: string } }).data?.signupToken;
+    if (signupToken) {
+      this.setSignupToken(signupToken);
+    }
+
     return result;
   },
 
-  // Resend signup OTP
   async resendSignupOTP(data: ResendOTPData): Promise<AuthResponse> {
     const response = await authFetch(`${API_URL}/auth/signup/resend-otp`, {
       method: 'POST',
@@ -263,6 +295,7 @@ export const authService = {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        ...this.signupFlowHeaders(),
       },
     });
 
@@ -281,6 +314,7 @@ export const authService = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...this.signupFlowHeaders(),
       },
       body: JSON.stringify(data),
     });
@@ -290,6 +324,8 @@ export const authService = {
     if (!response.ok) {
       throw result;
     }
+
+    this.clearSignupToken();
 
     if (result.data) {
       // Set encryption key and store auth data

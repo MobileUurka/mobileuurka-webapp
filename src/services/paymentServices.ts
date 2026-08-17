@@ -1,30 +1,38 @@
 /**
- * =========================
- * PUBLIC REQUEST HELPER
- * =========================
+ * Payment API — uses JWT auth for logged-in users or signup token during onboarding.
+ * Never ships internal API keys to the browser.
  */
-async function publicRequest(endpoint: string, options: any = {}) {
-  const BASE_URL =
-    import.meta.env.VITE_API_URL || "http://localhost:5500/api/v1";
+import { authService } from './authServices';
+import { api } from './apiClient';
+
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5500/api/v1';
+
+function paymentHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const signupToken = authService.getSignupToken();
+  if (signupToken) {
+    headers['x-signup-token'] = signupToken;
+  }
+  return headers;
+}
+
+async function paymentRequest(endpoint: string, options: RequestInit = {}) {
+  const token = authService.getAccessToken();
+  const headers = {
+    ...paymentHeaders(),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
 
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
+    headers,
+    credentials: token ? 'include' : options.credentials,
   });
 
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || "Request failed");
+  if (!response.ok) throw new Error(data.error || data.message || 'Request failed');
   return data;
-}
-
-function apiHeaders() {
-  const headers: Record<string, string> = {};
-  const key = import.meta.env.VITE_INTERNAL_API_KEY;
-  if (key) headers["x-api-key"] = key;
-  return headers;
 }
 
 /**
@@ -34,7 +42,7 @@ function apiHeaders() {
  */
 export interface PaymentRequest {
   planId: string;
-  paymentMethod: "mpesa" | "card";
+  paymentMethod: 'mpesa' | 'card';
   phoneNumber?: string;
   guestEmail?: string;
   features?: string[];
@@ -54,7 +62,7 @@ export interface PaymentPlan {
   name: string;
   price: number;
   currency: string;
-  interval: "month" | "year";
+  interval: 'month' | 'year';
   features: string[];
   popular?: boolean;
 }
@@ -63,13 +71,11 @@ export interface PaymentResponse {
   success: boolean;
   message: string;
   data?: {
-    provider: "mpesa" | "stripe";
+    provider: 'mpesa' | 'stripe';
     paymentId: string;
-    status: "pending" | "processing" | "completed" | "failed";
-    // M-Pesa
+    status: 'pending' | 'processing' | 'completed' | 'failed';
     merchantRequestId?: string;
     checkoutRequestId?: string;
-    // Stripe
     stripeSessionId?: string;
     stripeUrl?: string;
   };
@@ -81,39 +87,39 @@ export interface PaymentResponse {
  * =========================
  */
 export const paymentService = {
-  /**
-   * INITIATE PAYMENT
-   */
   async processPayment(request: PaymentRequest): Promise<PaymentResponse> {
     try {
-      const response = await publicRequest("/payments/initiate", {
-        method: "POST",
-        headers: apiHeaders(),
-        body: JSON.stringify({
-          paymentMethod: request.paymentMethod,
-          planId: request.planId,
-          phoneNumber: request.phoneNumber,
-          features: request.features,
-          email: request.guestEmail ?? request.userData?.email,
-          userData: request.userData,
-          organizationId: request.organizationId ?? request.userData?.organizationId,
-          returnTo: request.returnTo,
-        }),
-      });
+      const payload = {
+        paymentMethod: request.paymentMethod,
+        planId: request.planId,
+        phoneNumber: request.phoneNumber,
+        features: request.features,
+        email: request.guestEmail ?? request.userData?.email,
+        userData: request.userData,
+        organizationId: request.organizationId ?? request.userData?.organizationId,
+        returnTo: request.returnTo,
+      };
+
+      const response = authService.getAccessToken()
+        ? await api.post('/payments/initiate', payload)
+        : await paymentRequest('/payments/initiate', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
 
       const { provider, data } = response;
 
       return {
         success: true,
-        message: "Payment initiated successfully",
+        message: 'Payment initiated successfully',
         data: {
           provider,
           paymentId: data.merchantRequestId ?? data.id,
           merchantRequestId: data.merchantRequestId ?? data.id,
           checkoutRequestId: data.checkoutRequestId,
           stripeSessionId: data.id,
-          stripeUrl: data.stripeUrl ?? data.url,   // ← prefer explicit alias, fall back to url
-          status: "pending",
+          stripeUrl: data.stripeUrl ?? data.url,
+          status: 'pending',
         },
       };
     } catch (error: unknown) {
@@ -124,15 +130,12 @@ export const paymentService = {
     }
   },
 
-  /**
-   * CHECK STATUS (single poll)
-   */
   async checkPaymentStatus(merchantRequestId: string) {
     try {
-      const response = await publicRequest(
-        `/payments/verify/${merchantRequestId}`,
-        { method: "GET", headers: apiHeaders() }
-      );
+      const response = authService.getAccessToken()
+        ? await api.get(`/payments/verify/${merchantRequestId}`)
+        : await paymentRequest(`/payments/verify/${merchantRequestId}`, { method: 'GET' });
+
       return {
         success: response.success,
         canProceed: response.canProceed,
@@ -150,9 +153,6 @@ export const paymentService = {
     }
   },
 
-  /**
-   * POLL (M-Pesa — waits for callback to flip status to completed)
-   */
   async pollPaymentStatus(
     merchantRequestId: string,
     maxAttempts = 30,
@@ -164,69 +164,66 @@ export const paymentService = {
       if (status.canProceed) {
         return {
           success: true,
-          message: "Payment completed successfully",
+          message: 'Payment completed successfully',
           data: {
             paymentId: merchantRequestId,
             merchantRequestId,
-            provider: "mpesa",
-            status: "completed",
+            provider: 'mpesa',
+            status: 'completed',
           },
         };
       }
 
       if (status.success && !status.shouldRetry) {
-        return { success: false, message: status.message || "Payment failed" };
+        return { success: false, message: status.message || 'Payment failed' };
       }
 
       await new Promise((r) => setTimeout(r, intervalMs));
     }
 
-    return { success: false, message: "Payment verification timed out" };
+    return { success: false, message: 'Payment verification timed out' };
   },
 
-  /**
-   * PLANS (static — mirrors backend PAYMENT_PLANS)
-   */
   async getPlans(): Promise<PaymentPlan[]> {
     return [
       {
-        id: "basic",
-        name: "Basic",
+        id: 'basic',
+        name: 'Basic',
         price: 1,
-        currency: "KES",
-        interval: "month",
+        currency: 'KES',
+        interval: 'month',
         features: [
-          "Up to 50 patients",
-          "Basic patient management",
-          "Simple reporting",
-          "Email support",
+          'Up to 50 patients',
+          'Basic patient management',
+          'Simple reporting',
+          'Email support',
         ],
       },
       {
-        id: "professional",
-        name: "Professional",
+        id: 'professional',
+        name: 'Professional',
         price: 5000,
-        currency: "KES",
-        interval: "month",
+        currency: 'KES',
+        interval: 'month',
         popular: true,
         features: [
-          "Up to 200 patients",
-          "Advanced patient management",
-          "Analytics",
-          "Priority support",
+          'Up to 200 patients',
+          'Advanced patient management',
+          'Analytics',
+          'Priority support',
         ],
       },
       {
-        id: "enterprise",
-        name: "Enterprise",
+        id: 'enterprise',
+        name: 'Enterprise',
         price: 10000,
-        currency: "KES",
-        interval: "month",
+        currency: 'KES',
+        interval: 'month',
         features: [
-          "Unlimited patients",
-          "Full feature access",
-          "Custom integrations",
-          "24/7 support",
+          'Unlimited patients',
+          'Full feature access',
+          'Custom integrations',
+          '24/7 support',
         ],
       },
     ];
