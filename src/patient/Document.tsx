@@ -24,6 +24,9 @@ const cleanKey = (key: string): string =>
 const withUnit = (value: string, key: string): string => {
   const k = key.toLowerCase().replace(/[^a-z]/g, "");
   if (isNaN(parseFloat(value))) return value;
+  // Blood sugar (fbs, fbs1, fbs2, randombloodsugar) is stored in mmol/L; the lab form
+  // converts mg/dL entries unrounded, so show 1 decimal here.
+  if (k.includes("fbs") || k.includes("randombloodsugar")) return `${parseFloat(value).toFixed(1)} mmol/L`;
   const map: [string[], string][] = [
     [["height"], "cm"],
     [["weight"], "kg"],
@@ -31,7 +34,7 @@ const withUnit = (value: string, key: string): string => {
     [["gestationweek"], "wks"],
     [["alp", "alt", "ast"], "U/L"],
     [["albumin"], "g/dL"],
-    [["bilirubin", "creatinine", "uricacid", "bun", "fbs", "randombloodsugar"], "mg/dL"],
+    [["bilirubin", "creatinine", "uricacid", "bun"], "mg/dL"],
     [["potassium", "sodium", "chloride", "bicarbonate"], "mEq/L"],
     [["hba1c", "ht"], "%"],
     [["haemoglobin", "mchc"], "g/dL"],

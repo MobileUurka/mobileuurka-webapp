@@ -17,6 +17,15 @@ import {
   type GestationSource,
 } from '../utils/gestationWeek';
 import { uploadService } from '../services/uploadService';
+import {
+  GLUCOSE_FIELDS,
+  GLUCOSE_UNIT_FIELD,
+  glucoseToMmol,
+  hasGlucoseValue,
+  loadGlucoseUnit,
+  mgdlToMmol,
+  saveGlucoseUnit,
+} from '../utils/glucoseUnits';
 
 // Simple loading spinner component
 const LoadingSpinner = ({ size = 20 }: { size?: number }) => (
@@ -118,7 +127,12 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
   const navigate = useNavigate();
   const { tabId } = useParams();
   const { user, isReady } = useAuth();
-  const [formData, setFormData] = useState<Record<string, any>>(initialData);
+  const [formData, setFormData] = useState<Record<string, any>>(() =>
+    // Lab form: start from the blood sugar unit chosen last time on this device (none on first use)
+    fields.some(f => f.name === GLUCOSE_UNIT_FIELD) && !initialData[GLUCOSE_UNIT_FIELD]
+      ? { ...initialData, [GLUCOSE_UNIT_FIELD]: loadGlucoseUnit() }
+      : initialData
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentPage, setCurrentPage] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -431,6 +445,8 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
 
     setFormData(newFormData);
 
+    if (name === GLUCOSE_UNIT_FIELD) saveGlucoseUnit(value);
+
     // Live validation: gravida & parity (viable+loss notation)
     if ((name === 'gravida' || name === 'parityNotation') && newFormData.gravida != null && newFormData.parityNotation) {
       const gravida = Number(newFormData.gravida);
@@ -567,12 +583,15 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
 
       const value = formData[field.name];
 
-      // REQUIRED VALIDATION
+      // REQUIRED VALIDATION. The blood sugar unit is required whenever any glucose
+      // value is entered, since the number means nothing to the rules without it.
       if (
-        field.required &&
+        (field.required || (field.name === GLUCOSE_UNIT_FIELD && hasGlucoseValue(formData))) &&
         (value === undefined || value === null || value === '')
       ) {
-        newErrors[field.name] = `${field.label} is required`;
+        newErrors[field.name] = field.name === GLUCOSE_UNIT_FIELD
+          ? 'Choose the unit your lab reports blood sugar in'
+          : `${field.label} is required`;
         return;
       }
 
@@ -677,7 +696,8 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
     if (validateAllFields() && validateBusinessRules()) {
       setIsSubmitting(true);
       try {
-        const cleanedFormData = { ...formData };
+        // Blood sugar goes to the API in mmol/L whatever unit was entered
+        const cleanedFormData = { ...glucoseToMmol(formData) };
         fields.forEach(field => {
           if (field.persist === false) {
             delete cleanedFormData[field.name];
@@ -850,6 +870,8 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
         <label className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
           <span>
             {field.label}
+            {GLUCOSE_FIELDS.includes(field.name as typeof GLUCOSE_FIELDS[number]) &&
+              ` (${formData[GLUCOSE_UNIT_FIELD] || 'choose unit'})`}
             {field.required && <span className="text-red-500 ml-1">*</span>}
           </span>
           {(field.name === 'bmi' || field.name === 'map') && (
@@ -952,16 +974,16 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
               value={formData[field.name] || ''}
               onChange={(e) => handleInputChange(field.name, e.target.value)}
               disabled={isReadonly || (field.name === 'hospital' && loadingHospitals)}
-              className={`capitalize w-full px-3 py-3 pr-10 border rounded-lg appearance-none focus:outline-none focus:ring-0 focus:ring-[#008540] ${hasError ? 'border-red-500' : 'border-gray-300'
+              className={`${field.name === GLUCOSE_UNIT_FIELD ? '' : 'capitalize'} w-full px-3 py-3 pr-10 border rounded-lg appearance-none focus:outline-none focus:ring-0 focus:ring-[#008540] ${hasError ? 'border-red-500' : 'border-gray-300'
                 } ${isReadonly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             >
-              <option value="" className='capitalize'>
+              <option value="" className={field.name === GLUCOSE_UNIT_FIELD ? '' : 'capitalize'}>
                 {field.name === 'hospital' && loadingHospitals
                   ? 'Loading hospitals...'
                   : `Select ${field.label}`}
               </option>
               {fieldOptions?.map(option => (
-                <option className='capitalize' key={option} value={option}>{option}</option>
+                <option className={field.name === GLUCOSE_UNIT_FIELD ? '' : 'capitalize'} key={option} value={option}>{option}</option>
               ))}
               {field.name === 'hospital' && (
                 <>
@@ -1072,6 +1094,16 @@ const ScreeningForm = ({ title, fields, onSubmit, initialData = {}, isLastStep =
               } ${isReadonly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
           />
         )}
+
+        {/* Show what will be stored, to 1 decimal; the value sent stays unrounded */}
+        {formData[GLUCOSE_UNIT_FIELD] === 'mg/dL' &&
+          GLUCOSE_FIELDS.includes(field.name as typeof GLUCOSE_FIELDS[number]) &&
+          formData[field.name] !== undefined && formData[field.name] !== null && formData[field.name] !== '' &&
+          !Number.isNaN(Number(formData[field.name])) && (
+            <span className="text-gray-500 text-xs mt-1">
+              Saved as {mgdlToMmol(Number(formData[field.name])).toFixed(1)} mmol/L
+            </span>
+          )}
 
         {hasError && (
           <span className="text-red-500 text-xs mt-1">{hasError}</span>

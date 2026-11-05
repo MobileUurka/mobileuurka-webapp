@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Overlay from '../components/Overlay';
 import OTPForm from '../components/OTPForm';
@@ -20,9 +20,9 @@ function Verify() {
 
   const handleVerificationSuccess = (token?: string) => {
     if (verificationType === 'organization') {
-      // Store the email for password change
+      // Keep the set-password token from verify-email for the password step
       setUserEmail(email);
-      // Move to password change step
+      setVerificationToken(token || '');
       setIsOTPVerified(true);
     } else if (verificationType === 'password_reset') {
       // For password reset, also move to password change step and store token
@@ -54,6 +54,12 @@ function Verify() {
     }
   };
 
+  // Back to the code step after the set-password token expired or was used
+  const handleVerifyAgain = useCallback(() => {
+    setVerificationToken('');
+    setIsOTPVerified(false);
+  }, []);
+
   const Left = useMemo(
     () => (
       <div className="form">
@@ -63,13 +69,14 @@ function Verify() {
         {isOTPVerified && (
           <PasswordChangeForm
             email={userEmail}
-            token={verificationType === 'password_reset' ? verificationToken : undefined}
+            token={verificationToken || undefined}
             mode={verificationType === 'password_reset' ? 'reset' : 'setup'}
             onPasswordChanged={handlePasswordChanged}
+            onVerifyAgain={verificationType === 'organization' ? handleVerifyAgain : undefined}
           />
         )}
       </div>
-    ), [isOTPVerified, userEmail, verificationToken, verificationType, handlePasswordChanged]
+    ), [isOTPVerified, userEmail, verificationToken, verificationType, handlePasswordChanged, handleVerifyAgain]
   );
 
   const Right = useMemo(

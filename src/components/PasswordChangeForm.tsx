@@ -7,6 +7,8 @@ interface PasswordChangeFormProps {
   token?: string;
   mode?: 'setup' | 'reset';
   onPasswordChanged?: () => void;
+  // Setup mode only: return to the emailed-code step to get a fresh set-password token.
+  onVerifyAgain?: () => void;
 }
 
 // ── Password policy (kept in sync with Auth.tsx / SignUpForm.tsx) ───────────
@@ -52,13 +54,19 @@ const RequirementRow = ({ met, label }: { met: boolean; label: string }) => (
   </li>
 );
 
-const PasswordChangeForm = ({ email, token, mode = 'setup', onPasswordChanged }: PasswordChangeFormProps) => {
+const VERIFY_AGAIN_MESSAGE =
+  'Your verification has expired or was already used. Please verify your email again to get a new code, then set your password.';
+
+const PasswordChangeForm = ({ email, token, mode = 'setup', onPasswordChanged, onVerifyAgain }: PasswordChangeFormProps) => {
   const [formData, setFormData] = useState({
     newPassword: '',
     confirmPassword: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Setup needs the single-use setPasswordToken from verify-email (valid 15 minutes);
+  // with none, or once the backend rejects it, the only way on is to verify again.
+  const [needsReverify, setNeedsReverify] = useState<boolean>(mode === 'setup' && !token);
   const [pwdTouched, setPwdTouched] = useState(false);
   const [showPasswords, setShowPasswords] = useState({
     new: false,
@@ -107,6 +115,11 @@ const PasswordChangeForm = ({ email, token, mode = 'setup', onPasswordChanged }:
 
     if (!validateForm()) return;
 
+    if (mode === 'setup' && !token) {
+      setNeedsReverify(true);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -121,13 +134,18 @@ const PasswordChangeForm = ({ email, token, mode = 'setup', onPasswordChanged }:
           },
           body: JSON.stringify({
             email,
-            newPassword: formData.newPassword
+            newPassword: formData.newPassword,
+            setPasswordToken: token
           })
         });
 
         const result = await response.json();
 
         if (!response.ok) {
+          if (result.code === 'SET_PASSWORD_TOKEN_INVALID') {
+            setNeedsReverify(true);
+            return;
+          }
           throw new Error(result.message || 'Failed to set password');
         }
 
@@ -323,6 +341,21 @@ const PasswordChangeForm = ({ email, token, mode = 'setup', onPasswordChanged }:
         )}
       </div>
 
+      {needsReverify && (
+        <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm">
+          <p>{VERIFY_AGAIN_MESSAGE}</p>
+          {onVerifyAgain && (
+            <button
+              type="button"
+              onClick={onVerifyAgain}
+              className="mt-2 text-primary font-medium cursor-pointer hover:underline bg-transparent border-0 p-0"
+            >
+              Verify email again
+            </button>
+          )}
+        </div>
+      )}
+
       {error && (
         <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm">
           {error}
@@ -332,7 +365,7 @@ const PasswordChangeForm = ({ email, token, mode = 'setup', onPasswordChanged }:
       <button
         type="submit"
         className="w-full p-4 rounded-lg border-0 cursor-pointer bg-primary text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-        disabled={loading || (pwdTouched && (!isPasswordStrong || !passwordsMatch))}
+        disabled={loading || needsReverify || (pwdTouched && (!isPasswordStrong || !passwordsMatch))}
       >
         {loading ? 'Setting Password...' : mode === 'reset' ? 'Reset Password' : 'Set Password'}
       </button>

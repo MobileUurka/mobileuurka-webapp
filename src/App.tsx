@@ -22,7 +22,6 @@ import Verify from './pages/Verify';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Onboarding from './pages/Onboarding';
-import ChangePassword from './pages/ChangePassword';
 import LoadingSpinner from './components/LoadingSpinner';
 import { useAppDispatch } from './store/hooks';
 import { resetStore } from './store';
@@ -142,7 +141,6 @@ function App() {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/verify" element={<Verify />} />
               <Route path="/onboarding" element={<Onboarding />} />
-              <Route path="/change-password" element={<ChangePassword onPasswordChanged={checkAuth} />} />
               <Route path="*" element={<Navigate to="/auth" replace />} />
             </>
           ) : 

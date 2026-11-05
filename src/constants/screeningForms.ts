@@ -1,3 +1,5 @@
+import { GLUCOSE_UNIT_FIELD, GLUCOSE_UNITS } from '../utils/glucoseUnits';
+
 interface ChipOption {
   field: string;
   label: string;
@@ -659,13 +661,16 @@ export const SCREENING_FORMS: Record<string, { title: string; fields: FormField[
       { name: 'uricAcid', label: 'Uric Acid (mg/dL)', type: 'number', required: true },
       { name: 'bun', label: 'BUN (mg/dL)', type: 'number', required: true },
 
-      // Blood Sugar Tests
+      // Blood Sugar Tests. The unit choice applies to the four glucose fields only; the
+      // form converts mg/dL to mmol/L before sending (see utils/glucoseUnits.ts), and the
+      // field labels show the chosen unit.
+      { name: GLUCOSE_UNIT_FIELD, label: 'Blood Sugar Unit', type: 'select', options: GLUCOSE_UNITS, persist: false },
       { name: 'fbs', label: 'Fasting Blood Sugar', type: 'number', required: true },
-      { name: 'fbs1', label: 'FBS 1 Hour (mg/dL)', type: 'number' },
-      { name: 'fbs2', label: 'FBS 2 Hour (mg/dL)', type: 'number' },
+      { name: 'fbs1', label: 'FBS 1 Hour', type: 'number' },
+      { name: 'fbs2', label: 'FBS 2 Hour', type: 'number' },
       { name: 'hba1c', label: 'HbA1c', type: 'select', required: true, options: ['normal', 'prediabetic', 'diabetic'] },
       { name: 'hba1c_value', label: 'HbA1c Value (%)', type: 'number', dependsOn: { field: 'hba1c', value: ['prediabetic', 'diabetic'] } },
-      { name: 'randombloodsugar', label: 'Random Blood Sugar (mg/dL)', type: 'number', required: true },
+      { name: 'randombloodsugar', label: 'Random Blood Sugar', type: 'number', required: true },
 
       // Hematology
       { name: 'ht', label: 'Hematocrit (%)', type: 'number', required: true },

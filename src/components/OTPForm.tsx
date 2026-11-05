@@ -150,9 +150,10 @@ const OTPForm = ({ email, verificationType = 'signup', organizationSlug, onVerif
             });
           }
         } else {
-          // For organization, call success callback
+          // For organization, hand over the single-use setPasswordToken that
+          // verify-email returns; /auth/set-password rejects requests without it.
           if (onVerificationSuccess) {
-            onVerificationSuccess();
+            onVerificationSuccess(response.data?.setPasswordToken);
           }
         }
       }

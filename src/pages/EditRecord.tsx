@@ -7,6 +7,7 @@ import PatientSelector from '../components/PatientSelector';
 import ScreeningForm from '../components/ScreeningForm';
 import { formatParityNotation, readParityFromRecord, toParityStorage } from '../utils/gravidaParity';
 import { buildDietFoodGroups, flattenDietFoodGroups, stripDietFoodGroupFields } from '../utils/lifestyleDiet';
+import { GLUCOSE_UNIT_FIELD } from '../utils/glucoseUnits';
 
 // Small inline spinner (matches the one in ScreeningForm)
 const MiniSpinner = () => (
@@ -172,6 +173,9 @@ const EditRecord = () => {
     const flattenFn = FLATTEN[type.tableName] ?? ((r: any) => r);
     setPrefillData({
       ...flattenFn(option.raw),
+      // Stored blood sugar is in mmol/L (the form converts before saving), so an edit
+      // starts in mmol/L rather than the unit last chosen for new entries.
+      ...(type.tableName === 'labwork' ? { [GLUCOSE_UNIT_FIELD]: 'mmol/L' } : {}),
       patientId,
       patientName,
     });
